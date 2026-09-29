@@ -95,7 +95,7 @@ An optional `package_path` selects a guest-uploaded Irisin `.deb` instead.
 The path must be `/var/root/Library/Caches/vphoned-irisin-<UUID>.deb`; vphoned
 opens it without following symlinks, requires a regular file of at most 64 MiB,
 and validates the Debian package name, architecture, app version, executables,
-and launchd plist before installing. The Guest menu's Option alternate opens
+and launchd plist before installing. The Apps menu's Option alternate opens
 a file picker, uploads the selected package, and chooses the layout. The default
 menu item retains the verified latest-release download.
 Rootless uses `/var/jb`. RootHide reuses the sole valid `.jbroot-<16 hex>` under
@@ -165,9 +165,9 @@ are both removed. The daemon rejects a changed path and symlinked child
 directories. It unloads each bootstrap's launch daemons, unregisters its apps,
 deletes both rootless and RootHide roots, marks the completion record uninstalled,
 then schedules a full guest reboot. `"reboot":false` skips the reboot; holding
-Option on the Guest menu's uninstall item selects this mode. If cleanup fails, the
+Option on the Apps menu's uninstall item selects this mode. If cleanup fails, the
 installed record remains so the operation can be retried. Irisin's mobile
-Documents data outside the bootstrap is retained. Guest > Uninstall Bootstrap…
+Documents data outside the bootstrap is retained. Apps > Uninstall Bootstrap…
 shows every path in a destructive confirmation alert before sending the request.
 
 ## HTTP and WebSocket contract
@@ -270,7 +270,7 @@ request carries `"force": true`.
 | Area | Methods |
 | --- | --- |
 | Device | `device.snapshot`, `device.info` (snapshot plus network, screen, rotation, brightness, volume, low power, Developer Mode, agent), `device.screen`, `device.network`, `device.ioreg {plane}`, `device.environment`, `device.basebin {archive?}` |
-| Display, audio | `display.brightness {value?}`, `display.rotation {orientation?}`, `display.rotation_lock {locked}`, `audio.volume {value?, category?}`, `audio.state` |
+| Display, audio | `display.brightness {value?}`, `display.rotation {orientation?}`, `display.orientation` (`{degrees, source}`: SpringBoard's interface orientation without a screen capture, for polling; capability `display_orientation`), `display.rotation_lock {locked}`, `audio.volume {value?, category?}`, `audio.state` |
 | Input | `input.touch`, `input.hid`, `input.button {name}`, `input.key {name}`, `input.type {text, delay_ms?}`, `input.paste {text}`, `input.tap`, `input.double_tap`, `input.long_press`, `input.swipe`, `input.drag {points}`, `input.touch_sequence {events}` — gesture coordinates are screen points |
 | UI | `ui.tree` (alias `accessibility.tree`), `ui.element_at`, `ui.tap_element`, `ui.wait`, `ui.wait_gone`, `ui.ocr {languages?, min_confidence?}`, `ui.describe`, `screen.screenshot` |
 | Processes | `processes.list {filter?}`, `processes.kill {pid, signal?}` **force**, `memory.jetsam`, `memory.pressure` (only the three kernel memory sysctls, for polling) |

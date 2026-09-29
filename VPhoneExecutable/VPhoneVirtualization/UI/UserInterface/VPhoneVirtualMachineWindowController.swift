@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Virtualization
+import VPhoneCoreKit
 
 @MainActor
 class VPhoneVirtualMachineWindowController: NSObject {
@@ -8,7 +9,6 @@ class VPhoneVirtualMachineWindowController: NSObject {
     private weak var control: VPhoneGuestControl?
     private weak var virtualMachineView: VPhoneVirtualMachineView?
     private(set) var touchIDMonitor: VPhoneTouchIDMonitor?
-    private var menuKeyMonitor: Any?
     private var homeButton: NSButton?
     private var subtitleLabel: NSTextField?
 
@@ -33,14 +33,18 @@ class VPhoneVirtualMachineWindowController: NSObject {
         view.capturesSystemKeys = true
         view.keySender = keySender
         view.control = control
+        view.clipboardSync = VPhoneClipboardSync(control: control)
         virtualMachineView = view
-        let vmView: NSView = view
+        let container = VPhoneDisplayContainerView(displayView: view)
+        displayContainer = container
 
         let scale = CGFloat(screenScale)
         let windowSize = NSSize(
             width: CGFloat(screenWidth) / scale,
             height: CGFloat(screenHeight) / scale,
         )
+        panelSize = windowSize
+        container.panelSize = windowSize
 
         let window = NSWindow(
             contentRect: NSRect(origin: .zero, size: windowSize),
@@ -54,7 +58,7 @@ class VPhoneVirtualMachineWindowController: NSObject {
         VPhoneAlert.hostWindow = window
         window.contentAspectRatio = windowSize
         window.title = name
-        window.contentView = vmView
+        window.contentView = container
 
         // The scene belongs to the VM, not to the app: every VM directory keeps
         // its own window frame, and a newly created VM opens centered instead
@@ -65,6 +69,9 @@ class VPhoneVirtualMachineWindowController: NSObject {
             window.center()
         }
         window.setFrameAutosaveName(sceneName)
+        // A frame saved while the guest was sideways is turned back: the guest
+        // boots in portrait, and the orientation poll turns it again if not.
+        applyOrientation(.portrait, to: window, force: true)
 
         // An empty unified toolbar gives the title bar its full height. The Home
         // button is a titlebar accessory rather than a toolbar item so that a
@@ -76,26 +83,17 @@ class VPhoneVirtualMachineWindowController: NSObject {
         let homeAccessory = makeHomeAccessory()
         window.addTitlebarAccessoryViewController(homeAccessory)
         updateHomeButton(connected: false)
+        pinWindowButtons(in: window)
         installTitle(name, in: window, trailingInset: homeAccessory.view.frame.width)
 
         let controller = NSWindowController(window: window)
         controller.showWindow(nil)
         windowController = controller
 
-        // capturesSystemKeys lets the VM view take every shortcut before the menu
-        // bar sees it. Offer each key press to the menu first; the guest gets
-        // only what no enabled menu item handles.
-        menuKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak window] event in
-            let handledByMenu = MainActor.assumeIsolated {
-                guard let window, event.window === window else { return false }
-                return NSApp.mainMenu?.performKeyEquivalent(with: event) == true
-            }
-            return handledByMenu ? nil : event
-        }
-
         keySender.window = window
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
+        placeWindowButtons()
         window.makeFirstResponder(view)
 
         let monitor = VPhoneTouchIDMonitor()
@@ -110,17 +108,119 @@ class VPhoneVirtualMachineWindowController: NSObject {
                 self.updateSubtitle(control: control)
             }
         }
+
+        // The menu sets the orientation before the guest turns, and the poll
+        // after; either way the window follows it.
+        control.observeInterfaceOrientation { [weak self, weak window] orientation in
+            guard let self, let window else { return }
+            applyOrientation(orientation ?? .portrait, to: window)
+        }
+        _ = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor in self?.pollOrientation() }
+        }
+    }
+
+    // MARK: - Orientation
+
+    private weak var displayContainer: VPhoneDisplayContainerView?
+    private var panelSize: NSSize = .zero
+    private var orientationPollInFlight = false
+
+    /// Asks vphoned for the interface orientation once a second. Guests
+    /// without `display.orientation` stay portrait. A read that overlaps a
+    /// rotation the menu started is dropped: it may predate the turn.
+    private func pollOrientation() {
+        guard !orientationPollInFlight,
+              let control, control.isConnected, !control.isChangingOrientation,
+              control.guestCapabilities.contains("display_orientation")
+        else { return }
+        orientationPollInFlight = true
+        Task {
+            defer { orientationPollInFlight = false }
+            guard let result = try? await control.call("display.orientation"),
+                  !control.isChangingOrientation,
+                  let degrees = (result["degrees"] as? NSNumber)?.intValue,
+                  let orientation = VPhoneDisplayOrientation(degrees: degrees)
+            else { return }
+            control.interfaceOrientation = orientation
+        }
+    }
+
+    /// Turns the VM view and gives the window the turned panel's aspect
+    /// ratio, in one animation. A windowed VM reshapes around its center; a
+    /// full-screen one keeps the screen and letterboxes the turned panel.
+    private func applyOrientation(_ orientation: VPhoneDisplayOrientation, to window: NSWindow, force: Bool = false) {
+        guard let container = displayContainer, force || container.orientation != orientation else { return }
+        window.contentAspectRatio = orientation.displayedSize(panel: panelSize)
+        var frame: NSRect?
+        if !window.styleMask.contains(.fullScreen) {
+            let current = window.contentRect(forFrameRect: window.frame)
+            let visible = window.screen.map { window.contentRect(forFrameRect: $0.visibleFrame) } ?? .zero
+            let target = orientation.contentRect(from: current, panel: panelSize, within: visible)
+            if target != current {
+                frame = window.frameRect(forContentRect: target)
+            }
+        }
+        container.turn(to: orientation, windowFrame: frame, animated: !force)
     }
 
     // MARK: - Title
 
-    /// AppKit leaves a wider gap after the window buttons than before them, so
-    /// the title is drawn here instead: the gap after the zoom button equals
-    /// the close button's inset from the window edge. `window.title` and
+    /// The title bar uses one gap everywhere: before the close button, between
+    /// the window buttons (AppKit's is 9 pt), after the zoom button and after
+    /// the Home button.
+    private static let titlebarSpacing: CGFloat = 12
+
+    private weak var buttonWindow: NSWindow?
+    private var observedButtons = Set<ObjectIdentifier>()
+
+    /// AppKit insets the close button 19 pt, puts the buttons back there
+    /// whenever it lays out the title bar, and may replace them when the
+    /// window is shown. They are placed again after each of those.
+    private func pinWindowButtons(in window: NSWindow) {
+        buttonWindow = window
+        let names: [Notification.Name] = [
+            NSWindow.didResizeNotification, NSWindow.didEndLiveResizeNotification,
+            NSWindow.didExitFullScreenNotification, NSWindow.didBecomeKeyNotification,
+            NSWindow.didResignKeyNotification, NSWindow.didBecomeMainNotification,
+            NSWindow.didChangeScreenNotification, NSWindow.didUpdateNotification,
+        ]
+        for name in names {
+            NotificationCenter.default.addObserver(
+                self, selector: #selector(windowButtonMoved), name: name, object: window,
+            )
+        }
+        placeWindowButtons()
+    }
+
+    @objc private func windowButtonMoved() {
+        placeWindowButtons()
+    }
+
+    private func placeWindowButtons() {
+        guard let window = buttonWindow else { return }
+        var x = Self.titlebarSpacing
+        for kind in [NSWindow.ButtonType.closeButton, .miniaturizeButton, .zoomButton] {
+            guard let button = window.standardWindowButton(kind) else { continue }
+            if observedButtons.insert(ObjectIdentifier(button)).inserted {
+                button.postsFrameChangedNotifications = true
+                NotificationCenter.default.addObserver(
+                    self, selector: #selector(windowButtonMoved), name: NSView.frameDidChangeNotification,
+                    object: button,
+                )
+            }
+            if button.frame.minX != x {
+                button.setFrameOrigin(NSPoint(x: x, y: button.frame.minY))
+            }
+            x = button.frame.maxX + Self.titlebarSpacing
+        }
+    }
+
+    /// The window's own title would sit AppKit's wider gap after the buttons,
+    /// so the name and subtitle are drawn here. `window.title` and
     /// `window.subtitle` are still set for the Window menu and accessibility.
     private func installTitle(_ name: String, in window: NSWindow, trailingInset: CGFloat) {
-        guard let close = window.standardWindowButton(.closeButton),
-              let zoom = window.standardWindowButton(.zoomButton),
+        guard let zoom = window.standardWindowButton(.zoomButton),
               let titlebar = zoom.superview,
               let frame = window.contentView?.superview
         else { return }
@@ -144,16 +244,11 @@ class VPhoneVirtualMachineWindowController: NSObject {
         stack.spacing = 0
         stack.translatesAutoresizingMaskIntoConstraints = false
         titlebar.addSubview(stack)
-        let inset = NSLayoutGuide(), gap = NSLayoutGuide()
-        frame.addLayoutGuide(inset)
-        frame.addLayoutGuide(gap)
         NSLayoutConstraint.activate([
-            inset.leadingAnchor.constraint(equalTo: frame.leadingAnchor),
-            inset.trailingAnchor.constraint(equalTo: close.leadingAnchor),
-            gap.leadingAnchor.constraint(equalTo: zoom.trailingAnchor),
-            gap.trailingAnchor.constraint(equalTo: stack.leadingAnchor),
-            gap.widthAnchor.constraint(equalTo: inset.widthAnchor),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: frame.trailingAnchor, constant: -trailingInset - 8),
+            stack.leadingAnchor.constraint(equalTo: zoom.trailingAnchor, constant: Self.titlebarSpacing),
+            stack.trailingAnchor.constraint(
+                lessThanOrEqualTo: frame.trailingAnchor, constant: -trailingInset - Self.titlebarSpacing,
+            ),
             stack.centerYAnchor.constraint(equalTo: zoom.centerYAnchor),
         ])
     }
@@ -164,8 +259,12 @@ class VPhoneVirtualMachineWindowController: NSObject {
         guard let window = windowController?.window else { return }
         var parts: [String] = []
         if control.isConnected {
-            if let version = control.guestIOSVersion, !version.isEmpty { parts.append("iOS \(version)") }
-            if let address = control.guestIPAddress, !address.isEmpty { parts.append(address) }
+            if let version = control.guestIOSVersion, !version.isEmpty {
+                parts.append("iOS \(version)")
+            }
+            if let address = control.guestIPAddress, !address.isEmpty {
+                parts.append(address)
+            }
         }
         let subtitle = parts.joined(separator: " - ")
         if window.subtitle != subtitle {
@@ -222,7 +321,7 @@ class VPhoneVirtualMachineWindowController: NSObject {
 
         // A titlebar accessory takes its width from the view's frame, so the
         // container is sized explicitly; otherwise the button collapses to 0.
-        let trailingInset: CGFloat = 12
+        let trailingInset = Self.titlebarSpacing
         let container = NSView()
         container.addSubview(button)
         NSLayoutConstraint.activate([

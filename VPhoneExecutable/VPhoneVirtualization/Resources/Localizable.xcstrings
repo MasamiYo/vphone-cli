@@ -1949,6 +1949,9 @@
         }
       }
     },
+    "Allow Network" : {
+
+    },
     "Allow Wi-Fi and cellular data for this app" : {
       "localizations" : {
         "ja" : {
@@ -1976,6 +1979,9 @@
           }
         }
       }
+    },
+    "Allowing network access…" : {
+
     },
     "Always" : {
       "localizations" : {
@@ -8019,6 +8025,40 @@
         }
       }
     },
+    "Dropped Files" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dropped Files"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ドロップしたファイル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "놓은 파일"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tệp đã thả"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖入的文件"
+          }
+        }
+      }
+    },
     "Edit" : {
       "localizations" : {
         "en" : {
@@ -9181,6 +9221,40 @@
         }
       }
     },
+    "Features" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Features"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "機能"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기능"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tính năng"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "功能"
+          }
+        }
+      }
+    },
     "File Browser" : {
       "localizations" : {
         "en" : {
@@ -9701,6 +9775,40 @@
         }
       }
     },
+    "Guest Agent" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guest Agent"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲストエージェント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "게스트 에이전트"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tác nhân máy khách"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "客体代理"
+          }
+        }
+      }
+    },
     "Guest Agent Hash" : {
       "localizations" : {
         "en" : {
@@ -9731,6 +9839,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "客体代理哈希"
+          }
+        }
+      }
+    },
+    "Guest Clipboard" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Guest Clipboard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲストのクリップボード"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "게스트 클립보드"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bảng nhớ tạm máy khách"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "客户机剪贴板"
           }
         }
       }
@@ -13271,6 +13413,9 @@
         }
       }
     },
+    "Network Access" : {
+
+    },
     "Network Policy" : {
       "localizations" : {
         "ja" : {
@@ -13298,6 +13443,12 @@
           }
         }
       }
+    },
+    "Network access for %@ did not change. Relaunch the app and try again." : {
+
+    },
+    "Network access is restricted" : {
+
     },
     "Network access may be restricted" : {
       "localizations" : {
@@ -18643,6 +18794,74 @@
         }
       }
     },
+    "Rotate Left" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rotate Left"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左に回転"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "왼쪽으로 회전"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoay trái"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向左旋转"
+          }
+        }
+      }
+    },
+    "Rotate Right" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rotate Right"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右に回転"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오른쪽으로 회전"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xoay phải"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "向右旋转"
+          }
+        }
+      }
+    },
     "Rotate the guest interface" : {
       "localizations" : {
         "ja" : {
@@ -19275,6 +19494,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已保存至 %@"
+          }
+        }
+      }
+    },
+    "Saved “%@” to On My iPhone › %@ in Files." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saved “%1$@” to On My iPhone › %2$@ in Files."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%1$@」を“ファイル”の「このiPhone内 › %2$@」に保存しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%1$@”을(를) 파일 앱의 ‘나의 iPhone › %2$@’에 저장했습니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã lưu “%1$@” vào Trên iPhone › %2$@ trong ứng dụng Tệp."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将“%1$@”保存到“文件”App 的“我的 iPhone › %2$@”。"
           }
         }
       }
@@ -22703,6 +22956,34 @@
         }
       }
     },
+    "The app in front does not support this orientation." : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前面のアプリはこの向きに対応していません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "앞에 있는 앱이 이 방향을 지원하지 않습니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ứng dụng đang mở không hỗ trợ hướng này."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前台应用不支持这个方向。"
+          }
+        }
+      }
+    },
     "The app, its data container and its plug-ins' data are removed from the guest. This cannot be undone." : {
       "localizations" : {
         "ja" : {
@@ -24163,6 +24444,34 @@
         }
       }
     },
+    "Unable to Rotate" : {
+      "localizations" : {
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "回転できません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "회전할 수 없음"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể xoay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法旋转"
+          }
+        }
+      }
+    },
     "Unable to add the keychain item. Try again." : {
       "localizations" : {
         "en" : {
@@ -24196,6 +24505,9 @@
           }
         }
       }
+    },
+    "Unable to allow network access for %@." : {
+
     },
     "Unable to capture the guest log. Check the connection. Retrying in 3 seconds." : {
       "localizations" : {

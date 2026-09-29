@@ -67,7 +67,7 @@ struct VPhoneLaunchpadControlCommands {
     // MARK: - Status
 
     private func status() -> [String: Any] {
-        let helper: String = switch model.helper.state {
+        let helper = switch model.helper.state {
         case .unknown: "unknown"
         case .notInstalled: "not installed"
         case let .outdated(installed, bundled): "outdated (\(installed), app has \(bundled))"
@@ -176,7 +176,7 @@ struct VPhoneLaunchpadControlCommands {
         guard let version = progress.version else {
             throw VPhoneLaunchpadError("The install did not report a version.")
         }
-        return report(try installed(version))
+        return try report(installed(version))
     }
 
     private func reportSteps(
@@ -257,7 +257,7 @@ struct VPhoneLaunchpadControlCommands {
 
     private func report(_ machine: VPhoneLaunchpadMachine) -> [String: Any] {
         let path = machine.path
-        let state: String = switch library.state(of: path) {
+        let state = switch library.state(of: path) {
         case .stopped: "stopped"
         case .running: "running"
         case let .busy(activity): "busy: \(activity)"
@@ -446,7 +446,7 @@ struct VPhoneLaunchpadControlCommands {
 
         let pipeline: VPhoneLaunchpadCreationPipeline
         if let from = request.option("from") {
-            guard let step = VPhoneLaunchpadCreationPipeline.Step.allCases.first(where: { "\($0)" == from }) else {
+            guard let step = VPhoneLaunchpadCreationPipeline.Step.allCases.first(where: { from == "\($0)" }) else {
                 let steps = VPhoneLaunchpadCreationPipeline.Step.allCases.map { "\($0)" }.joined(separator: ", ")
                 throw VPhoneLaunchpadError("--from takes one of: \(steps).")
             }
@@ -581,7 +581,7 @@ struct VPhoneLaunchpadControlCommands {
             onLine: emit,
         )
         guard status == 0 else {
-            throw VPhoneLaunchpadError("cfw install exited with status \(status).")
+            throw VPhoneLaunchpadError("Unable to install custom firmware. Check the log for details.")
         }
         return ["name": machine.name, "bundle": version, "status": status]
     }
@@ -662,10 +662,10 @@ nonisolated enum VPhoneLaunchpadGuestSocket {
         let line = try JSONSerialization.data(withJSONObject: object) + Data([0x0A])
         let response = try await Task.detached { try exchange(line, socketPath: socketPath) }.value
         guard let json = try? JSONSerialization.jsonObject(with: response) else {
-            throw VPhoneLaunchpadError("The machine answered with something other than JSON.", detail: String(decoding: response.prefix(512), as: UTF8.self))
+            throw VPhoneLaunchpadError("The machine sent a reply that could not be read. Try again.", detail: String(decoding: response.prefix(512), as: UTF8.self))
         }
         if let dictionary = json as? [String: Any], dictionary["ok"] as? Bool == false {
-            throw VPhoneLaunchpadError("The guest refused the request.", detail: dictionary["error"] as? String)
+            throw VPhoneLaunchpadError("The machine refused the request. Try again.", detail: dictionary["error"] as? String)
         }
         return json
     }
@@ -697,7 +697,7 @@ nonisolated enum VPhoneLaunchpadGuestSocket {
             }
         }
         guard connected == 0 else {
-            throw VPhoneLaunchpadError("The machine's vphone.sock is not answering.", detail: String(cString: strerror(errno)))
+            throw VPhoneLaunchpadError("The machine is not responding. Make sure it is running, then try again.", detail: String(cString: strerror(errno)))
         }
         guard VPhoneLaunchpadControl.write(line, to: fd) else {
             throw VPhoneLaunchpadError("Unable to send the request to the machine.")
