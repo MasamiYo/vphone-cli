@@ -3,15 +3,14 @@ import Foundation
 import Virtualization
 
 @MainActor
-class VPhoneVirtualMachineWindowController: NSObject, NSToolbarDelegate {
+class VPhoneVirtualMachineWindowController: NSObject {
     private var windowController: NSWindowController?
     private weak var control: VPhoneGuestControl?
     private weak var virtualMachineView: VPhoneVirtualMachineView?
     private(set) var touchIDMonitor: VPhoneTouchIDMonitor?
-    private var ecid: String?
     private var menuKeyMonitor: Any?
-
-    private nonisolated static let homeItemID = NSToolbarItem.Identifier("home")
+    private var homeButton: NSButton?
+    private var subtitleLabel: NSTextField?
 
     var captureView: VPhoneVirtualMachineView? {
         virtualMachineView
@@ -24,11 +23,10 @@ class VPhoneVirtualMachineWindowController: NSObject, NSToolbarDelegate {
         screenScale: Double,
         keySender: VPhoneVirtualMachineKeySender,
         control: VPhoneGuestControl,
-        ecid: String?,
+        name: String,
         sceneIdentifier: String,
     ) {
         self.control = control
-        self.ecid = ecid
 
         let view = VPhoneVirtualMachineView()
         view.virtualMachine = vm
@@ -55,8 +53,7 @@ class VPhoneVirtualMachineWindowController: NSObject, NSToolbarDelegate {
         window.level = .normal
         VPhoneAlert.hostWindow = window
         window.contentAspectRatio = windowSize
-        window.title = VPhoneLocalization.text("vphone — Starting…")
-        window.subtitle = makeSubtitle(ip: nil)
+        window.title = name
         window.contentView = vmView
 
         // The scene belongs to the VM, not to the app: every VM directory keeps
@@ -69,12 +66,17 @@ class VPhoneVirtualMachineWindowController: NSObject, NSToolbarDelegate {
         }
         window.setFrameAutosaveName(sceneName)
 
-        // Toolbar with unified style for two-line title
+        // An empty unified toolbar gives the title bar its full height. The Home
+        // button is a titlebar accessory rather than a toolbar item so that a
+        // narrow window truncates the title instead of moving it to overflow.
         let toolbar = NSToolbar(identifier: "vphone-toolbar")
-        toolbar.delegate = self
         toolbar.displayMode = .iconOnly
         window.toolbar = toolbar
         window.toolbarStyle = .unified
+        let homeAccessory = makeHomeAccessory()
+        window.addTitlebarAccessoryViewController(homeAccessory)
+        updateHomeButton(connected: false)
+        installTitle(name, in: window, trailingInset: homeAccessory.view.frame.width)
 
         let controller = NSWindowController(window: window)
         controller.showWindow(nil)
@@ -100,58 +102,150 @@ class VPhoneVirtualMachineWindowController: NSObject, NSToolbarDelegate {
         monitor.start(control: control, window: window)
         touchIDMonitor = monitor
 
-        // Poll vphoned status for title indicator
-        _ = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) {
-            [weak self, weak window] _ in
+        // Poll vphoned status for the Home button and the subtitle
+        _ = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                guard let self, let window, let control = self.control else { return }
-                window.title = VPhoneLocalization.text(
-                    control.isConnected ? "vphone — Connected" : "vphone — Disconnected",
-                )
-                window.subtitle = self.makeSubtitle(ip: control.isConnected ? control.guestIPAddress : nil)
+                guard let self, let control = self.control else { return }
+                self.updateHomeButton(connected: control.isConnected)
+                self.updateSubtitle(control: control)
             }
         }
     }
 
-    private func makeSubtitle(ip: String?) -> String {
-        switch (ecid, ip) {
-        case let (ecid?, ip?): "\(ecid) — \(ip)"
-        case (let ecid?, nil): ecid
-        case (nil, let ip?): ip
-        case (nil, nil): ""
+    // MARK: - Title
+
+    /// AppKit leaves a wider gap after the window buttons than before them, so
+    /// the title is drawn here instead: the gap after the zoom button equals
+    /// the close button's inset from the window edge. `window.title` and
+    /// `window.subtitle` are still set for the Window menu and accessibility.
+    private func installTitle(_ name: String, in window: NSWindow, trailingInset: CGFloat) {
+        guard let close = window.standardWindowButton(.closeButton),
+              let zoom = window.standardWindowButton(.zoomButton),
+              let titlebar = zoom.superview,
+              let frame = window.contentView?.superview
+        else { return }
+        window.titleVisibility = .hidden
+
+        let title = NSTextField(labelWithString: name)
+        title.font = .systemFont(ofSize: NSFont.systemFontSize + 2, weight: .bold)
+        let subtitle = NSTextField(labelWithString: "")
+        subtitle.font = .systemFont(ofSize: NSFont.smallSystemFontSize)
+        subtitle.textColor = .secondaryLabelColor
+        subtitle.isHidden = true
+        for label in [title, subtitle] {
+            label.lineBreakMode = .byTruncatingTail
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        }
+        subtitleLabel = subtitle
+
+        let stack = NSStackView(views: [title, subtitle])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 0
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        titlebar.addSubview(stack)
+        let inset = NSLayoutGuide(), gap = NSLayoutGuide()
+        frame.addLayoutGuide(inset)
+        frame.addLayoutGuide(gap)
+        NSLayoutConstraint.activate([
+            inset.leadingAnchor.constraint(equalTo: frame.leadingAnchor),
+            inset.trailingAnchor.constraint(equalTo: close.leadingAnchor),
+            gap.leadingAnchor.constraint(equalTo: zoom.trailingAnchor),
+            gap.trailingAnchor.constraint(equalTo: stack.leadingAnchor),
+            gap.widthAnchor.constraint(equalTo: inset.widthAnchor),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: frame.trailingAnchor, constant: -trailingInset - 8),
+            stack.centerYAnchor.constraint(equalTo: zoom.centerYAnchor),
+        ])
+    }
+
+    /// `iOS <version> - <address>` from vphoned's health report, which picks
+    /// the IPv4 address first and falls back to IPv6; hidden until it connects.
+    private func updateSubtitle(control: VPhoneGuestControl) {
+        guard let window = windowController?.window else { return }
+        var parts: [String] = []
+        if control.isConnected {
+            if let version = control.guestIOSVersion, !version.isEmpty { parts.append("iOS \(version)") }
+            if let address = control.guestIPAddress, !address.isEmpty { parts.append(address) }
+        }
+        let subtitle = parts.joined(separator: " - ")
+        if window.subtitle != subtitle {
+            window.subtitle = subtitle
+            subtitleLabel?.stringValue = subtitle
+            subtitleLabel?.isHidden = subtitle.isEmpty
         }
     }
 
-    // MARK: - NSToolbarDelegate
+    // MARK: - Home Button
 
-    nonisolated func toolbar(
-        _: NSToolbar,
-        itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
-        willBeInsertedIntoToolbar _: Bool,
-    ) -> NSToolbarItem? {
-        MainActor.assumeIsolated {
-            if itemIdentifier == Self.homeItemID {
-                let item = NSToolbarItem(itemIdentifier: itemIdentifier)
-                item.label = VPhoneLocalization.text("Home")
-                item.toolTip = VPhoneLocalization.text("Home Button")
-                item.image = NSImage(
-                    systemSymbolName: "circle.circle",
-                    accessibilityDescription: VPhoneLocalization.text("Home"),
-                )
-                item.target = self
-                item.action = #selector(homePressed)
-                return item
-            }
-            return nil
+    private static let homeImage = NSImage(
+        systemSymbolName: "circle.circle",
+        accessibilityDescription: VPhoneLocalization.text("Home"),
+    ) ?? NSImage()
+
+    /// `circle.circle` with a slash drawn across it; SF Symbols has no
+    /// `circle.circle.slash`. The slash cuts a gap in the circles like the
+    /// system's own slashed symbols.
+    private static let homeSlashImage: NSImage = {
+        let base = homeImage
+        let image = NSImage(size: base.size, flipped: false) { rect in
+            base.draw(in: rect)
+            let slash = NSBezierPath()
+            slash.move(to: NSPoint(x: rect.minX + 1, y: rect.maxY - 1))
+            slash.line(to: NSPoint(x: rect.maxX - 1, y: rect.minY + 1))
+            slash.lineCapStyle = .round
+            NSGraphicsContext.current?.compositingOperation = .clear
+            slash.lineWidth = 4
+            slash.stroke()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            NSColor.black.setStroke()
+            slash.lineWidth = 1.5
+            slash.stroke()
+            return true
         }
+        image.isTemplate = true
+        image.accessibilityDescription = base.accessibilityDescription
+        return image
+    }()
+
+    private func makeHomeAccessory() -> NSTitlebarAccessoryViewController {
+        let button = NSButton(image: Self.homeImage, target: self, action: #selector(homePressed))
+        if #available(macOS 26.0, *) {
+            button.bezelStyle = .glass
+            button.borderShape = .circle
+        } else {
+            button.bezelStyle = .toolbar
+        }
+        button.controlSize = .large
+        button.toolTip = VPhoneLocalization.text("Home Button")
+        button.translatesAutoresizingMaskIntoConstraints = false
+        homeButton = button
+
+        // A titlebar accessory takes its width from the view's frame, so the
+        // container is sized explicitly; otherwise the button collapses to 0.
+        let trailingInset: CGFloat = 12
+        let container = NSView()
+        container.addSubview(button)
+        NSLayoutConstraint.activate([
+            button.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            button.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -trailingInset),
+            button.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            button.widthAnchor.constraint(equalTo: button.heightAnchor),
+        ])
+        let side = button.fittingSize.height
+        container.frame.size = NSSize(width: side + trailingInset, height: side)
+
+        let accessory = NSTitlebarAccessoryViewController()
+        accessory.view = container
+        accessory.layoutAttribute = .trailing
+        return accessory
     }
 
-    nonisolated func toolbarDefaultItemIdentifiers(_: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.flexibleSpace, Self.homeItemID]
-    }
-
-    nonisolated func toolbarAllowedItemIdentifiers(_: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [Self.homeItemID, .flexibleSpace, .space]
+    /// The button presses Home through vphoned, so it is disabled and slashed
+    /// while vphoned is not connected.
+    private func updateHomeButton(connected: Bool) {
+        guard let homeButton else { return }
+        homeButton.isEnabled = connected
+        homeButton.image = connected ? Self.homeImage : Self.homeSlashImage
     }
 
     // MARK: - Actions
