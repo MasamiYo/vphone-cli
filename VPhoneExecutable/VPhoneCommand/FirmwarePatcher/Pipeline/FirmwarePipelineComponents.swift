@@ -20,7 +20,7 @@ extension FirmwarePipeline {
     ///   - iOSBase: The iPhone base `ProductVersion` read from `iPhone-BuildManifest.plist`,
     ///     or nil when it could not be read. Two patchers still branch on the release
     ///     itself rather than on a patch being selected: the skywalk-netagent boot-arg is
-    ///     18.x-only, and `KernelJailbreakPatcher.applyIOS27` changes the shapes a patch
+    ///     18.x-only, and `KernelCustomFirmwarePatcher.applyIOS27` changes the shapes a patch
     ///     method looks for rather than whether it runs.
     ///   - plan: The resolved preset, or nil when there is none. A patcher whose whole
     ///     patch set the preset left out is not built at all: its records would be
@@ -44,7 +44,7 @@ extension FirmwarePipeline {
 
         let includeBootChain = includesSet(FirmwareBootChainPatchSet.identifier)
         let includeKernelBase = includesSet(FirmwareKernelBasePatchSet.identifier)
-        let includeKernelJailbreak = includesSet(FirmwareKernelJailbreakPatchSet.identifier)
+        let includeKernelCustomFirmware = includesSet(FirmwareKernelCustomFirmwarePatchSet.identifier)
         let includeDeviceTree = includesSet(FirmwareDeviceTreePatchSet.identifier)
 
         /// Whether the plan turned a patch on. Without a plan, fall back to the
@@ -59,7 +59,7 @@ extension FirmwarePipeline {
         // patcher built to write nothing is a patcher whose log lines lie.
         // `standard` blocks it: see FirmwareKernelHypervisorPatchSet.
         let includeHypervisor = includesSet(FirmwareKernelHypervisorPatchSet.identifier)
-            && isEnabled("kernelcache_exp.hv_vmm", fallback: false)
+            && isEnabled("kernel-exp-hv_vmm", fallback: false)
 
         let baseIs18 = iOSBase?.major == 18
         let baseIs27 = iOSBase?.major == 27
@@ -68,7 +68,7 @@ extension FirmwarePipeline {
         // SpringBoard trip GUARD_TYPE_MACH_PORT flavor 10 and crash-loop the UI —
         // the VM does not boot there without it. On 26.x and 27.x it only hides
         // violations, so it is off unless a VM checks it on.
-        let applyExcGuard = isEnabled("kernel.thread_guard_violation", fallback: baseIs18)
+        let applyExcGuard = isEnabled("kernel-boot-thread_guard_violation", fallback: baseIs18)
 
         // Not a selection: `applyIOS27` changes which shapes the JB patch methods
         // look for, and which sandbox hook is left real for the fpfs trampoline.
@@ -131,7 +131,7 @@ extension FirmwarePipeline {
                             return p
                         },
                         { data, verbose in
-                            let p = IBootJailbreakPatcher(data: data, mode: .ibss, verbose: verbose)
+                            let p = IBootCustomFirmwarePatcher(data: data, mode: .ibss, verbose: verbose)
                             p.gate = gate
                             return p
                         },
@@ -191,8 +191,8 @@ extension FirmwarePipeline {
             }(),
         ))
 
-        // 6. Kernel — the public JB firmware includes the former EXP
-        //    hv_vmm rename after the base and jailbreak patches.
+        // 6. Kernel — the public CFW firmware includes the former EXP
+        //    hv_vmm rename after the base and custom-firmware patches.
         components.append(ComponentDescriptor(
             name: "kernelcache",
             inRestoreDir: true,
@@ -219,12 +219,12 @@ extension FirmwarePipeline {
                         return p
                     }] : []
                 case .jb, .exp:
-                    kernelJailbreakFactories(
+                    kernelCustomFirmwareFactories(
                         applyExcGuard: applyExcGuard,
                         applyIOS27: applyIOS27,
                         applyFrida: applyFrida,
                         includeBase: includeKernelBase,
-                        includeJailbreak: includeKernelJailbreak,
+                        includeCustomFirmware: includeKernelCustomFirmware,
                         includeHypervisor: includeHypervisor,
                         gate: gate,
                     )
@@ -251,6 +251,9 @@ extension FirmwarePipeline {
         ))
 
         // 8. Filesystem
+        //    Not restorable: it reads BuildManifest.plist but writes cryptex images
+        //    all over the restore tree, so putting the manifest back on its own
+        //    would describe a tree that no longer exists. See ComponentDescriptor.
         components.append(ComponentDescriptor(
             name: "Filesystem",
             inRestoreDir: true,
@@ -270,9 +273,12 @@ extension FirmwarePipeline {
                     []
                 }
             }(),
+            restorable: false,
         ))
 
         // 9. Firmware Manifest - Only required when excluding the img4 signature patches.
+        //    Not restorable, for the same reason as Filesystem: the hashes it writes
+        //    describe files other steps produced, not the manifest's own bytes.
         components.append(ComponentDescriptor(
             name: "Manifest",
             inRestoreDir: true,
@@ -287,6 +293,7 @@ extension FirmwarePipeline {
                     []
                 }
             }(),
+            restorable: false,
         ))
 
         return appendingExternalPatchers(to: components, plan: plan, gate: gate, iOSBase: iOSBase)
@@ -325,16 +332,16 @@ extension FirmwarePipeline {
 
     // MARK: - Kernel Factories
 
-    /// The kernelcache patcher chain the JB and EXP variants share.
+    /// The kernelcache patcher chain the CFW and EXP variants share.
     ///
     /// Each patcher corresponds to one bundled patch set, and a set the preset
     /// left out drops its patcher rather than being filtered afterwards.
-    private func kernelJailbreakFactories(
+    private func kernelCustomFirmwareFactories(
         applyExcGuard: Bool,
         applyIOS27: Bool,
         applyFrida: Bool,
         includeBase: Bool,
-        includeJailbreak: Bool,
+        includeCustomFirmware: Bool,
         includeHypervisor: Bool,
         gate: VPhonePatchGate,
     ) -> [(Data, Bool) throws -> any Patcher] {
@@ -346,9 +353,9 @@ extension FirmwarePipeline {
                 return p
             }
         }
-        if includeJailbreak {
+        if includeCustomFirmware {
             factories.append { data, verbose in
-                let p = KernelJailbreakPatcher(data: data, verbose: verbose)
+                let p = KernelCustomFirmwarePatcher(data: data, verbose: verbose)
                 p.applyIOS27 = applyIOS27
                 p.applyFrida = applyFrida
                 p.gate = gate

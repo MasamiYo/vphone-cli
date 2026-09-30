@@ -52,8 +52,6 @@ struct VPhoneLaunchpadMachineInspector: View {
 
     var body: some View {
         Form {
-            VPhoneLaunchpadInstallSection()
-
             Section {
                 if let creation = library.creations[machine.path] {
                     creationSummary(creation)
@@ -67,8 +65,8 @@ struct VPhoneLaunchpadMachineInspector: View {
                 if let started = library.startedAt[machine.path] {
                     LabeledContent("Started", value: started.formatted(date: .omitted, time: .shortened))
                 }
-                if let variant = machine.restoreInfo?.variant {
-                    LabeledContent("Variant", value: variant)
+                if let firmwareName = machine.firmwareName {
+                    LabeledContent("Firmware", value: firmwareName)
                 }
             } header: {
                 Text(machine.name)

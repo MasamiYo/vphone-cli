@@ -13,7 +13,7 @@ public enum FirmwarePatchSetCatalog {
     public static let bundled: [VPhonePatchSetManifest] = [
         FirmwareBootChainPatchSet.manifest,
         FirmwareKernelBasePatchSet.manifest,
-        FirmwareKernelJailbreakPatchSet.manifest,
+        FirmwareKernelCustomFirmwarePatchSet.manifest,
         FirmwareKernelHypervisorPatchSet.manifest,
         FirmwareKernelFridaPatchSet.manifest,
         FirmwareDeviceTreePatchSet.manifest,
@@ -51,28 +51,56 @@ public enum FirmwarePatchSetCatalog {
     /// freshly restored 26.4 guest booting at all. See
     /// ``hypervisorConcealmentPatches``. The rest of the former EXP variant is
     /// off with it, bar the camera: see ``experimentalIdentityPatches``.
+    ///
+    /// `dyld-exp-mis_trust_auth` is off because a userspace hook now does its
+    /// job: see ``misTrustAuthPatch``.
     public static let manualOnlyPatches: Set<String> =
         Set(FirmwareKernelFridaPatchSet.manifest.patches.map(\.identifier))
             .union(hypervisorConcealmentPatches)
             .union(experimentalIdentityPatches)
+            .union([misTrustAuthPatch])
+
+    /// The shared-cache short-circuit of `libmis`'s `checkTrustAndAuthorization`.
+    ///
+    /// Off in `standard` because `libmisfix.dylib` reaches the same outcome from
+    /// userspace without editing the cache. The hook passes
+    /// `RespectUppTrustAndAuthorization = false` in the options dictionary, and
+    /// libmis only calls `checkTrustAndAuthorization` when that flag is set, so
+    /// `0xE8008026` — "missing trust and/or authorization", which a hacktivated
+    /// guest with no activation record can never satisfy — is never produced.
+    /// `cfw install` injects that hook into `installd` and `misagent`.
+    ///
+    /// Leaving the patch on costs more than it buys. On iOS 27 it stops the guest
+    /// booting: TXM rejects the re-attested page, dyld cannot map
+    /// `libSystem.B.dylib`, and `initproc failed to start` (issue #532). On 24A435
+    /// it cannot even be applied — `checkTrustAndAuthorization` there carries
+    /// neither the seeding prologue the patcher matches nor the patcher's own
+    /// output, so `cfw install` fails outright before it writes anything.
+    ///
+    /// What it still buys, and why it stays declared rather than being deleted:
+    /// the hook only covers the processes it is injected into, so an app signed
+    /// with a *free personal-team* certificate can be installed but is still
+    /// refused at launch, where SpringBoard asks MIS itself. A VM that wants that
+    /// on a 26.x base can check this box; on 27 it should not.
+    public static let misTrustAuthPatch = "dyld-exp-mis_trust_auth"
 
     /// The former EXP patches that make the guest claim to be an iPhone17,3.
     ///
     /// `standard` is the JB baseline plus the camera. The camera needs the device
-    /// tree's `/product/camera`, ISP and SMC nodes and `camera_dsc`, which stay on;
+    /// tree's `/product/camera`, ISP and SMC nodes and `dyld-cfw-camera`, which stay on;
     /// it does not need the identity rewrites. They shipped on with the hypervisor
     /// concealment when EXP joined the JB flow, and guests from that build lost
     /// location (issue #438), so they go back to opt-in with it. `extended` or a
     /// per-VM checkmark turns them back on.
     public static let experimentalIdentityPatches: Set<String> = [
-        "devicetree.target_sub_type",
-        "devicetree.compatible_secondary",
-        "devicetree.product.fdr_product_type",
-        "devicetree.product.sub_product_type",
-        "devicetree.product.unique_model",
-        "devicetree.product.gestalt_variants_rename",
-        "devicetree.arm_io.device_type",
-        "devicetree.arm_io.soc_generation",
+        "devicetree-exp-target_sub_type",
+        "devicetree-exp-compatible_secondary",
+        "devicetree-exp-product_fdr_product_type",
+        "devicetree-exp-product_sub_product_type",
+        "devicetree-exp-product_unique_model",
+        "devicetree-exp-product_gestalt_variants_rename",
+        "devicetree-exp-arm_io_device_type",
+        "devicetree-exp-arm_io_soc_generation",
         FirmwareGuestIdentityPatchSet.prebootDeviceTreeIdentity,
     ]
 
@@ -92,9 +120,9 @@ public enum FirmwarePatchSetCatalog {
     /// waits on migration forever — a black screen with no panic. See
     /// `Research/Patches/hv_vmm_present_usermode_xrefs.md`.
     public static let hypervisorConcealmentPatches: Set<String> = [
-        "kernelcache_exp.hv_vmm",
-        "hv_vmm_dsc",
-        "watchdogd.hv_vmm_cache",
+        "kernel-exp-hv_vmm",
+        "dyld-exp-hv_vmm",
+        "system-watchdogd-exp-hv_vmm_cache",
     ]
 
     /// The preset a VM gets when nothing else is named.
@@ -106,7 +134,7 @@ public enum FirmwarePatchSetCatalog {
     public static let standardPreset = VPhonePatchPreset(
         identifier: VPhonePatchPreset.standardIdentifier,
         title: "Standard",
-        summary: "The patches every vphone VM needs to boot, jailbroken, with a working display and camera.",
+        summary: "The patches every vphone VM needs to boot custom firmware, with a working display and camera.",
         patchSets: bundledReferences,
         selection: .block(manualOnlyPatches),
     )
@@ -114,9 +142,9 @@ public enum FirmwarePatchSetCatalog {
     /// Everything the bundle declares, including the Frida relaxations, the
     /// hypervisor concealment and the iPhone17,3 identity. Each patch's own version
     /// gate still decides whether it lands.
-    public static let extendedPreset = VPhonePatchPreset(
-        identifier: "extended",
-        title: "Extended",
+    public static let experimentalPreset = VPhonePatchPreset(
+        identifier: "experimental",
+        title: "Experimental",
         summary: """
         Every patch this bundle declares, including the Frida Stalker relaxations, \
         the iPhone17,3 identity rewrites, and the hv_vmm_present concealment that a \
@@ -127,5 +155,5 @@ public enum FirmwarePatchSetCatalog {
     )
 
     /// The presets the bundle ships.
-    public static let builtInPresets: [VPhonePatchPreset] = [standardPreset, extendedPreset]
+    public static let builtInPresets: [VPhonePatchPreset] = [standardPreset, experimentalPreset]
 }

@@ -22,7 +22,7 @@ nonisolated struct VPhoneLaunchpadPatchCatalog: Decodable, Sendable {
         var displayTitle: String {
             switch identifier {
             case "standard": String(localized: "Standard", comment: "The built-in patch preset")
-            case "extended": String(localized: "Extended", comment: "The built-in patch preset")
+            case "experimental": String(localized: "Experimental", comment: "The built-in patch preset")
             default: title
             }
         }
@@ -30,7 +30,7 @@ nonisolated struct VPhoneLaunchpadPatchCatalog: Decodable, Sendable {
         var displaySummary: String {
             switch identifier {
             case "standard": String(localized: "Patches every machine needs to start, with a working display and camera.")
-            case "extended": String(localized: "Every patch in this bundle, including advanced ones that may stop a newly restored 26.4 machine from starting.")
+            case "experimental": String(localized: "Every patch in this bundle, including advanced ones that may stop a newly restored 26.4 machine from starting.")
             default: summary
             }
         }
@@ -59,6 +59,41 @@ nonisolated struct VPhoneLaunchpadPatchCatalog: Decodable, Sendable {
         var isVersionGated: Bool {
             applicability != "any"
         }
+
+        /// What the patch changes: `kernel`, `dyld`, `system-seputil`.
+        var component: String {
+            parts.component
+        }
+
+        /// Why it is there: `boot`, `cfw` or `exp`.
+        var effect: String {
+            parts.effect
+        }
+
+        /// The patch's own name within its component and effect.
+        var name: String {
+            parts.name
+        }
+
+        /// Splits `{component}-{effect}-{name}`, read from the right: the name
+        /// holds no hyphen, and a component may (`system-seputil`). Every
+        /// bundled patch follows this; an outside set that names its patches
+        /// another way keeps its identifier whole as the name.
+        private var parts: (component: String, effect: String, name: String) {
+            let segments = identifier.split(separator: "-", omittingEmptySubsequences: false)
+            guard segments.count >= 3,
+                  Self.effects.contains(String(segments[segments.count - 2]))
+            else {
+                return ("", "", identifier)
+            }
+            return (
+                segments.dropLast(2).joined(separator: "-"),
+                String(segments[segments.count - 2]),
+                String(segments[segments.count - 1]),
+            )
+        }
+
+        private static let effects: Set<String> = ["boot", "cfw", "exp"]
     }
 
     /// The preset this report was made against: the VM's own, or the one `--preset`

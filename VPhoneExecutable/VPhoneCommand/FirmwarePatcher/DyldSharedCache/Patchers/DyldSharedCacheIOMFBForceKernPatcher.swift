@@ -33,7 +33,7 @@
 // selected the kern fp — every present call now routes through the kern/method-5
 // implementation regardless of how iOS 27 classified the display.
 //
-// Companion kernel patch: `KernelJailbreakPatcher.patchIomfbSwapEndVariableSize` /
+// Companion kernel patch: `KernelCustomFirmwarePatcher.patchIomfbSwapEndVariableSize` /
 // `…HandlerSize`, which make the 26.4 userclient accept iOS 27's native 0x6e0
 // SwapEnd struct (26.x sent 0x588). Both halves are required together — forcing
 // kern without the kernel size-accept makes method 5 return
@@ -84,7 +84,7 @@ public enum DyldSharedCacheIOMFBForceKernPatcher {
     public static let requiredSuffixes: [String] = ["SwapBegin", "SwapEnd", "SwapSetLayer"]
 
     /// Record group name, matching `records.set_group("iomfb_force_kern")`.
-    public static let recordGroup = "iomfb_force_kern"
+    public static let recordGroup = "dyld-boot-iomfb_force_kern"
 
     /// Where diagnostics go when the caller does not say. Mirrors the
     /// reference's `print`, so the two runs can be diffed line by line.

@@ -73,6 +73,22 @@ final class VPhoneGuestControl {
         orientationObservers.append(observer)
     }
 
+    /// True while the guest will show Setup Assistant, from `/v1/health`.
+    /// False when disconnected.
+    private(set) var isSetupAssistantPending = false {
+        didSet {
+            for observer in setupAssistantObservers {
+                observer(isSetupAssistantPending)
+            }
+        }
+    }
+
+    @ObservationIgnored private var setupAssistantObservers: [(Bool) -> Void] = []
+
+    func observeSetupAssistantPending(_ observer: @escaping (Bool) -> Void) {
+        setupAssistantObservers.append(observer)
+    }
+
     /// Turns the guest to the first of `candidates` it accepts. Each is set
     /// before the guest is asked, so the window turns with the guest instead
     /// of after it, and a refused one moves straight on to the next. When
@@ -162,6 +178,10 @@ final class VPhoneGuestControl {
             if ios != guestIOSVersion {
                 guestIOSVersion = ios
             }
+            let setupPending = info["setup_pending"] as? Bool ?? false
+            if setupPending != isSetupAssistantPending {
+                isSetupAssistantPending = setupPending
+            }
             if !isConnected {
                 isConnected = true
                 print("[control] connected to vphoned HTTP API (iOS \(guestIOSVersion ?? "?"))")
@@ -187,6 +207,7 @@ final class VPhoneGuestControl {
         guestIPAddress = nil
         guestIOSVersion = nil
         interfaceOrientation = nil
+        isSetupAssistantPending = false
         if wasConnected {
             onDisconnect?()
         }
@@ -220,6 +241,27 @@ final class VPhoneGuestControl {
             default: "up"
             }
         enqueueInput("input.touch", params: ["phase": name, "x": x, "y": y, "normalized": true])
+    }
+
+    /// Whether the guest takes two fingers in one hand event. Guests that only
+    /// advertise `touch` cannot: icli's single-finger `input.touch` is all they
+    /// have, so a pinch has to fall back to moving one finger.
+    var supportsMultiTouch: Bool {
+        isConnected && guestCapabilities.contains("touch2")
+    }
+
+    /// Two fingers in one hand event, for a trackpad pinch. Coordinates are
+    /// normalized 0..1 with the origin at the top-left, like `sendTouch`.
+    func sendTouch2(phase: Int, x1: Double, y1: Double, x2: Double, y2: Double) {
+        let name =
+            switch phase {
+            case 0: "down"
+            case 1: "move"
+            default: "up"
+            }
+        enqueueInput("input.touch2", params: [
+            "phase": name, "x1": x1, "y1": y1, "x2": x2, "y2": y2, "normalized": true,
+        ])
     }
 
     private func enqueueInput(_ method: String, params: [String: Any]) {

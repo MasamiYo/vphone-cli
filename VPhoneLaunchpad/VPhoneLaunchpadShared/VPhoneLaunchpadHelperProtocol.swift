@@ -54,8 +54,19 @@ nonisolated protocol VPhoneLaunchpadHelperProtocol {
         bundleVersion: String,
         machineName: String,
         libraryRoot: String,
-        forceDyldSharedCacheMaxSlide: Bool,
         keepArtifacts: Bool,
+        reply: @escaping @Sendable (Int32, String?) -> Void,
+    )
+
+    /// Runs `vphone-cli cfw update-environment` from a store bundle as root:
+    /// redeploys the bundle's guest resources into a stopped machine and
+    /// nothing else. Same output channel and reply as `installCustomFirmware`,
+    /// and `cancelCustomFirmware` stops it.
+    func updateGuestEnvironment(
+        authorization: Data,
+        bundleVersion: String,
+        machineName: String,
+        libraryRoot: String,
         reply: @escaping @Sendable (Int32, String?) -> Void,
     )
 
