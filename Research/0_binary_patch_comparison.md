@@ -1830,6 +1830,118 @@ applies interposing to `dlsym` as well as to call sites, so
 the probe measured its own text and never touched the cache. It then asked for
 `VM_PROT_WRITE` in place of `VM_PROT_EXECUTE` on the page it was executing
 from, which faults on the next instruction fetch and crash-looped installd
-until the flag was cleared. The probe now resolves through a handle on
-`libMobileGestalt` (a handle-scoped `dlsym` is not interposed), refuses a
-target inside its own image, asks for RWX, and runs in installd only.
+until the flag was cleared.
+
+A handle-scoped `dlsym` is interposed too — measured, on a handle to
+libMobileGestalt itself — so there is no spelling of `dlsym` that answers this.
+What dyld leaves alone is the interposing image's own imports, which is why
+`MISFixDetour` takes an address that libmisfix obtained with `&`, and refuses
+to take a name at all.
+
+## An Xcode install works, and what it took (2026-09-30)
+
+Measured on test-26.4, `xcrun devicectl device install app` with
+`AirBuild-Debug.ipa` — a paid team's app (`QDJ93ZUQ9B`), signed
+`Apple Development`, whose embedded profile provisions eight real devices and
+no VM:
+
+```
+App installed:
+• bundleID: plus.yellow.AirBuild
+• installationURL: file:///private/var/containers/Bundle/Application/9A626C1C-…/AirBuild.app/
+```
+
+and it launches. So does a `codesign --sign -` bundle with no certificate and
+no profile at all. Four separate refusals had to go, in this order, and each
+one was only visible once the one before it was gone.
+
+1. **The interpose never ran.** Replaced by `MISFixDetour`: a four-word
+   absolute jump at the top of the callee, the displaced instructions
+   relocated onto an `mmap`ed trampoline, the target page taken
+   copy-on-write. Installed in installd's own address space, so nothing on
+   disk and no other process changes — which is the whole difference between
+   this and row 17, the libmis cache patch that stopped a 27.0 guest booting.
+   Measured: `detour: MISValidateSignatureAndCopyInfoWithProgress at
+   0x1bf41c830 in libmis.dylib`.
+
+   `MISValidateSignatureAndCopyInfo` itself is a thunk in front of the
+   `…WithProgress` body, shorter than the jump, and `MISFixDetour` refuses it
+   with `MISFixDetourTooShort` rather than write over whatever follows. Its
+   callers are covered anyway, because it branches into the hooked function.
+
+2. **`0xE8008015`, no valid profile.** Widening the options does not help a
+   CMS-signed app: `AllowAdHocSigning` is about ad-hoc signatures, and this one
+   is real. The profile has to actually install, and misagent refuses it
+   because a VM's UDID is in no `ProvisionedDevices`. misagent asks
+   `MISProfileGetValue(profile, "ProvisionsAllDevices")` *first* and only
+   consults the device list when that is false — so `MISFixProfileScope.c`
+   detours `MISProfileGetValue` and answers that one key `true`. The profile
+   then installs for real and MIS validates the app against it:
+
+   ```
+   misagent: Installing provisioning profile: 50806e9b-…
+   MISValidateSignature(…/extracted/Payload/AirBuild.app) -> 0x0
+     info[SigningID] = plus.yellow.AirBuild   info[TeamID] = QDJ93ZUQ9B
+     info[SignerCertificate] = <1484 bytes>   info[Entitlements] = <7 entries>
+     info[ValidatedByProfile] = true          info[SignerType] = 3
+   ```
+
+   Nothing is faked: the signature, the certificate, the entitlements and the
+   cdhash are the ones Apple issued. The only claim widened is which devices
+   the profile covers.
+
+3. **`0xE8008012` from `-[MIInstallableBundle _installEmbeddedProfilesWithError:]`.**
+   Kept as a backstop for a profile that still cannot install, in
+   `MISFixInstallPolicy.c`: the real implementation runs, and a refusal is
+   logged and turned into "there is no profile" rather than a failed install.
+
+4. **`-[MICodeSigningVerifier performValidationWithError:]`, line 424, "Failed
+   to extract signer identity".** The gate behind the gate, and the one that
+   stops an ad-hoc signature: MIS accepts the bundle and MobileInstallation
+   then wants a CMS leaf certificate out of it, which `codesign --sign -`
+   does not produce.
+
+   The verifier already knows what to do. It carries `allowAdhocSigning` as a
+   settable property — the same shape as the MIS option — and installd never
+   turns it on, so `MISFixInstallPolicy.c` forces the getter. The real
+   validation then succeeds and fills `signingInfo` for real.
+
+Both Objective-C hooks are swizzles, not detours. A method list is data, so
+replacing an implementation reaches every caller without making any cache text
+writable; where that is available it is strictly better.
+
+### The dead end that proved the shape of the fix
+
+Before `allowAdhocSigning` was found, `performValidationWithError:` was forced
+to return `YES` after it had failed. That got no further:
+
+```
+-[MIExecutableBundle codeSigningInfoByValidatingResources:…]: 1306:
+    Code signing identifier ((null)) does not match bundle identifier (wiki.qaq.vphone.signtest)
+```
+
+The verifier had bailed before storing anything, so its caller read a nil
+signing identifier. A refusal can be allowed through; an answer that was never
+computed cannot be invented. The override was removed once the property made
+it unnecessary, and the rule generalises to every gate above MIS.
+
+The class's interface came from the runtime, not from a disassembly:
+`class_copyMethodList` and `class_copyIvarList` printed into the note log.
+`MISFixInstallPolicy.c` still does that, but only when a selector it expects
+has gone, which is the one moment the list earns its few hundred lines.
+
+### Still refused, deliberately
+
+A bundle with no signature at all (`0xE800801C`) and an app with no
+`application-identifier` entitlement (`MIInstallerErrorDomain` 63). Both are
+real absences rather than policy, and everything downstream needs what they
+are missing. Unsigned bundles reach the guest through vphoned's
+`apps.install`, which re-signs in the container and never involves installd.
+
+### A trap in the measurement, not in the guest
+
+Two runs failed with `0xE8008017` on a bundle whose signature was fine. The
+IPA had been repacked on the host with `zip -r`, which writes AppleDouble
+`._*` files next to every resource; they break the sealed resource envelope.
+`COPYFILE_DISABLE=1 zip -X` after deleting them, and the same bundle installs.
+Worth remembering before reading `0xE8008017` as a guest-side gate.
