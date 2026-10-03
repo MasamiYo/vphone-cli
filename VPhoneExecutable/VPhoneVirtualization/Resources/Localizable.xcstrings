@@ -1,6 +1,193 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Use Hardware Keyboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use Hardware Keyboard"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "使用硬件键盘"
+          }
+        }
+      }
+    },
+    "Changing the hardware keyboard requires restarting the virtual machine." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changing the hardware keyboard requires restarting the virtual machine."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改硬件键盘需要重新启动虚拟机。"
+          }
+        }
+      }
+    },
+    "Enable Hardware Keyboard?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable Hardware Keyboard?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用硬件键盘？"
+          }
+        }
+      }
+    },
+    "Disable Hardware Keyboard?" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Disable Hardware Keyboard?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停用硬件键盘？"
+          }
+        }
+      }
+    },
+    "Changing the hardware keyboard requires restarting the virtual machine. Save your work in the guest first. The setting is saved for this machine. With the hardware keyboard disabled, tap a text field to use the guest's software keyboard." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changing the hardware keyboard requires restarting the virtual machine. Save your work in the guest first. The setting is saved for this machine. With the hardware keyboard disabled, tap a text field to use the guest's software keyboard."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改硬件键盘需要重新启动虚拟机。请先保存客体系统中的工作。设置会保存在这台虚拟机中。停用硬件键盘后，点击文本框即可使用客体系统的软件键盘。"
+          }
+        }
+      }
+    },
+    "Restart and Apply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Restart and Apply"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新启动并应用"
+          }
+        }
+      }
+    },
+    "Unable to Change Hardware Keyboard" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to Change Hardware Keyboard"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法更改硬件键盘"
+          }
+        }
+      }
+    },
+    "Unable to Restart Virtual Machine" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to Restart Virtual Machine"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法重新启动虚拟机"
+          }
+        }
+      }
+    },
+    "The virtual machine stopped and the keyboard setting was saved. Launch this machine again. Unable to restart: %@" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The virtual machine stopped and the keyboard setting was saved. Launch this machine again. Unable to restart: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "虚拟机已停止，键盘设置已保存。请再次启动这台虚拟机。无法重新启动：%@"
+          }
+        }
+      }
+    },
+    "Recording in Progress" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recording in Progress"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在录制"
+          }
+        }
+      }
+    },
+    "Stop the screen recording before changing the hardware keyboard." : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop the screen recording before changing the hardware keyboard."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先停止屏幕录制，再更改硬件键盘。"
+          }
+        }
+      }
+    },
     "%@ / %@" : {
       "localizations" : {
         "en" : {
@@ -2999,6 +3186,40 @@
         }
       }
     },
+    "Bootstrap Already Installed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bootstrap Already Installed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブートストラップはインストール済みです"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "부트스트랩이 이미 설치됨"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bootstrap đã được cài đặt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导环境已安装"
+          }
+        }
+      }
+    },
     "Bootstrap Tools" : {
       "localizations" : {
         "ja" : {
@@ -3023,6 +3244,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Bootstrap 工具"
+          }
+        }
+      }
+    },
+    "Bootstrap already installed" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bootstrap already installed"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブートストラップはインストール済みです"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "부트스트랩이 이미 설치됨"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bootstrap đã được cài đặt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导环境已安装"
           }
         }
       }
@@ -17528,36 +17783,36 @@
         }
       }
     },
-    "Quit vphone" : {
+    "Quit VPhone" : {
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Quit vphone"
+            "value" : "Quit VPhone"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "vphone を終了"
+            "value" : "VPhone を終了"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "vphone 종료"
+            "value" : "VPhone 종료"
           }
         },
         "vi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Thoát vphone"
+            "value" : "Thoát VPhone"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "退出 vphone"
+            "value" : "退出 VPhone"
           }
         }
       }
@@ -23924,6 +24179,74 @@
         }
       }
     },
+    "The bootstrap is already installed in %@. To reinstall it, uninstall the bootstrap first." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The bootstrap is already installed in %@. To reinstall it, uninstall the bootstrap first."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブートストラップは %@ にインストール済みです。再インストールするには、先にブートストラップを削除してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "부트스트랩이 이미 %@에 설치되어 있습니다. 다시 설치하려면 먼저 부트스트랩을 제거하세요."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bootstrap đã được cài đặt tại %@. Để cài lại, hãy gỡ bootstrap trước."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导环境已安装在 %@。如需重新安装，请先卸载引导环境。"
+          }
+        }
+      }
+    },
+    "The bootstrap is already installed. To reinstall it, uninstall the bootstrap first." : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The bootstrap is already installed. To reinstall it, uninstall the bootstrap first."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブートストラップはインストール済みです。再インストールするには、先にブートストラップを削除してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "부트스트랩이 이미 설치되어 있습니다. 다시 설치하려면 먼저 부트스트랩을 제거하세요."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bootstrap đã được cài đặt. Để cài lại, hãy gỡ bootstrap trước."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "引导环境已安装。如需重新安装，请先卸载引导环境。"
+          }
+        }
+      }
+    },
     "The guest agent is not connected. Wait for it to connect, then try again." : {
       "localizations" : {
         "en" : {
@@ -26137,6 +26460,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法安装应用包。请检查文件和客体连接后重试。"
+          }
+        }
+      }
+    },
+    "Unable to install the bootstrap.\n\n%@" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unable to install the bootstrap.\n\n%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブートストラップをインストールできません。\n\n%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "부트스트랩을 설치할 수 없습니다.\n\n%@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể cài đặt bootstrap.\n\n%@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法安装引导环境。\n\n%@"
           }
         }
       }
