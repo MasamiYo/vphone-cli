@@ -37,8 +37,8 @@ extension FirmwarePipeline {
     ) -> [ComponentDescriptor] {
         var components: [ComponentDescriptor] = []
 
-        /// Whether the plan kept a bundled set. True when there is no plan, so a
-        /// directly built pipeline runs every patcher its variant names.
+        // Whether the plan kept a bundled set. True when there is no plan, so a
+        // directly built pipeline runs every patcher its variant names.
         func includesSet(_ identifier: String) -> Bool {
             plan?.includesPatchSet(identifier) ?? true
         }
@@ -55,9 +55,9 @@ extension FirmwarePipeline {
         let hasGuestTree = guestDevice.isPad && FileManager.default.fileExists(atPath: guestTreeURL.path)
         let boardTreeURL = restoreDir.appending(path: guestDevice.boardDeviceTreePath)
 
-        /// Whether the plan turned a patch on. Without a plan, fall back to the
-        /// release the patch is pinned to, which is the same answer the standard
-        /// preset gives.
+        // Whether the plan turned a patch on. Without a plan, fall back to the
+        // release the patch is pinned to, which is the same answer the standard
+        // preset gives.
         func isEnabled(_ identifier: String, fallback: Bool) -> Bool {
             plan?.isEnabled(identifier) ?? fallback
         }
@@ -89,6 +89,10 @@ extension FirmwarePipeline {
         let applyFrida = FirmwareKernelFridaPatchSet.manifest.patches.contains {
             isEnabled($0.identifier, fallback: false)
         }
+
+        // The 120 Hz display timing, off unless the VM asked for it.
+        let applyDisplayRefresh = isEnabled(FirmwarePatchSetCatalog.displayRefreshPatch, fallback: false)
+        let applyParavirtUserClients = isEnabled(FirmwarePatchSetCatalog.paravirtUserClientsPatch, fallback: false)
 
         // iOS 18 bases: disable the skywalk flowswitch netagents via boot-arg so
         // Network.framework uses the BSD path (the 26.1-kernel skywalk
@@ -232,6 +236,8 @@ extension FirmwarePipeline {
                         applyExcGuard: applyExcGuard,
                         applyIOS27: applyIOS27,
                         applyFrida: applyFrida,
+                        applyDisplayRefresh: applyDisplayRefresh,
+                        applyParavirtUserClients: applyParavirtUserClients,
                         includeBase: includeKernelBase,
                         includeCustomFirmware: includeKernelCustomFirmware,
                         includeHypervisor: includeHypervisor,
@@ -270,13 +276,13 @@ extension FirmwarePipeline {
                 inRestoreDir: true,
                 searchPatterns: [FirmwareManifest.guestDeviceTreePath],
                 patcherFactories: includeDeviceTree ? [{ data, verbose in
-                    let p = DeviceTreePatcher(
+                    let p = try DeviceTreePatcher(
                         data: data,
                         verbose: verbose,
                         includeIdentityPatches: dtIncludeIdentity,
                         device: guestDevice,
                         role: .installed,
-                        sourceTree: try self.loader.load(from: boardTreeURL),
+                        sourceTree: self.loader.load(from: boardTreeURL),
                     )
                     p.gate = gate
                     return p
@@ -374,6 +380,8 @@ extension FirmwarePipeline {
         applyExcGuard: Bool,
         applyIOS27: Bool,
         applyFrida: Bool,
+        applyDisplayRefresh: Bool,
+        applyParavirtUserClients: Bool,
         includeBase: Bool,
         includeCustomFirmware: Bool,
         includeHypervisor: Bool,
@@ -392,6 +400,8 @@ extension FirmwarePipeline {
                 let p = KernelCustomFirmwarePatcher(data: data, verbose: verbose)
                 p.applyIOS27 = applyIOS27
                 p.applyFrida = applyFrida
+                p.applyDisplayRefresh = applyDisplayRefresh
+                p.applyParavirtUserClients = applyParavirtUserClients
                 p.gate = gate
                 return p
             }

@@ -20,8 +20,10 @@ class VPhoneMenuController {
             }
         }
     }
+
     var hardwareKeyboardItem: NSMenuItem?
     var onHardwareKeyboardChange: ((Bool) async throws -> Void)?
+    var onFrameRateDisplayChange: ((Bool) -> Void)?
 
     var onFilesPressed: (() -> Void)?
     var onKeychainPressed: (() -> Void)?
@@ -36,8 +38,10 @@ class VPhoneMenuController {
     var installBootstrapFromFileItem: NSMenuItem?
     var uninstallBootstrapItem: NSMenuItem?
     var uninstallBootstrapNoRestartItem: NSMenuItem?
+    var rebuildAppRegistrationsItem: NSMenuItem?
     var isInstallingBootstrap = false
     var isUninstallingBootstrap = false
+    var isRebuildingAppRegistrations = false
     var installPackageItem: NSMenuItem?
     var clipboardGetItem: NSMenuItem?
     var clipboardSetItem: NSMenuItem?
