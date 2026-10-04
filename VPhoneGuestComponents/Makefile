@@ -78,14 +78,20 @@ GPU_DYNAMIC_LOOKUP_SYMS := \
 	-Wl,-U,_MTLMetalFunctionCreate \
 	-Wl,-U,_MTLMetalLibInsertFunction \
 	-Wl,-U,_MTLWriteMetalLibToMemoryBuffer
-ARTIFACTS := $(CAMFIX) $(VCAMCAPTURED) $(LAUNCHHOOK) $(SYSTEMHOOK) $(MISFIX) $(HAPTICSFIX) $(GPU_PLUGIN)
+# The HAL plugin audiomxd loads for the virtio-snd device. AudioServerDriver
+# is private and not in the SDK, so its classes link against the stub beside
+# the sources. The bundle is flat, as iOS HAL plugins are, and signed whole.
+VIRTIOSOUND := $(STAGE)/virtiosound/VPhoneVirtIOSound.driver
+VIRTIOSOUND_SOURCES := $(wildcard VirtIOSound/*.m VirtIOSound/*.c)
+VIRTIOSOUND_INCLUDES := $(wildcard VirtIOSound/*.h) VirtIOSound/Info.plist VirtIOSound/AudioServerDriver.tbd
+ARTIFACTS := $(CAMFIX) $(VCAMCAPTURED) $(LAUNCHHOOK) $(SYSTEMHOOK) $(MISFIX) $(HAPTICSFIX) $(GPU_PLUGIN) $(VIRTIOSOUND)
 PLISTS := $(STAGE)/camfix/libcamfix.plist $(STAGE)/vcamcaptured/libvcamcaptured.plist \
 	$(STAGE)/misfix/libmisfix.plist
 GPU_PROVENANCE := $(STAGE)/gpu/README.md
 
 # Directory timestamps also catch files removed from the wildcard inputs.
 
-.PHONY: all gpu package test-loader-links test-injection-environment test-vcam-dataplane clean
+.PHONY: all gpu package test-loader-links test-injection-environment test-vcam-dataplane test-virtiosound clean
 
 all: $(ARTIFACTS) $(PLISTS) $(GPU_PROVENANCE)
 
@@ -93,7 +99,7 @@ gpu: $(GPU_PLUGIN)
 
 package: all
 	@rm -f $(ARCHIVE)
-	@/usr/bin/tar -cf $(ARCHIVE) -C $(STAGE) camfix vcamcaptured launchhook systemhook misfix hapticsfix gpu
+	@/usr/bin/tar -cf $(ARCHIVE) -C $(STAGE) camfix vcamcaptured launchhook systemhook misfix hapticsfix gpu virtiosound
 	@echo "Packaged $(ARCHIVE)"
 
 test-loader-links:
@@ -108,6 +114,29 @@ test-injection-environment:
 		-o $(OUT)/InjectionEnvironmentTests Tests/InjectionEnvironmentTests.c
 	@$(OUT)/InjectionEnvironmentTests
 
+# Host proof harness for the virtio-snd format choice, the rings, the input
+# reader, the capture's low cut, the clock, the capture rate converter and the
+# speaker's reported latency.
+test-virtiosound:
+	@mkdir -p $(OUT)
+	xcrun --sdk macosx clang -O1 -Wall -Wextra -Werror -IVirtIOSound \
+		-o $(OUT)/VirtIOSoundTests \
+		Tests/VirtIOSoundTests.c VirtIOSound/VPVirtIOSoundProtocol.c VirtIOSound/VPVirtIOSoundRing.c \
+		VirtIOSound/VPVirtIOSoundFilter.c
+	@$(OUT)/VirtIOSoundTests
+	xcrun --sdk macosx clang -O1 -Wall -Wextra -Werror -IVirtIOSound \
+		-o $(OUT)/VirtIOSoundClockTests \
+		Tests/VirtIOSoundClockTests.c VirtIOSound/VPVirtIOSoundClock.c
+	@$(OUT)/VirtIOSoundClockTests
+	xcrun --sdk macosx clang -O1 -Wall -Wextra -Werror -IVirtIOSound \
+		-o $(OUT)/VirtIOSoundConverterTests \
+		Tests/VirtIOSoundConverterTests.c VirtIOSound/VPVirtIOSoundConverter.c
+	@$(OUT)/VirtIOSoundConverterTests
+	xcrun --sdk macosx clang -O1 -Wall -Wextra -Werror -IVirtIOSound \
+		-o $(OUT)/VirtIOSoundLatencyTests \
+		Tests/VirtIOSoundLatencyTests.c VirtIOSound/VPVirtIOSoundLatency.c
+	@$(OUT)/VirtIOSoundLatencyTests
+
 # Host proof harness for the camera data plane the guest hooks share.
 test-vcam-dataplane:
 	@mkdir -p $(OUT)
@@ -119,7 +148,7 @@ test-vcam-dataplane:
 		-framework CoreGraphics
 	@$(OUT)/VCamDataPlaneTests
 
-$(STAGE)/camfix $(STAGE)/vcamcaptured $(STAGE)/launchhook $(STAGE)/systemhook $(STAGE)/misfix $(STAGE)/hapticsfix $(STAGE)/gpu:
+$(STAGE)/camfix $(STAGE)/vcamcaptured $(STAGE)/launchhook $(STAGE)/systemhook $(STAGE)/misfix $(STAGE)/hapticsfix $(STAGE)/gpu $(STAGE)/virtiosound:
 	@mkdir -p $@
 
 $(CAMFIX): $(CAMFIX_SOURCES) $(CAMFIX_INPUTS) | $(STAGE)/camfix
@@ -177,6 +206,16 @@ $(GPU_PLUGIN): $(GPU_PLUGIN_SOURCES) $(GPU_PLUGIN_INCLUDES) GraphicLoader | $(ST
 		-o $@ $(GPU_PLUGIN_SOURCES)
 	@codesign --force --sign - $@
 
+$(VIRTIOSOUND): $(VIRTIOSOUND_SOURCES) $(VIRTIOSOUND_INCLUDES) VirtIOSound | $(STAGE)/virtiosound
+	@rm -rf $@
+	@mkdir -p $@
+	$(CLANG) $(COMMON_FLAGS) -Wall -Wextra -Werror -fvisibility=hidden -bundle \
+		-o $@/VPhoneVirtIOSound $(VIRTIOSOUND_SOURCES) \
+		-framework Foundation -framework IOKit \
+		VirtIOSound/AudioServerDriver.tbd -Wl,-not_for_dyld_shared_cache
+	@cp VirtIOSound/Info.plist $@/Info.plist
+	@codesign --force --sign - $@
+
 $(STAGE)/camfix/libcamfix.plist: CamFix/libcamfix.plist | $(STAGE)/camfix
 	@cp $< $@
 
@@ -188,3 +227,12 @@ $(GPU_PROVENANCE): GraphicLoader/README.md | $(STAGE)/gpu
 
 clean:
 	@rm -rf $(OUT)
+
+# Host proof harness for the scan that finds cameracaptured's GPU prewarm call.
+.PHONY: test-vcam-prewarm
+test-vcam-prewarm:
+	@mkdir -p $(OUT)
+	xcrun --sdk macosx clang -O1 -Wall -Wextra -Werror -IVCamCaptured/Prewarm \
+		-o $(OUT)/VCamPrewarmScanTests \
+		Tests/VCamPrewarmScanTests.c VCamCaptured/Prewarm/VCamPrewarmScan.c
+	@$(OUT)/VCamPrewarmScanTests

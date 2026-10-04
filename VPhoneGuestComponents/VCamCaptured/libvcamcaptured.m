@@ -42,6 +42,7 @@
 //   Synthetic/  the synthetic source, device and stream classes
 //   Frames/     the shm frame reader and viewfinder / sink delivery
 //   Hooks/      observation and delivery hooks on the capture graph
+//   Prewarm/    the GPU prewarm skip for the paravirtual Metal driver
 // Cross-file symbols are declared in each folder's header with hidden
 // visibility, so none becomes a public dylib interface.
 
@@ -89,6 +90,11 @@ __attribute__((constructor)) static void vcc_init(void) {
     vcc_log(@"loaded (argv0=%@)",
             NSProcessInfo.processInfo.arguments.firstObject ?: @"?");
 
+    // Not delayed with the camera hooks below: the daemon asks for its
+    // capture sources as soon as a client connects.
+    vcc_install_microphone_source();
+    vcc_install_remix_session_skip();
+
     // Schedule install after the daemon has run its own init. The delay
     // gives FigCaptureSourceServerStart's `dispatch_once` block time to
     // allocate _sSourceList before we try to mutate it.
@@ -130,5 +136,9 @@ __attribute__((constructor)) static void vcc_init(void) {
                        vcc_install_copy_streams_from_hook();
                      }
                    });
+
+    // Not delayed: the daemon starts its shader preload at launch, and the
+    // call has to be gone before the precompilation queue reaches it.
+    vcc_install_gpu_prewarm_skip();
   }
 }

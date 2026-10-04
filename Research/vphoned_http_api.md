@@ -1,4 +1,4 @@
-# vphoned HTTP/WebSocket API
+`audio.volume {value?, category?}`, `audio.state`, `audio.host_latency {seconds?}` (`{seconds}`, plus `changed` after a set: the Mac output latency the sound plugin adds, see below; capability `audio_host_latency`) |# vphoned HTTP/WebSocket API
 
 ## Transport and ownership
 
@@ -302,6 +302,24 @@ and whenever the settings change. SpringBoard reads the key when it starts, so
 a newly written one holds from the next boot or respring. Measurements:
 `Research/Guest/lock_screen_idle_timer.md`.
 
+`/v1/health` also carries `mobilegestalt_restart_pending`. At startup vphoned
+removes libMobileGestalt's cache,
+`/private/var/containers/Shared/SystemGroup/systemgroup.com.apple.mobilegestaltcache/Library/Caches/com.apple.MobileGestalt.plist`,
+when it is older than the Preboot `devicetree.img4` the guest booted: its
+answers were worked out from an older tree
+(`VPhoneDaemon/Daemon/GuestMobileGestaltCache.swift`). Running processes keep
+the answers they read, so the field is true from that removal until the guest
+restarts, also across a vphoned restart in the same boot; vphoned does not
+restart the guest itself. See `Research/Guest/virtio_sound.md` §7.
+
+At startup vphoned also stores `ProductIDOverride` 8010 in
+`com.apple.audio.virtualaudio` for user mobile, on an iPad or iPhone guest
+that has the sound plugin (`VPhoneDaemon/Daemon/GuestVirtualAudioProduct.swift`).
+VirtualAudio reads the key before it derives a ProductID, and the one it
+derives on a VM never initializes. A value already stored is replaced;
+`VPhoneVirtIOSoundProductID` in `com.apple.coreaudio` names another ID, and 0
+there leaves the key alone. See `Research/Guest/virtio_sound.md` §6.
+
 `screen.unlock` reads the lock state, then turns the display on with
 `SBSUndimScreen` (no toggle, unlike a power press) and presses Home to dismiss
 the Lock Screen: a passcode-free guest goes to the Home Screen, a guest with a
@@ -325,6 +343,20 @@ so SpringBoard's clock changes at once. `{automatic: true}` hands the zone
 back to timed. Both add `changed`. `vphone-vm` sends the Mac's zone after
 every connect and whenever the Mac's zone changes (`VPhoneTimeZoneSync`), so
 the guest's clock reads the same local time as the host.
+
+`audio.host_latency` (capability `audio_host_latency`) reads or sets what the
+Mac's output device adds after its mixer, in seconds, which the guest's
+sound plugin adds to its speaker's output latency so a player in the guest
+holds its picture back by as much (`VPhoneDaemon/Daemon/GuestAPI+AudioLatency.swift`).
+Without `seconds` it returns `{seconds}`, the stored value or 0. `{seconds}`
+(0 to 1) stores it as `VPhoneVirtIOSoundHostLatency` in `com.apple.coreaudio`
+for user mobile, posts the Darwin notification
+`com.vphone.audio.host-latency` so a running audiomxd reads it again, and
+returns `{seconds, changed}`; a value within 10 µs of the stored one is
+neither written nor posted (`changed: false`). `vphone-vm` sends the default
+output device's device latency + output stream latency after every connect and whenever the default output device or one of
+those changes (`VPhoneHostAudioLatencySync`). See
+`Research/Guest/virtio_sound.md` §6, "Picture against sound".
 
 `network.ipv4.get` and `network.ipv4.set` read and write the IPv4 settings of
 one interface (default `en0`) in configd's network preferences,
