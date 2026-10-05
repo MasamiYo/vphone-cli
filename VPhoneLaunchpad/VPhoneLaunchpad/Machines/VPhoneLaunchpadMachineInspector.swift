@@ -6,7 +6,8 @@ import SwiftUI
 /// A machine's run state as the table and the inspector show it.
 struct VPhoneLaunchpadMachineStateLabel: View {
     let state: VPhoneLaunchpadMachineLibrary.RunState
-    /// An export's progress, shown as a bar in place of the activity text.
+    /// An export's or a creation's IPSW download progress, shown as a bar in
+    /// place of the activity text, which becomes its help tag.
     var progress: Double?
 
     var body: some View {
@@ -101,7 +102,7 @@ struct VPhoneLaunchpadMachineInspector: View {
                 LabeledContent("State") {
                     VPhoneLaunchpadMachineStateLabel(
                         state: library.state(of: machine.path),
-                        progress: library.exports[machine.path]?.fraction,
+                        progress: library.progress(of: machine.path),
                     )
                 }
                 if let started = library.startedAt[machine.path] {
@@ -292,9 +293,29 @@ struct VPhoneLaunchpadMachineInspector: View {
                             }
                             .help(pendingHelp(catalog, pending: pending))
                         }
+                        // The kernelcache has its own button below; only the
+                        // restore-only patches need this spelled-out dead-end.
+                        if catalog.pendingRestorePatches > 0 {
+                            Text("Boot chain: ^[\(catalog.pendingRestorePatches) patch](inflect: true) (TXM, device tree, LLB) not applied; only a restore applies them, which erases the data. Run `vphone-cli fw patches \(machine.name)` for each.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                     }
                     HStack {
                         Spacer()
+                        if catalog.installed == true, catalog.pendingKernelPatches > 0 {
+                            Button("Update Kernel") {
+                                Task {
+                                    await library.updateKernel(machine.path)
+                                    patchRevision += 1
+                                }
+                            }
+                            .disabled(library.state(of: machine.path) != .stopped)
+                            .help(library.state(of: machine.path) == .stopped
+                                ? String(localized: "Swaps the Preboot kernelcache for the one this machine's patches resolve to, keeping the data (no restore).")
+                                : String(localized: "Stop the machine to update its kernel."))
+                        }
                         if catalog.installed == true, catalog.pendingGuestPatches > 0 {
                             Button("Apply to Guest") {
                                 Task {
@@ -330,8 +351,11 @@ struct VPhoneLaunchpadMachineInspector: View {
         if catalog.pendingGuestPatches > 0 {
             lines.append(String(localized: "^[\(catalog.pendingGuestPatches) guest patch](inflect: true) to apply with Apply to Guest."))
         }
-        if catalog.pendingBootChainPatches > 0 {
-            lines.append(String(localized: "^[\(catalog.pendingBootChainPatches) boot chain patch](inflect: true) that only a restore applies."))
+        if catalog.pendingKernelPatches > 0 {
+            lines.append(String(localized: "^[\(catalog.pendingKernelPatches) kernel patch](inflect: true) to apply with Update Kernel (keeps the data)."))
+        }
+        if catalog.pendingRestorePatches > 0 {
+            lines.append(String(localized: "^[\(catalog.pendingRestorePatches) boot chain patch](inflect: true) that only a restore applies."))
         }
         lines.append(String(localized: "vphone-cli fw patches \(machine.name) lists each one."))
         return lines.joined(separator: "\n")

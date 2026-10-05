@@ -92,6 +92,12 @@ final class VPhoneLaunchpadMachineLibrary {
         Set(machines.map(\.libraryRoot)).count > 1
     }
 
+    /// The bar the state label shows in place of its text: an export's
+    /// progress, or the IPSW download of a creation.
+    func progress(of machine: Path) -> Double? {
+        exports[machine]?.fraction ?? creations[machine]?.downloadFraction
+    }
+
     func state(of machine: Path) -> RunState {
         if let creation = creations[machine], creation.isRunning, let step = creation.current {
             return .busy(String(localized: "Creating: \(step.title)"))
@@ -522,6 +528,40 @@ final class VPhoneLaunchpadMachineLibrary {
             if !(error is CancellationError) {
                 actionError = error as? VPhoneLaunchpadError
                     ?? VPhoneLaunchpadError(String(localized: "Unable to update the guest environment."), detail: error.localizedDescription)
+            }
+        }
+        await refresh()
+    }
+
+    /// Replaces the machine's Preboot kernelcache with the one its current
+    /// patch selection resolves to, keeping the guest's data (no restore). The
+    /// data-preserving way to apply a kernel patch change to an installed VM.
+    func updateKernel(_ machine: Path) async {
+        guard let version = bundleVersion(for: machine) else {
+            actionError = VPhoneLaunchpadError(String(localized: "No Core Bundle version is installed. Install one in Core Bundle."))
+            return
+        }
+        activities[machine] = String(localized: "Updating kernel…")
+        defer { activities[machine] = nil }
+        appendConsoleLog(machine, "$ vphone-cli cfw update-kernel \(machine.name)")
+        let log = Self.consoleLog(machine)
+        do {
+            let status = try await helper.updateKernel(
+                bundleVersion: version,
+                machineName: machine.name,
+                libraryRoot: machine.libraryRoot,
+                onLine: { line in Self.append(line, to: log) },
+            )
+            if status != 0 {
+                actionError = VPhoneLaunchpadError(
+                    String(localized: "Unable to update the kernel."),
+                    detail: String(localized: "Choose Show Console Log for the full output."),
+                )
+            }
+        } catch {
+            if !(error is CancellationError) {
+                actionError = error as? VPhoneLaunchpadError
+                    ?? VPhoneLaunchpadError(String(localized: "Unable to update the kernel."), detail: error.localizedDescription)
             }
         }
         await refresh()

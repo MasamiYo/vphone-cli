@@ -151,7 +151,7 @@ it is not checked and needs a phone or VM in DFU.
 | 1 | `restore` (online, default) | `pmd3 restore-update` | `erase=true, ticket_path=NULL` | VM boots | **device**, but both halves are now proven separately: the online TSS fetch by row 2 and the erase-and-flash by row 3. What has not been run is the two in one invocation. Options mapping is `unit`: `RestoreOptionsTests.defaultsAreAnOnlineEraseRestore` |
 | 2 | `restore --get-shsh` | `pmd3 restore-get-shsh` | `shsh_only=true` | `.shsh` semantically equal to the Python's, same filename | ✅ **DONE 2026-09-23.** Real TSS round trip against a DFU-booted `dfu-spike`: ApNonce and SepNonce read from the device, `Received SHSH blobs`, saved as `206C763772858301.shsh` — the `%016X` name `VPhoneRestoreLayout.shshOutput` promises. The blob is a TSS response (`@ServerVersion 2.1.0`, 5,803-byte `ApImg4Ticket`), binary plist where the Python wrote XML — a serialization difference, not a semantic one |
 | 3 | `restore --offline` | AEA decrypt in place → `--tss <first .shsh>` | AEA decrypt in place → `ticket_path=<same file>` | ① `noSHSH` with no blob ② `noRestoreDir` with no tree ③ multiple `.shsh` → sorted first ④ VM boots | ✅ **DONE 2026-09-23.** ①②③ `unit` and also run through the CLI (see below); ④ a full flash of `dfu-spike` from the 26.1/23B85 tree with the cached ticket: four `.dmg.aea` decrypted in place, filesystem sent, system volume sealed, `Status: Restore Finished`, exit 0, and the device left DFU |
-| 4 | `restore --no-erase` | `Behavior.Update` | `erase=false` | user data survives | **device.** The flag did not exist until 2026-09-23 — see below. Mapping is `unit`: `RestoreOptionsTests.updateInPlaceClearsErase` |
+| 4 | `restore --no-erase` | `Behavior.Update` | `erase=false` | user data survives | ❌ **Not possible (2026-10-05); the flag refuses.** restored in the cloudOS ramdisk repartitions whatever the host sends, so an in-place restore erases the Data volume — see "An in-place restore cannot keep a guest's data" below. A kernel patch instead reaches an installed guest data-preserving through `cfw update-kernel` (no restore). Library mapping still `unit`: `RestoreOptionsTests.updateInPlaceClearsErase` |
 | 5 | metadata on success | writes `restore-info.json` | same | contents identical | ✅ **DONE 2026-09-23.** Written only after the restore returned: `{"ios":{"version":"26.1","build":"23B85"},"cloudOS":{"version":"26.1","build":"23B85"}}` |
 | 6 | failure | no `restore-info.json`, exit code passed through | same | exit codes match | **device.** The bridge's own rejections are `unit` (`RestoreRunnerTests`); a failure from inside idevicerestore is not |
 | 7 | verbosity | `-v` → one, `-vv`/`-vvv` → two `-v` | `debug_level` | logs comparably detailed | **device.** The level enum matches upstream's one for one and that is `unit` (`RestoreEventTests.levelsMatchIdevicerestoresEnum`) |
@@ -263,6 +263,82 @@ comparison.
 - **A `.ipsw` handed to `restore_dir` is rejected by name.** Upstream would have
   opened it through libzip; this build has no libzip, so the check moved to the
   front where the error is legible.
+
+## An in-place restore cannot keep a guest's data (2026-10-05)
+
+The question was whether a boot-chain patch change — a kernel patch turned on
+after creation — could reach an installed guest without losing its data, the
+way an iOS update does. Row 4 was the only candidate. It was run on a dedicated
+test VM (`iPhone17,3` 27.0 `24A435` + cloudOS 26.4 `23E5207q`), with a marker
+file written to `/var/mobile/Documents` through vphoned before each round,
+`kernel-exp-display_refresh_120hz` toggled with `fw set-patches` and `fw patch`,
+then `vm launch --dfu`, `restore --no-erase`, `cfw install` and a boot.
+
+1. **As shipped: restored fails part way, after the system volume is written.**
+   The hybrid manifest `fw prepare` writes has one identity, *Darwin Cloud
+   Customer Erase Install*. idevicerestore falls back to it for an update, but
+   restored later asks for the Upgrade identity's boot objects
+   (`PersonalizedBootObjectV3` for `Ap,SecurePageTableMonitor`):
+   `Unable to find a matching build identity`, `Unable to successfully restore
+   device`. The command still exited 0 and recorded the restore as done — a
+   separate bug, fixed (below). The marker was gone afterwards.
+2. **With an Upgrade identity added (a copy of the Erase one with
+   `RestoreBehavior` `Update`): the restore completes, the kernel is replaced,
+   the data is not kept.** `Variant: … Upgrade Install`, `Status: Restore
+   Finished`; the Preboot `kernelcache` was rewritten and the guest booted. But
+   restored ran `Creating partition map (11)`, `Creating filesystem (12)`,
+   `Creating Protected Volume (67)` and `Creating system key bag (50)`: the
+   cloudOS restore ramdisk (`094-39914-031.dmg`), the only one this hybrid
+   restores with, erases whatever behaviour it is told. The marker was gone.
+   cloudOS ships no Upgrade identity and no update ramdisk for
+   `vresearch101ap`: all seven of its identities are Erase.
+3. **With the iPhone's update ramdisk (`043-69093-769.dmg` and its trust
+   cache) in that identity: the device never enters restore mode.** The iOS 27
+   ramdisk's launchd exits on the cloudOS 26.4 restore kernel —
+   `panic: initproc exited -- exit reason namespace 2 subcode 0x6` — as the
+   installed system would without the dyld cache patches `cfw install` applies,
+   which a ramdisk does not get.
+
+4. **The erase is `restored`'s, not the host's.** A fourth round cleared the
+   one host option that directly orders a reformat — `CreateFilesystemPartitions`,
+   which `restore.c` hardcodes to 1 — *and* handed restored the Update identity.
+   restored still ran `Creating partition map` / `filesystem` / `system key bag`
+   and the marker was gone. So restored in the cloudOS (erase) ramdisk
+   repartitions whatever the host sends; no host-side change reaches it.
+
+So a restore always erases a vphone guest, and that is restored's decision in
+the ramdisk, not a host flag. `restore --no-erase` refuses with that reason
+instead of re-imaging the system volume and failing (a hidden flag, so a script
+gets the reason rather than a usage error). Making a restore itself keep data
+would mean an update ramdisk that boots on the cloudOS restore kernel — patching
+the iPhone's, as the installed system is patched — which was not attempted.
+
+**But the kernel can be changed without a restore.** The one boot-chain change
+that matters for a patch toggle is the kernelcache, and it does not need a
+restore at all: the booting kernel lives in Preboot as an IMG4, and iBoot
+accepts a modified IM4P under the original signed IM4M — the same image4 bypass
+that lets `cfw install` rewrite `devicetree.img4` there. `cfw update-kernel`
+(`VPhoneCustomFirmwareInstaller` mode `.kernelUpdate`) host-mounts Preboot on a
+clone and swaps in a re-patched kernelcache, keeping every volume. It re-patches
+the pristine kernelcache kept in `FirmwareOriginals` with the VM's current
+selection (`FirmwarePipeline.patchKernelcacheFile`, in the `.jb` variant), so it
+needs no restore tree and no prior `fw patch` — a VM in normal use has its
+restore tree deleted but keeps `FirmwareOriginals`. Proven on test VMs
+2026-10-05: with a kernel patch toggled by `fw set-patches` and no restore tree,
+`cfw update-kernel` booted the re-patched kernel and the `/var/mobile/Documents`
+marker survived. So
+`fw set-patches`, `fw patches` and the Launchpad inspector now send a kernel
+patch through `cfw update-kernel` (data-preserving) and only TXM, DeviceTree,
+LLB, iBSS and iBEC through the erasing restore. TXM and DeviceTree live in
+Preboot too and could follow the same path later; the kernelcache was done
+first because a kernel patch is the common reason to change the boot chain.
+
+**The exit-status bug.** `restore_device` in `Transfer/restore.c` sets
+`FLAG_QUIT` on the first handler error, reads one more message, and that
+message's handler overwrote `err` with 0, so a restore that restored had already
+given up on returned success and `restore-info.json` and the patch receipt were
+written. It now keeps the first fatal error. Round 3 above, with this fix,
+exited 1 and stopped before `cfw install`.
 
 ## Still open
 

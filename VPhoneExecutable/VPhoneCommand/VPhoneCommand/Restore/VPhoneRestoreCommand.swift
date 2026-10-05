@@ -40,11 +40,19 @@ struct VPhoneRestoreCommand: ParsableCommand {
     @Option(name: .shortAndLong, help: "Device UDID (optional)") var udid: String?
     @Option(name: .shortAndLong, help: "Device ECID (default: read from the bundle's udid-prediction.txt)")
     var ecid: String?
-    /// The Python exposed this as `--erase/--no-erase`, defaulting to erase, and
-    /// `VPhoneRestoreOptions.erase` has carried it since the port. Only the flag
-    /// was missing, which left `Behavior.Update` reachable from the library and
-    /// its unit test but not from the command line.
-    @Flag(name: .customLong("no-erase"), help: "Update in place instead of erasing (upstream's Behavior.Update)")
+    /// Refused: an in-place restore cannot keep a vphone guest's data. Tried on
+    /// a test VM (iPhone 27.0 24A435 + cloudOS 26.4, 2026-10-05), it fails
+    /// three ways, see `Research/Restore/native_restore_architecture.md`: the
+    /// hybrid manifest has no Upgrade identity, so restored fails after the
+    /// system volume is written; with one, the cloudOS restore ramdisk, the
+    /// only one a vphone guest boots, still creates the partition map and a
+    /// new system key bag, which erases the Data volume; and the iPhone's
+    /// update ramdisk panics (initproc exits) on the cloudOS restore kernel.
+    /// The flag stays so a script using it gets this reason, not a usage error.
+    @Flag(name: .customLong("no-erase"), help: ArgumentHelp(
+        "Not supported: an in-place restore erases a vphone guest's data anyway",
+        visibility: .hidden,
+    ))
     var noErase = false
     @Flag(name: .customShort("v"), help: "Increase verbosity: -v tool detail, -vv guest serial, -vvv internal trace")
     var verboseCount: Int
@@ -54,6 +62,14 @@ struct VPhoneRestoreCommand: ParsableCommand {
     /// used to be. A failure therefore throws instead of returning an exit
     /// code — which keeps the two halves that mattered, the non-zero exit and
     /// `restore-info.json` staying unwritten.
+    func validate() throws {
+        if noErase {
+            throw ValidationError(
+                "An in-place restore cannot keep this guest's data: restored in the cloudOS restore ramdisk recreates the partition map whatever the host asks. To change the kernel on an installed VM without erasing it, use `cfw update-kernel`.",
+            )
+        }
+    }
+
     func run() throws {
         let v = max(VPhoneVerbosity.info, VPhoneVerbosity(count: verboseCount))
         let name = try VPhoneVirtualMachineSelection.resolveExisting(name, in: lib.library)
@@ -107,7 +123,7 @@ struct VPhoneRestoreCommand: ParsableCommand {
             vmDir: bundle.url,
             ecid: ecidValue,
             udid: udid,
-            erase: !noErase,
+            erase: true,
             ticketPath: ticket,
             debugLevel: v.restoreDebugLevel,
             onEvent: onEvent,
@@ -215,6 +231,7 @@ struct VPhoneCustomFirmwareCommand: ParsableCommand {
         abstract: "Custom-firmware install (host-mount; VM must be off)",
         subcommands: [
             VPhoneCustomFirmwareInstallCommand.self,
+            VPhoneCustomFirmwareUpdateKernelCommand.self,
             VPhoneCustomFirmwareInstallRootCommand.self,
             VPhoneCustomFirmwareUpdateEnvironmentCommand.self,
             VPhoneCustomFirmwareFlipSnapshotCommand.self,
@@ -359,6 +376,42 @@ struct VPhoneCustomFirmwareInstallCommand: ParsableCommand {
 /// the restore tree, the cryptex copy and the GPU bundle, are skipped (an
 /// installed guest already carries both); the recorded `jb` variant is left
 /// alone. A VM that was never installed is refused rather than half-filled.
+struct VPhoneCustomFirmwareUpdateKernelCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "update-kernel",
+        abstract: "Replace an installed VM's Preboot kernelcache without erasing its data (VM must be off)",
+        discussion: """
+        Replaces the kernel the guest boots with one re-patched from the VM's
+        current selection, keeping every volume. The booting kernelcache lives
+        in Preboot as an IMG4; iBoot accepts a modified IM4P under the original
+        signed IM4M — the same image4 bypass that lets `cfw install` rewrite the
+        Preboot device tree — so this replaces the kernelcache's payload and
+        nothing else. No volume is reformatted, so the guest's data survives. It
+        is the one boot-chain change that reaches an installed guest without a
+        restore, which always erases (see `restore --no-erase`).
+
+        The kernelcache is re-patched from the pristine copy kept in
+        FirmwareOriginals, so no restore tree and no prior `fw patch` is needed:
+        change the selection with `fw set-patches` (or the Launchpad patch
+        editor), then run this. Needs root, and the VM must be powered off.
+        """,
+    )
+
+    @OptionGroup var lib: VPhoneLibraryOption
+    @Argument(help: "VM name") var name: String?
+
+    func run() throws {
+        let name = try VPhoneVirtualMachineSelection.resolveExisting(name, in: lib.library)
+        let bundle = try lib.library.bundle(named: name)
+        let code = try VPhoneCustomFirmwareInstaller.elevate(
+            bundle: bundle.url,
+            resources: VPhoneResources.resolve(),
+            mode: .kernelUpdate,
+        )
+        throw ExitCode(code)
+    }
+}
+
 struct VPhoneCustomFirmwareUpdateEnvironmentCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "update-environment",

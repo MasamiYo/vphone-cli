@@ -102,6 +102,8 @@
                 await sheet(.newMachine, "07-new-machine-advanced", suffix)
                 newMachinePage = .general
                 await sheet(.creation(path("ios27-rc")), "08-creation-progress", suffix)
+                creation.applyPreview(downloading: 0.42)
+                await sheet(.creation(path("ios27-rc")), "08a-creation-downloading", suffix)
                 creation.applyPreview(failed: true)
                 await sheet(.creation(path("ios27-rc")), "08b-creation-failed", suffix)
                 creation.applyPreview()
@@ -326,7 +328,16 @@
             let blocked = machine ? #"["kernel-cfw-debugger","dyld-cfw-camera"]"# : "[]"
             let records = machine ? #""installed":true,"receiptRecorded":true,"pendingPatches":2,"# : ""
             func pending(_ part: String, _ value: Bool = false) -> String {
-                machine ? #","part":"\#(part)","pending":\#(value)"# : ""
+                guard machine else { return "" }
+                // delivery is reported only for a pending patch, by part.
+                let deliveryKind: String = switch part {
+                case "kernelcache": "update-kernel"
+                case "Guest": "update-environment"
+                case "AVPBooter": "fw-patch"
+                default: "restore"
+                }
+                let delivery = value ? #","delivery":"\#(deliveryKind)""# : ""
+                return #","part":"\#(part)","pending":\#(value)"# + delivery
             }
             let json = """
             {"activePreset":"\(active)","blockedPatches":\(blocked),"allowedPatches":[],\(records)

@@ -22,9 +22,13 @@ public enum FirmwarePatchDelivery: String, Sendable, Hashable, CaseIterable, Cod
     /// `fw patch` alone delivers it. `fw patch` still needs the VM's restore
     /// tree, which is kept only with `--keep-artifacts`.
     case firmwarePatch = "fw-patch"
-    /// iBSS and iBEC are used only while restoring, LLB lives in NOR, and
-    /// kernelcache, TXM and DeviceTree are personalized into Preboot by the
-    /// restore. Nothing else writes them.
+    /// The kernelcache lives in Preboot as an IMG4; `cfw update-kernel`
+    /// re-patches it from the VM's FirmwareOriginals and swaps its IM4P into
+    /// Preboot under the signed manifest, with no restore and no erase.
+    case updateKernel = "update-kernel"
+    /// iBSS and iBEC are used only while restoring, LLB lives in NOR, and TXM
+    /// and DeviceTree are personalized into Preboot by the restore, which
+    /// erases. Nothing else writes them.
     case restore
     /// Everything `cfw install` writes into the guest volumes.
     case updateEnvironment = "update-environment"
@@ -33,8 +37,10 @@ public enum FirmwarePatchDelivery: String, Sendable, Hashable, CaseIterable, Cod
         switch target {
         case .firmware(.avpBooter):
             self = .firmwarePatch
+        case .firmware(.kernelcache):
+            self = .updateKernel
         case .firmware:
-            // Every other boot-chain component, and the restore-only
+            // iBSS, iBEC, LLB, TXM, DeviceTree, and the restore-only
             // Filesystem/Manifest.
             self = .restore
         case .dyldSharedCache, .guestExecutable, .guestEntitlements, .guestFile, .prebootDeviceTree:
@@ -134,6 +140,11 @@ public enum FirmwarePatchDrift {
     ///   - planned: The plan's enabled patches, or nil with no plan.
     ///   - applied: The receipt's patches by part, or nil with no receipt. A
     ///     part missing from it leaves its patches' `applied` nil.
+    ///   - standIns: A patch and the patch that puts the same change into
+    ///     the guest another way, such as a boot-chain DeviceTree patch and the
+    ///     Preboot repair for a VM restored before it
+    ///     (`FirmwareGuestSystemPatchSet.prebootRepairs`). When the stand-in is
+    ///     live, the patch reads as applied, whatever its own part records.
     ///   - part: The receipt's rule for naming a target's part.
     public static func states(
         declarations: [VPhonePatchDeclaration],
@@ -141,15 +152,24 @@ public enum FirmwarePatchDrift {
         planned: Set<String>?,
         applied: [String: Set<String>]?,
         notApplicable: Set<String> = [],
+        standIns: [String: String] = [:],
         part: (VPhonePatchTarget) -> String,
     ) -> [PatchState] {
-        declarations.map { declaration in
-            let part = part(declaration.target)
+        let partOf = part
+        let targets = Dictionary(declarations.map { ($0.identifier, $0.target) }, uniquingKeysWith: { first, _ in first })
+        return declarations.map { declaration in
+            let part = partOf(declaration.target)
             let isWanted = wanted.contains(declaration.identifier)
             // A patch the guest has nothing for reads as whatever is wanted,
             // so turning it on or off is never reported as pending.
-            let isApplied = applied?[part].map {
+            var isApplied = applied?[part].map {
                 notApplicable.contains(declaration.identifier) ? isWanted : $0.contains(declaration.identifier)
+            }
+            if let standIn = standIns[declaration.identifier],
+               let standInTarget = targets[standIn],
+               applied?[partOf(standInTarget)]?.contains(standIn) == true
+            {
+                isApplied = true
             }
             return PatchState(
                 identifier: declaration.identifier,

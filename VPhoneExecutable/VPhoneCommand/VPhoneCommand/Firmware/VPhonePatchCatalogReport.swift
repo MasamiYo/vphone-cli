@@ -99,6 +99,7 @@ public struct VPhonePatchCatalogReport: Sendable {
                 planned: plan.map { Set($0.enabledPatches) },
                 applied: receipt.map { $0.parts.mapValues { Set($0.patches) } },
                 notApplicable: Set(receipt?.parts.values.flatMap(\.notApplicable) ?? []),
+                standIns: FirmwareGuestSystemPatchSet.prebootRepairs,
                 part: VPhoneVirtualMachinePatchReceipt.part(for:),
             )
         }
@@ -404,12 +405,14 @@ public struct VPhonePatchCatalogReport: Sendable {
             case .firmwarePatch:
                 "run `vphone-cli fw patch \(vm)`; it takes effect at the next boot."
                     + " It needs the VM's restore tree (kept with `--keep-artifacts`)."
+            case .updateKernel:
+                "run `sudo vphone-cli cfw update-kernel \(vm)` with the machine off;"
+                    + " it re-patches the kernelcache and keeps the guest's data (no restore)."
             case .restore where part == VPhoneFirmwareComponent.iBSS.rawValue
                 || part == VPhoneFirmwareComponent.iBEC.rawValue:
                 "used only while restoring, so the change matters at the next restore and not to this guest."
             case .restore:
-                "only a restore writes \(part), and restoring in place"
-                    + " (`restore --no-erase`) is not validated yet."
+                "only a restore writes \(part), and a restore erases the guest's data: there is no in-place one."
             case .updateEnvironment:
                 "run `sudo vphone-cli cfw update-environment \(vm)`"
                     + " (in Launchpad: Update Guest Environment), with the machine off."
