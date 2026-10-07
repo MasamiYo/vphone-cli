@@ -62,6 +62,30 @@ public enum ARM64Encoder {
         return ARM64.encodeU32(insn)
     }
 
+    /// Encode `CBZ`/`CBNZ` for a general-purpose register.
+    ///
+    /// The 32-bit form is used by the IOMFB display dispatcher so the loaded
+    /// mach port does not overwrite the upper half of the scratch register.
+    /// The immediate is a signed 19-bit instruction offset (±1 MiB).
+    public static func encodeCompareBranch(
+        nonzero: Bool,
+        register: UInt32,
+        from pc: Int,
+        to target: Int,
+        width64: Bool = false,
+    ) -> Data? {
+        guard register < 32 else { return nil }
+        let delta = target - pc
+        guard delta & 0x3 == 0 else { return nil }
+        let imm19 = delta >> 2
+        guard imm19 >= -(1 << 18), imm19 < (1 << 18) else { return nil }
+        var insn: UInt32 = (width64 ? 0xB400_0000 : 0x3400_0000)
+        if nonzero { insn |= 1 << 24 }
+        insn |= (UInt32(bitPattern: Int32(imm19)) & 0x7FFFF) << 5
+        insn |= register
+        return ARM64.encodeU32(insn)
+    }
+
     /// Encode BL (branch with link) instruction.
     ///
     /// Format: `[31:26] = 0b100101`, `[25:0] = signed offset / 4`
@@ -222,6 +246,27 @@ public enum ARM64Encoder {
     }
 
     // MARK: - Stores
+
+    /// Encode `STR Xt, [Xn, #offset]` — 64-bit store, unsigned scaled offset.
+    ///
+    /// The unsigned immediate uses `opc = 00`; `imm12` is
+    /// scaled by 8, so `offset` must be a multiple of 8 in `0...32760`.
+    /// `rn == 31` means SP.
+    public static func encodeStrXUnsignedOffset(rt: UInt32, rn: UInt32, offset: UInt32) -> Data? {
+        guard rt < 32, rn < 32 else { return nil }
+        guard offset % 8 == 0 else { return nil }
+        let imm12 = offset / 8
+        guard imm12 < 4096 else { return nil }
+
+        var insn: UInt32 = 0b11 << 30 // size
+        insn |= 0b111 << 27
+        insn |= 0b01 << 24
+        insn |= 0b00 << 22 // opc = STR
+        insn |= imm12 << 10
+        insn |= rn << 5
+        insn |= rt
+        return ARM64.encodeU32(insn)
+    }
 
     /// Encode `STP Xt1, Xt2, [Xn, #offset]` — 64-bit store pair, signed scaled
     /// offset, no writeback.
