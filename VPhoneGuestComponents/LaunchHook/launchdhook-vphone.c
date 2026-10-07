@@ -1,6 +1,8 @@
 #include "../Shared/InjectionEnvironment.h"
+#include "../Shared/JetsamLimits.h"
 #include "../Shared/RootHideLoaderLinks.h"
 #include <fcntl.h>
+#include <stdint.h>
 #include <limits.h>
 #include <spawn.h>
 #include <stdarg.h>
@@ -97,7 +99,9 @@ static int vpSpawnWith(VPSpawnFunction spawn, pid_t *restrict pid, const char *r
     // have to be decided here as well as in SystemHook.
     const VPInsertedLibraries libraries = vpInsertedLibrariesFor(path);
     VPInjectionEnvironment injected = vpInsertHooksFor(envp, vpBootRoot, &libraries);
+    VPJetsamLimits limits = vpRaiseJetsamLimits(vpBootRoot, path, attributes, envp);
     int status = spawn(pid, path, actions, attributes, argv, injected.values ? injected.values : envp);
+    vpRestoreJetsamLimits(&limits);
     if (bootstrapProgram || appProgram || libraries.count || strcmp(path, "/usr/libexec/xpcproxy") == 0) {
         char event[128];
         if (!injected.values) {
@@ -186,6 +190,8 @@ static void vpLogVolumeAllow(const char *name) {
     close(fd);
 }
 
+#include "InstallCoordinationPersona.h"
+
 static int vpSandboxCheckByAuditToken(vp_audit_token_t token, const char *operation,
                                       unsigned int filter, ...) {
     va_list arguments;
@@ -197,6 +203,10 @@ static int vpSandboxCheckByAuditToken(vp_audit_token_t token, const char *operat
     if (operation && (filter == VPSandboxFilterGlobalName || filter == VPSandboxFilterLocalName) &&
         first && strcmp(operation, "mach-lookup") == 0 &&
         strcmp((const char *)first, VP_AVVOLUME_SERVICE) == 0) {
+        vpLogVolumeAllow((const char *)first);
+        return 0;
+    }
+    if (vpInstallProxyPersonaAllowed(token, operation, filter, first)) {
         vpLogVolumeAllow((const char *)first);
         return 0;
     }
