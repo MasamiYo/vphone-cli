@@ -1,5 +1,19 @@
 # Patch Comparison: Regular / Development / Jailbreak / Experimental
 
+> **iOS 27 locationd startup (2026-10-08):**
+> `system-locationd-cfw-disable_auto_cohort` disables only `CLAutoCohort` in
+> `System/Library/FeatureFlags/Domain/CoreLocation.plist`. The guest system set
+> selects it for iOS 27 only; `cfw install` and environment updates back up the
+> original plist and restore it when deselected. Independent location silos
+> avoid the startup queue hangs/PAC failures seen with automatic cohorts on
+> the cloudOS 26.4 research kernel. No executable or PAC instruction is patched.
+> On `loc27-iphone` (24A435), 20 locationd restarts and 5 cold boots answered
+> before watchdog recovery; restoring the original flag brought back repeated
+> launches and a watchdog kill. A fresh iPad16,1 24A446 guest reproduced the
+> same PAC failure with stock cohorts; with this change, another 20 restarts
+> and 5 cold boots passed, with no new crash reports or watchdog actions. See
+> [evidence and verification](Guest/locationd_27_0_1_startup_race.md).
+
 > **Patch sets and presets (2026-09-28):** every patch is now *declared*, and
 > selection happens before any byte is written. The declarations live in nine
 > bundled patch sets under `VPhoneExecutable/VPhoneCommand/FirmwarePatcher/PatchSets/`
@@ -231,6 +245,41 @@
 > (`Research/vphoned_http_api.md`). Validation: `processes.list` shows
 > `cameracaptured`, `vphone-systemhook.log` records `camera-hook=... result=loaded`
 > for its PID, and `vcamcaptured.log` shows the hook installing its source.
+
+> **3D gyroscope core (2026-10-08; guest acceptance pending):**
+> `system-backboardd-cfw-gyroscope`, declared in the Guest System set and
+> selected by both presets on iOS 18+, installs `/usr/lib/libvphonegyro.dylib`.
+> SystemHook loads it into backboardd through the same no-bootstrap daemon
+> route as the camera hook. It publishes a virtual HID gyro (page `0xff00`,
+> usage `9`); vphoned's `motion.gyroscope.set/get/clear` sends an atomic
+> three-axis rad/s configuration through mobile's backboardd preferences and
+> a Darwin notification. There is no system executable, kernel or DSC byte
+> change. Disabling the patch removes the added library; live environment
+> sync cannot reinstall an absent selected library. A provider/library update
+> needs a reboot, without silently restarting backboardd. The VM display app's
+> Features → Motion Sensors → 3D Gyroscope panel sends valid three-axis edits immediately,
+> with a simulation checkbox that retains values and a reset that zeros all
+> axes. `motion.gyroscope.set` accepts an optional Boolean `enabled` (default
+> true); the panel checks `motion_gyroscope_toggle` support. Writes serialize
+> and coalesce, preserve the latest values across old acknowledgements, and
+> retry pending state after reconnect. HID enumeration
+> and dispatch are observable separately from CoreMotion app acceptance; the
+> platform capability gate and optional IMU match still require guest proof.
+> Reveal evidence and manual acceptance: `Research/Guest/virtual_gyroscope.md`.
+
+> **Device attitude (2026-10-08; guest acceptance pending):**
+> `system-apps-cfw-attitude` in Guest System is selected by both presets on
+> iOS 18+. It adds `/usr/lib/libvphoneattitude.dylib`, loaded by SystemHook
+> into apps, with no system executable, kernel or DSC byte change. Public
+> CMMotionManager methods supply a stationary XArbitraryZVertical pose through
+> polling/callbacks. vphoned persists degrees and publishes one packed Darwin
+> notify state; apps receive radians, quaternion, matrix and matching gravity.
+> Disabling restores the native path; removing the library and relaunching apps
+> reverts injection. Live sync cannot reinstall an absent selected library.
+> Features → Motion Sensors → Device Attitude provides live angle editing,
+> a simulation checkbox and zero reset. Native host subscription tests and
+> guest cross-compilation passed; manual guest acceptance remains.
+> Contract and validation: `Research/Guest/virtual_attitude.md`.
 
 > **Current launchd hook (2026-09-25; isolated VM verification):**
 > `cfw install` now places `launchdhook-vphone.dylib` and a diagnostic

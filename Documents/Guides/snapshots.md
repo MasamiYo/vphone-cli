@@ -22,7 +22,9 @@ first, with `created` in ISO 8601 and `note` left out when there is none.
 
 `create` and `revert` refuse while the VM is running, and so does anything that
 holds its disk image, `SEPStorage` or `nvram.bin` open. Stop it with
-`vphone-cli vm stop myphone` or from its window, then try again.
+`vphone-cli vm stop myphone` or from its window, then try again. The refusal
+names each process holding them; when none of them runs the VM (a backup tool,
+Spotlight), it says so, and the retry succeeds once that process closes them.
 
 The three files move together. The Secure Enclave's anti-replay counters live in
 `SEPStorage`, and the disk holds the matching state. A disk from one moment with
@@ -68,6 +70,11 @@ and costs no space; the VM and its snapshots share every block until the guest
 writes to it, and then only the changed blocks take new space. Because of this,
 `du` and Finder count each snapshot at the full size of the disk and overstate
 what it really uses. Free space on the volume is the honest measure.
+
+A snapshot keeps the disk blocks it was taken with. `vm rebase`, which makes a
+VM share identical blocks with another VM's, frees nothing while a snapshot of
+that VM still holds the old ones; see
+[Sharing disk space between VMs](create-and-run.md#sharing-disk-space-between-vms).
 
 The VM must be on an APFS volume. Elsewhere `create` refuses rather than copying
 a disk image that can be tens of gigabytes.

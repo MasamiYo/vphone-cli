@@ -12,12 +12,17 @@ extension GuestAPI {
             executeService,
             executeLog,
             executeAppDetail,
+            executeSystemApps,
             executeFileTool,
+            executeStorage,
             executeEnvironment,
             executeDeviceIdentity,
             executeSetupAssistant,
+            executeFirstBoot,
             executeTimeZone,
             executeAudioLatency,
+            executeGyroscope,
+            executeAttitude,
         ]
         for area in areas {
             if let result = try area(method, params) {

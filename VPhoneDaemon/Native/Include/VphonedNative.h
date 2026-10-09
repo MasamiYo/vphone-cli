@@ -1,5 +1,6 @@
 #pragma once
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #ifdef __OBJC__
 #import <Foundation/Foundation.h>
@@ -56,7 +57,34 @@ char *vp_usb_set_serial(const char *serial, bool force, bool *changed);
 /// `unique-chip-id`. malloc-owned, or NULL when the device tree lacks either.
 char *vp_usb_own_serial(void);
 
+/// The names of the APFS snapshots of the volume mounted at `mount`, in
+/// `*names` (free with `vp_apfs_snapshot_names_free`). Returns 0 or an errno value.
+int vp_apfs_snapshot_list(const char *mount, char ***names, int *count);
+void vp_apfs_snapshot_names_free(char **names, int count);
+
+/// Append the names in one `fs_snapshot_list` batch of `entries` entries
+/// (`ATTR_CMN_RETURNED_ATTRS | ATTR_CMN_NAME`) to `*names`, skipping names
+/// already there and malformed entries; `*added` counts the new ones.
+/// Returns 0 or ENOMEM.
+int vp_apfs_snapshot_parse(const char *buffer, size_t size, int entries, char ***names, int *count, int *added);
+
+/// Delete the snapshot `name` of the volume mounted at `mount`. Returns 0 or
+/// an errno value. Needs root and com.apple.private.vfs.snapshot.
+int vp_apfs_snapshot_delete(const char *mount, const char *name);
+
+/// Register the Apple app bundle at `app_path`, inside the bundle container
+/// `container_path`, with LaunchServices as a deletable system app. Returns a
+/// malloc-owned error or NULL, with the registration call that worked in
+/// `*method` (malloc-owned).
+char *vp_ls_register_system_app(const char *app_path, const char *container_path, char **method);
+
 #ifdef __OBJC__
+/// The configured radians/second and the injected HID provider's heartbeat.
+NSDictionary *vp_gyro_get(void);
+BOOL vp_gyro_set(double x, double y, double z, bool enabled);
+NSDictionary *vp_attitude_get(void);
+BOOL vp_attitude_set(double roll, double pitch, double yaw, bool enabled);
+
 /// Snapshot-local nested accessibility tree, using actual private iOS child links.
 NSDictionary *vp_ax_hierarchy(int pid, int maxElements, int maxDepth, int timeoutMS);
 
