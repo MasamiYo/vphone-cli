@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UniformTypeIdentifiers
 
 /// The third stage: the VM library, driven entirely through `vphone-cli vm`.
 ///
@@ -30,7 +31,6 @@ final class VPhoneLaunchpadMachineLibrary {
     private(set) var creations: [Path: VPhoneLaunchpadCreationPipeline] = [:]
     /// Each listed machine's Core Bundle, read from its `launchpad.json`.
     private(set) var bindings: [Path: VPhoneLaunchpadMachineBinding] = [:]
-    private(set) var globalActivity: String?
     /// Folders chosen in New Machine, in the order they were added. The
     /// default library is not among them.
     private(set) var addedRoots: [String]
@@ -100,13 +100,12 @@ final class VPhoneLaunchpadMachineLibrary {
         exports[machine]?.fraction ?? creation(for: machine)?.downloadFraction
     }
 
+    /// A creation shows only its current step: the spinner says it is busy,
+    /// and the inspector says what is being created.
     func state(of machine: Path) -> RunState {
-        if let creation = creations[machine], creation.isRunning, let step = creation.current {
-            return .busy(String(localized: "Creating: \(step.title)"))
-        }
-        // The temporary machine a template is built in.
+        // The machine, or the temporary machine a template is built in.
         if let creation = creation(for: machine), creation.isRunning, let step = creation.current {
-            return .busy(String(localized: "Building template: \(step.title)"))
+            return .busy(step.title)
         }
         if let activity = activities[machine] {
             return .busy(activity)
@@ -233,7 +232,7 @@ final class VPhoneLaunchpadMachineLibrary {
         listError = errors.first
         hasListed = true
         forgetEmptyLocations(listed: listed)
-        selection.formIntersection(machines.map(\.id))
+        selection.formIntersection(machines.map(\.id) + imports.map(\.row))
         if selection.isEmpty, let first = machines.first {
             selection = [first.id]
         }
@@ -331,6 +330,17 @@ final class VPhoneLaunchpadMachineLibrary {
     /// Names of the listed machines bound to `version`.
     func machineNames(boundTo version: String) -> [String] {
         machines.filter { bundleVersion(for: $0.path) == version }.map(\.name)
+    }
+
+    /// Names of the machines bound to `version` that are not stopped.
+    func activeMachineNames(boundTo version: String) -> [String] {
+        machines.filter { bundleVersion(for: $0.path) == version && state(of: $0.path) != .stopped }.map(\.name)
+    }
+
+    /// True when the machine's Core Bundle is not installed, so it cannot
+    /// run until it is given another one.
+    func isDamaged(_ machine: Path) -> Bool {
+        bundleVersion(for: machine).map { !bundles.selectableVersions.contains($0) } ?? false
     }
 
     /// The binding on disk, or the listed copy when the file cannot be read.
@@ -678,6 +688,31 @@ final class VPhoneLaunchpadMachineLibrary {
         launched[machine]?.interrupt()
     }
 
+    /// Kills the machine's VM processes, `vphone-vm` and Virtualization's VM
+    /// service, without asking the guest or `vphone-cli`: for a guest that
+    /// hangs or ignores a stop. They run as this user, so no helper is
+    /// needed. The `vphone-cli` that launched it exits once they are gone.
+    func forceStop(_ machine: Path) async {
+        activities[machine] = String(localized: "Force stopping…")
+        defer { activities[machine] = nil }
+        let holders = await Task.detached {
+            Self.diskHolders([machine])[machine, default: []].filter(\.runsMachine)
+        }.value
+        let refused = holders.filter { kill($0.pid, SIGKILL) != 0 && errno != ESRCH }
+        if !refused.isEmpty {
+            actionError = VPhoneLaunchpadError(
+                String(localized: "Unable to Force Stop \(machine.name)"),
+                detail: refused.map(\.description).joined(separator: "\n"),
+            )
+        }
+        launched[machine]?.terminate()
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline, await isMachineRunning(machine) {
+            try? await Task.sleep(for: .milliseconds(200))
+        }
+        await refresh()
+    }
+
     /// How long a guest gets to shut down before `vm stop` takes over.
     private static let guestShutdownTimeout: TimeInterval = 30
 
@@ -796,6 +831,9 @@ final class VPhoneLaunchpadMachineLibrary {
                 ["vm", "delete", machine.name, "--force"] + machine.libraryArguments,
                 anyBundle: true,
             )
+            // A creation that stopped short goes with its machine; kept, it
+            // would still claim its IPSWs in Downloaded Firmware.
+            discardCreation(machine)
             if let notice = VPhoneLaunchpadTemplateNotice.parse(result.lines, libraryRoot: machine.libraryRoot) {
                 templateNotice = notice
             }
@@ -844,7 +882,7 @@ final class VPhoneLaunchpadMachineLibrary {
         }
         let libraryRoots = roots.filter { $0 == libraryRoot || VPhoneLaunchpadMachineLocations.isAvailable($0) }
         let meter = diskMeter
-        let templatesMayOpen = self.templatesMayOpen
+        let templatesMayOpen = templatesMayOpen
         let mayOpenNow: @Sendable (String) async -> Bool = { [weak self] folder in
             await self?.mayOpenDisk(inFolder: folder) ?? false
         }
@@ -859,6 +897,7 @@ final class VPhoneLaunchpadMachineLibrary {
             )
             diskUsage = measured.usage
             templateUsage = measured.templates
+            hasTemplates = measured.hasTemplates
             diskUsageMeasured = Date()
             isMeasuringDiskUsage = false
             if isDiskUsageRequested {
@@ -882,7 +921,7 @@ final class VPhoneLaunchpadMachineLibrary {
             isLaunched: launched[machine] != nil,
             isHeld: diskHolders[machine]?.isEmpty == false,
             isBusy: isBusy || creation(for: machine)?.isRunning == true || exports[machine] != nil,
-            isLibraryBusy: globalActivity != nil,
+            isLibraryBusy: isImporting,
         )
     }
 
@@ -892,7 +931,7 @@ final class VPhoneLaunchpadMachineLibrary {
     /// refuses while another process holds the template open.
     private var templatesMayOpen: Bool {
         VPhoneLaunchpadDiskAccess.templatesMayOpen(
-            isLibraryBusy: globalActivity != nil,
+            isLibraryBusy: isImporting,
             creationSteps: creations.values.filter(\.isRunning).compactMap(\.current),
         )
     }
@@ -917,13 +956,15 @@ final class VPhoneLaunchpadMachineLibrary {
         templatesMayOpen: Bool,
         meter: VPhoneLaunchpadDiskMeter,
         mayOpenNow: @escaping @Sendable (String) async -> Bool,
-    ) async -> (usage: [Path: VPhoneLaunchpadDiskUsage], templates: [String: VPhoneLaunchpadDiskUsage]) {
+    ) async -> (usage: [Path: VPhoneLaunchpadDiskUsage], templates: [String: VPhoneLaunchpadDiskUsage], hasTemplates: Bool) {
         // Templates are keyed as `usage(of:)` looks them up.
         var templateKeys: [String: String] = [:]
+        var hasBuilds = false
         for root in libraryRoots {
             for folder in VPhoneLaunchpadDiskMeter.templateFolders(in: root) {
                 templateKeys[folder] = URL(fileURLWithPath: folder).lastPathComponent + "@" + root
             }
+            hasBuilds = hasBuilds || VPhoneLaunchpadDiskMeter.hasTemplateBuilds(in: root)
         }
         let folders = machineFolders + templateKeys.keys.sorted().map { VPhoneLaunchpadDiskMeter.Folder(path: $0, mayOpen: templatesMayOpen) }
         let measured = await meter.measure(folders, mayOpenNow: mayOpenNow)
@@ -935,7 +976,7 @@ final class VPhoneLaunchpadMachineLibrary {
         for (folder, key) in templateKeys {
             templates[key] = measured[folder]
         }
-        return (usage, templates)
+        return (usage, templates, !templateKeys.isEmpty || hasBuilds)
     }
 
     // MARK: - Templates
@@ -949,6 +990,11 @@ final class VPhoneLaunchpadMachineLibrary {
     /// Each template's disk use, by `<identifier>@<library root>`, measured
     /// with the machines.
     private(set) var templateUsage: [String: VPhoneLaunchpadDiskUsage] = [:]
+
+    /// Whether any library holds a template or a left-over build, from the
+    /// disk meter's scan of `.templates` and from `refreshTemplates`. The
+    /// Templates menu item is shown only then.
+    private(set) var hasTemplates = false
 
     func refreshTemplates() async {
         guard let commandLine = bundles.commandLine() else {
@@ -975,6 +1021,9 @@ final class VPhoneLaunchpadMachineLibrary {
         templates = found.sorted { $0.created > $1.created }
         templateBuilds = builds
         templatesError = errors.first
+        if errors.isEmpty {
+            hasTemplates = !found.isEmpty || !builds.isEmpty
+        }
         refreshDiskUsage(force: true)
     }
 
@@ -1062,7 +1111,7 @@ final class VPhoneLaunchpadMachineLibrary {
 
     /// Exports each machine to its destination file, one at a time: each
     /// export reads a whole disk image.
-    func export(_ items: [(machine: Path, destination: URL)], densest: Bool, includeIPSW: Bool) async {
+    func export(_ items: [(machine: Path, destination: URL)]) async {
         for item in items {
             exports[item.machine] = Export()
         }
@@ -1072,7 +1121,7 @@ final class VPhoneLaunchpadMachineLibrary {
                 continue
             }
             let task = Task {
-                await runExport(item.machine, to: item.destination, densest: densest, includeIPSW: includeIPSW)
+                await runExport(item.machine, to: item.destination)
             }
             exports[item.machine]?.task = task
             await task.value
@@ -1092,14 +1141,10 @@ final class VPhoneLaunchpadMachineLibrary {
         }
     }
 
-    private func runExport(_ machine: Path, to destination: URL, densest: Bool, includeIPSW: Bool) async {
-        var arguments = ["vm", "export", machine.name, "--out", destination.path] + machine.libraryArguments
-        if densest {
-            arguments.append("--max")
-        }
-        if includeIPSW {
-            arguments.append("--include-ipsw")
-        }
+    private func runExport(_ machine: Path, to destination: URL) async {
+        // zstd, the default: Launchpad does not offer xz. Never
+        // --include-ipsw: the restore IPSWs stay in the IPSW cache.
+        let arguments = ["vm", "export", machine.name, "--out", destination.path] + machine.libraryArguments
         await perform(String(localized: "Exporting…"), on: machine, arguments) { [weak self] fraction in
             Task { @MainActor in self?.exports[machine]?.fraction = fraction }
         }
@@ -1110,12 +1155,137 @@ final class VPhoneLaunchpadMachineLibrary {
         }
     }
 
+    /// What Import accepts: `.vpea`, and the `.tzst` and `.txz` names exports
+    /// had before it. `vm import` detects the compressor, not the name.
+    static var importableTypes: [UTType] {
+        [.vphoneExportedArchive] + ["tzst", "txz"].compactMap { UTType(filenameExtension: $0) }
+    }
+
+    // MARK: - Import
+
+    /// An import queued or under way, listed as a row of its own until the
+    /// machine it brings appears. `fraction` is nil until the command reports
+    /// progress; `task` is nil while the import waits its turn.
+    struct Import: Identifiable {
+        let id = UUID()
+        let archive: URL
+        /// The default library, which every import writes to.
+        let libraryRoot: String
+        var fraction: Double?
+        fileprivate var task: Task<Void, Never>?
+
+        var isWaiting: Bool {
+            task == nil
+        }
+
+        /// The archive's name without its extension, which is the machine's
+        /// name unless the export was renamed.
+        var name: String {
+            archive.deletingPathExtension().lastPathComponent
+        }
+
+        /// The row's identity in the machine table. No machine has it: a
+        /// machine name cannot start with a dot.
+        var row: Path {
+            Path(libraryRoot: libraryRoot, name: ".import-\(id.uuidString)")
+        }
+    }
+
+    private(set) var imports: [Import] = []
+    /// The last import queued; each one waits for the one before.
+    private var lastImport: Task<Void, Never>?
+
+    /// True while an import unpacks into the library.
+    var isImporting: Bool {
+        imports.contains { !$0.isWaiting }
+    }
+
+    func importItem(_ row: Path) -> Import? {
+        imports.first { $0.row == row }
+    }
+
+    /// Imports one archive after those already queued: each import writes a
+    /// whole disk image.
     func importArchive(_ archive: URL) async {
-        await perform(
-            String(localized: "Importing \(archive.lastPathComponent)"),
-            on: nil,
-            ["vm", "import", archive.path, "--library-root", libraryRoot],
-        )
+        let item = Import(archive: archive, libraryRoot: libraryRoot)
+        imports.append(item)
+        // So the inspector shows the import as it runs.
+        selection = [item.row]
+        let previous = lastImport
+        let queued = Task {
+            await previous?.value
+            await runImport(item.id)
+        }
+        lastImport = queued
+        await queued.value
+    }
+
+    private func runImport(_ id: UUID) async {
+        // Cancelled while it waited.
+        guard let index = imports.firstIndex(where: { $0.id == id }) else {
+            return
+        }
+        let item = imports[index]
+        let arguments = ["vm", "import", item.archive.path, "--library-root", libraryRoot]
+        let task = Task {
+            do {
+                let result = try await performChecked(String(localized: "Importing…"), on: nil, arguments) { fraction in
+                    Task { @MainActor in
+                        guard let index = self.imports.firstIndex(where: { $0.id == id }) else {
+                            return
+                        }
+                        self.imports[index].fraction = fraction
+                    }
+                }
+                // `imported → <name>`: the import's row gives way to the
+                // machine, selected in its place.
+                if let name = result.lines.last(where: { $0.hasPrefix("imported → ") })?.dropFirst("imported → ".count),
+                   selection == [item.row]
+                {
+                    selection = [Path(libraryRoot: libraryRoot, name: String(name))]
+                }
+            } catch {
+                if !(error is CancellationError) {
+                    actionError = VPhoneLaunchpadError(actionFailure: error)
+                }
+            }
+        }
+        imports[index].task = task
+        await task.value
+        imports.removeAll { $0.id == id }
+        selection.remove(item.row)
+    }
+
+    /// Stops an import under way, or takes a waiting one out of the queue.
+    /// `vm import` removes what it had unpacked.
+    func cancelImport(_ id: UUID) {
+        guard let item = imports.first(where: { $0.id == id }) else {
+            return
+        }
+        if let task = item.task {
+            task.cancel()
+        } else {
+            imports.removeAll { $0.id == id }
+        }
+    }
+
+    /// True while an import or an export is queued or under way.
+    var hasActiveTransfer: Bool {
+        !imports.isEmpty || !exports.isEmpty
+    }
+
+    /// Stops every import and export and waits for their commands to exit,
+    /// so none is left running, or half written, when Launchpad quits.
+    func stopTransfers() async {
+        let running = imports.compactMap(\.task) + exports.values.compactMap(\.task)
+        imports.removeAll { $0.isWaiting }
+        exports = exports.filter { !$0.value.isWaiting }
+        for task in running {
+            task.cancel()
+        }
+        for task in running {
+            await task.value
+        }
     }
 
     /// Runs one command with `activity` shown as the machine's state. False
@@ -1162,16 +1332,14 @@ final class VPhoneLaunchpadMachineLibrary {
             }
             throw CancellationError()
         }
+        // Without a machine, the caller shows the activity itself: Import
+        // shows a row of its own.
         if let machine {
             activities[machine] = activity
-        } else {
-            globalActivity = activity
         }
         defer {
             if let machine {
                 activities[machine] = nil
-            } else {
-                globalActivity = nil
             }
         }
         do {

@@ -27,8 +27,43 @@ struct VPhoneLaunchpadApp: App {
         .restorationBehavior(.disabled)
         .commands {
             CommandGroup(replacing: .newItem) {
-                Button("Downloaded IPSWs…") { model.present(.ipswCache) }
-                Button("Templates…") { model.present(.templates) }
+                Button("New…") { model.machineSheetRequest = .newMachine }
+                    .keyboardShortcut("n")
+                    .disabled(model.bundles.defaultVersion == nil)
+                Button("Import…") { model.machines.chooseImport() }
+                    .keyboardShortcut("o")
+                Divider()
+                Button("Downloaded Firmware…") { model.present(.ipswCache) }
+                if model.machines.hasTemplates {
+                    Button("Templates…") { model.present(.templates) }
+                }
+            }
+            // Now rather than on the next five-second tick: the machine list,
+            // then the templates, which also measures disk use again.
+            CommandGroup(before: .toolbar) {
+                Button("Refresh") {
+                    Task {
+                        await model.machines.refresh()
+                        await model.machines.refreshTemplates()
+                    }
+                }
+                .keyboardShortcut("r")
+                // Every command Launchpad ran, not one machine's: here rather
+                // than in a machine's menu.
+                Button("Recent Commands") { model.machineSheetRequest = .commands }
+                    .keyboardShortcut("l", modifiers: [.command, .shift])
+                Divider()
+            }
+            // The selected machines' actions, as the toolbar's Actions menu
+            // has them, with shortcuts.
+            CommandGroup(after: .pasteboard) {
+                Divider()
+                VPhoneLaunchpadMachineActions(machines: model.machines.selectedMachines, placement: .editMenu)
+                    .environment(model)
+            }
+            CommandMenu("Machine") {
+                VPhoneLaunchpadMachineActions(machines: model.machines.selectedMachines, placement: .machineMenu)
+                    .environment(model)
             }
             CommandGroup(after: .appSettings) {
                 Button("Host Setup…") { model.present(.hostSetup) }
@@ -50,11 +85,16 @@ struct VPhoneLaunchpadApp: App {
 }
 
 /// Guests keep running when Launchpad quits (their output goes to a log
-/// file, not a pipe). A machine being created does not survive, so quitting
-/// then asks first.
+/// file, not a pipe). A machine being created, an import and an export do
+/// not survive, so quitting then asks first.
 @MainActor
 final class VPhoneLaunchpadAppDelegate: NSObject, NSApplicationDelegate {
-    weak var model: VPhoneLaunchpadModel?
+    weak var model: VPhoneLaunchpadModel? {
+        didSet { importOpened() }
+    }
+
+    /// Archives opened from Finder before the window gave us the model.
+    private var opened: [URL] = []
     private let dockPolicy = VPhoneLaunchpadDockPolicy()
     /// Set once the user confirms closing the last window while a machine is
     /// being created, so the terminate path that follows does not ask again.
@@ -62,6 +102,28 @@ final class VPhoneLaunchpadAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_: Notification) {
         dockPolicy.start()
+    }
+
+    /// A `.vpea` opened in Finder, or dropped on the Dock icon, is imported
+    /// into the default library, as Import… would; an IPSW is added to the
+    /// IPSW cache.
+    func application(_: NSApplication, open urls: [URL]) {
+        opened += urls.filter(\.isFileURL)
+        importOpened()
+    }
+
+    private func importOpened() {
+        guard let model, !opened.isEmpty else {
+            return
+        }
+        let archives = opened.filter { !VPhoneLaunchpadIPSWImport.isIPSW($0) }
+        model.ipswImport.register(opened, model: model)
+        opened = []
+        Task {
+            for archive in archives {
+                await model.machines.importArchive(archive)
+            }
+        }
     }
 
     /// In menu bar mode the app stays behind in the menu bar. Closing the
@@ -77,13 +139,22 @@ final class VPhoneLaunchpadAppDelegate: NSObject, NSApplicationDelegate {
                 return .terminateNow
             }
         #endif
-        if confirmedClose {
+        guard let model else {
             return .terminateNow
         }
-        guard let model, model.machines.hasActiveCreation else {
+        if !confirmedClose, model.machines.hasActiveCreation || model.machines.hasActiveTransfer, !confirmStopWork() {
+            return .terminateCancel
+        }
+        guard model.machines.hasActiveTransfer else {
             return .terminateNow
         }
-        return confirmStopCreation() ? .terminateNow : .terminateCancel
+        // A `vm import` or `vm export` left behind would go on writing with
+        // nobody reading its output. Stopped, each removes what it wrote.
+        Task {
+            await model.machines.stopTransfers()
+            NSApp.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 
     /// The close button, Close menu item and ⌘W all ask here, while the
@@ -91,22 +162,31 @@ final class VPhoneLaunchpadAppDelegate: NSObject, NSApplicationDelegate {
     /// quits, so the alert says Quit. Cancel refuses the close. In menu bar
     /// mode closing only hides the window, so no confirmation is needed.
     func windowShouldClose(_: NSWindow) -> Bool {
-        guard !VPhoneLaunchpadMenuBar.isEnabled, let model, model.machines.hasActiveCreation else {
+        guard !VPhoneLaunchpadMenuBar.isEnabled, let model,
+              model.machines.hasActiveCreation || model.machines.hasActiveTransfer
+        else {
             return true
         }
-        guard confirmStopCreation() else {
+        guard confirmStopWork() else {
             return false
         }
         confirmedClose = true
         return true
     }
 
-    private func confirmStopCreation() -> Bool {
+    private func confirmStopWork() -> Bool {
         let alert = NSAlert()
-        alert.messageText = String(localized: "Stop Creating Machine?")
-        alert.informativeText = String(
-            localized: "Quitting stops creating this machine. You can retry later from the step where it stopped.",
-        )
+        if model?.machines.hasActiveCreation == true {
+            alert.messageText = String(localized: "Stop Creating Machine?")
+            alert.informativeText = String(
+                localized: "Quitting stops creating this machine. You can retry later from the step where it stopped.",
+            )
+        } else {
+            alert.messageText = String(localized: "Stop Importing and Exporting?")
+            alert.informativeText = String(
+                localized: "Quitting stops every import and export under way and removes what they had written.",
+            )
+        }
         alert.addButton(withTitle: String(localized: "Quit"))
         alert.addButton(withTitle: String(localized: "Cancel"))
         return alert.runModal() == .alertFirstButtonReturn

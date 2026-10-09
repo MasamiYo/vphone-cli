@@ -2,18 +2,22 @@ import Foundation
 
 // MARK: - Rows
 
-/// One IPSW in the Downloaded IPSWs table.
+/// One IPSW in the Downloaded Firmware table.
 nonisolated struct VPhoneLaunchpadIPSWRow: Identifiable, Hashable, Sendable {
     var id: String
     var title: String
     var fileName: String
     var kind: VPhoneLaunchpadIPSW.Kind
     var kindLabel: String
+    /// The product types the IPSW restores, `iPhone17,3`, which tell apart
+    /// two IPSWs of one release.
+    var devices: String
     var size: Int64
     var usedBy: [String]
     var isDownloading: Bool
-    /// Why the IPSW cannot be deleted now; nil when it can.
-    var blockedReason: String?
+    /// What deleting the IPSW now would break; nil when nothing. Deletion
+    /// goes ahead either way, after the confirmation repeats it.
+    var deletionWarning: String?
 }
 
 // MARK: - Catalog names
@@ -111,13 +115,14 @@ nonisolated enum VPhoneLaunchpadIPSWRows {
                 title: title(file, catalogName: catalogName),
                 fileName: file.name,
                 kind: kind,
-                kindLabel: kindLabel(kind, beta: facts?.isBeta == true || catalogName?.localizedCaseInsensitiveContains("beta") == true),
+                kindLabel: kindLabel(kind),
+                devices: facts?.productTypes.joined(separator: ", ") ?? "",
                 size: file.size,
                 usedBy: uses.filter { $0.uses(file) }.map { use in
                     use.isCreating ? String(localized: "\(use.machine) (creating)") : use.machine
                 },
                 isDownloading: file.isDownloading,
-                blockedReason: deletionBlock(file, uses: uses, isCreating: isCreating),
+                deletionWarning: deletionWarning(file, uses: uses, isCreating: isCreating),
             )
         }
         .sorted { lhs, rhs in
@@ -148,24 +153,25 @@ nonisolated enum VPhoneLaunchpadIPSWRows {
         return file.facts?.title ?? file.name
     }
 
-    static func kindLabel(_ kind: VPhoneLaunchpadIPSW.Kind, beta: Bool) -> String {
-        let name = switch kind {
+    static func kindLabel(_ kind: VPhoneLaunchpadIPSW.Kind) -> String {
+        switch kind {
         case .iPhone: String(localized: "iPhone")
         case .iPad: String(localized: "iPad")
         case .cloudOS: String(localized: "cloudOS")
         case .unknown: String(localized: "Unknown")
         }
-        return beta ? String(localized: "\(name) · beta") : name
     }
 
     // MARK: Deleting
 
-    /// Why `file` cannot be deleted now, or nil. A restored machine no longer
-    /// reads its IPSWs: Update Kernel and Update Guest Environment work from
-    /// the machine folder. So only a creation that has not finished holds
-    /// one, since a retry reads its sources again. A partial file is a
-    /// download, and only a creation under way downloads (`isCreating`).
-    static func deletionBlock(
+    /// What deleting `file` now would break, or nil. A restored machine no
+    /// longer reads its IPSWs: Update Kernel and Update Guest Environment
+    /// work from the machine folder. So only a creation that has not
+    /// finished needs one, since a retry reads its sources again. A partial
+    /// file is a download, and only a creation under way downloads
+    /// (`isCreating`). None of this refuses the deletion: that creation
+    /// fails instead, and is retried or deleted.
+    static func deletionWarning(
         _ file: VPhoneLaunchpadIPSWFile,
         uses: [VPhoneLaunchpadIPSWUse],
         isCreating: Bool,
@@ -183,17 +189,18 @@ nonisolated enum VPhoneLaunchpadIPSWRows {
     }
 
     /// The confirmation's text: what goes, which machines keep working, and
-    /// what brings it back.
+    /// what brings it back, then what the deletion breaks.
     static func deletionMessage(_ row: VPhoneLaunchpadIPSWRow) -> String {
+        let warning = row.deletionWarning.map { " \($0)" } ?? ""
         if row.isDownloading {
-            return String(localized: "The partial download of \(row.fileName) is deleted.")
+            return String(localized: "The partial download of \(row.fileName) is deleted.") + warning
         }
         let deleted = String(localized: "\(row.fileName) is deleted from the IPSW cache.")
         let again = String(localized: "Creating a machine from this release downloads it again.")
         guard !row.usedBy.isEmpty else {
-            return "\(deleted) \(again)"
+            return "\(deleted) \(again)\(warning)"
         }
         let keep = String(localized: "\(row.usedBy.joined(separator: ", ")) keep working without it.")
-        return "\(deleted) \(keep) \(again)"
+        return "\(deleted) \(keep) \(again)\(warning)"
     }
 }
