@@ -79,8 +79,8 @@ command-line executable remains unentitled and still launches `vphone-vm`.
 The guest links IcliKit directly. App registration refresh is available through
 `POST /v1/apps/refresh` or the WebSocket method `apps.refresh`. An optional
 `directory` selects a bundle directory; omitted, it uses `/Applications` under
-the bootstrap vphoned installed (vphoned runs from the system volume, so
-IcliKit cannot find the bootstrap itself). `system.uicache` is the same call.
+the bootstrap vphoned installed (vphoned runs from the system volume, and
+knows which install it completed). `system.uicache` is the same call.
 IcliKit verifies registrations by reading them back; a bundle it could not
 register or verify is named in the error message. Since icli 0.7.17 a
 registration builds the record uicache builds (entitlements, containerization,
@@ -92,10 +92,17 @@ Since icli 0.8.0 a `PlugIns` entry that is not an app extension (a
 `.bundle`, a `.framework`, or an `.appex` without `NSExtension`) no longer
 stalls `apps.register` or `apps.refresh` and fails them with "did not record
 the plug-ins"; a `refresh_incomplete` message names the app and the field.
+Since icli 0.8.4 a refresh lists apps from LaunchServices' application
+records and reads a registration only for the apps it plans to change: one
+with nothing to do took 0.03 s on an iOS 26.6.2 guest, 0.53 s before.
 `screen.screenshot` uses IcliKit's native screen capture and returns a base64
 JPEG with `mime_type`, `width`, and `height`; the current VM produces 1290×2796.
 The host's Save/Copy Screenshot menu decodes this guest image. It omits the
 notch and cutout drawn by the host VM window.
+Since icli 0.8.4 a native-resolution screenshot taken while SpringBoard is
+not running (the boot logo, the respring spinner) is captured through the
+render server at its real size; UIKit's capture came out magnified by the
+screen scale.
 `apps.install` accepts IPA and TIPA archives. IcliKit 0.6.8 validates and
 extracts the archive, then calls vphone's signer on the temporary app bundle
 before IcliKit copies it into a container, registers it, and owns rollback.
@@ -209,8 +216,14 @@ into memory.
 `jailbreak.source`. The layout is `roothide`, `rootless`, or `rootful` when
 detected. If there is no bootstrap and `/` is read-only, both `layout` and
 `jbroot` are JSON `null`; `/` alone is not evidence of a rootful bootstrap.
-The daemon checks a loaded RootHide `systemhook.dylib` export and `/var/jb`
-at request time so a bootstrap created after daemon startup can be reported.
+The daemon first reports the bootstrap it installed itself, from its
+completion record (`source` is `vphoned bootstrap`). The later probes look
+for a jailbreak's own traces, and a RootHide root vphoned made has none: a
+system-installed vphoned has no `.jbroot` link or libroot library beside it,
+and vphone's SystemHook exports no `get_jbroot`. It then checks a loaded
+RootHide `systemhook.dylib` export, icli's own detection and `/var/jb`. All
+of this runs at request time so a bootstrap created after daemon startup can
+be reported.
 
 For raw guest TCP ports, upgrade `GET /v1/ports/<port>` to WebSocket. Each
 binary WebSocket message carries an unmodified chunk of the TCP byte stream
@@ -230,7 +243,12 @@ finish before closing the opposite socket, with a five-second drain limit.
 RunningBoard's live focal assertion and accepts it only when one real app owns
 it. iOS 26.6.2 uses `SuspendableRole-UIFocal`; older systems may use
 `Workspace-ForegroundFocal`. The Home screen's widget renderer can also hold
-`UIFocal`, so the Kit excludes it. `apps.foreground` reports the Kit's
+`UIFocal`, so the Kit excludes it. Since icli 0.8.5 it also leaves out every
+app tagged hidden (`SBAppTags`), view services SpringBoard hosts in its own
+interface such as the iPad Dock's folder stack, which made the Home screen
+report `com.apple.DocumentManager.DockFolderViewService`; when several apps
+hold the assertion, as with windows side by side in iOS 27, the one with the
+`ForegroundFocal` jetsam priority wins. `apps.foreground` reports the Kit's
 `verified` and `source` values. If no unique focal app can be confirmed,
 a newly started process is reported with `frontmost_verified=false` and a
 warning. A failed start or an already running app without foreground
@@ -336,6 +354,20 @@ anything else (`VPhoneDaemon/Daemon/GuestLockScreenIdle.swift`), at startup
 and whenever the settings change. SpringBoard reads the key when it starts, so
 a newly written one holds from the next boot or respring. Measurements:
 `Research/Guest/lock_screen_idle_timer.md`.
+
+Since icli 0.8.4 `device.environment` and the package methods see a
+bootstrap vphoned installed. vphoned runs from the system volume, outside
+the bootstrap, and icli found no RootHide root from there: the report said
+no bootstrap, and `packages.list` and `packages.status` looked for
+`/var/lib/dpkg/status`. icli now finds the one `.jbroot-<16 hex digits>`
+directory in `/var/containers/Bundle/Application` (`jbroot_source` is
+`filesystem .jbroot`), and reads dpkg's database from the root's
+`Library/dpkg` when `var/lib/dpkg`, a link the dpkg package ships, is not
+there yet. Both methods answer in either layout as soon as
+`bootstrap.install` has written the `firmware` record. A RootHide root
+directory left by an install that did not finish is found the same way;
+`bootstrap.inspect` tells a completed install (`jbroot`) from a root that
+is only there (`roots`).
 
 `/v1/health` also carries `mobilegestalt_restart_pending`. At startup vphoned
 removes libMobileGestalt's cache,
