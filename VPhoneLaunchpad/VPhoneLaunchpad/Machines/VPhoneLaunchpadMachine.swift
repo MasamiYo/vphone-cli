@@ -145,14 +145,20 @@ nonisolated struct VPhoneLaunchpadMachine: Decodable, Hashable, Identifiable, Se
         guestProductType?.hasPrefix("iPad") == true
     }
 
-    /// The guest OS's name: iPadOS on an iPad.
+    /// True for an Apple TV guest.
+    var isAppleTV: Bool {
+        guestProductType?.hasPrefix("AppleTV") == true
+    }
+
+    /// The guest OS's name: iPadOS on an iPad, tvOS on an Apple TV.
     var osName: String {
-        isPad ? "iPadOS" : "iOS"
+        isAppleTV ? "tvOS" : isPad ? "iPadOS" : "iOS"
     }
 
     /// config.plist's `guestProductType`, else the product type in the name
     /// of the restore tree `fw prepare` keeps in `FirmwareOriginals`
-    /// (`iPhone17,3_…_Restore`, or `iPhoneOS_iPad16,1_…_Restore` for an iPad),
+    /// (`iPhone17,3_…_Restore`, or `iPhoneOS_iPad16,1_…_Restore` for an iPad
+    /// and `iPhoneOS_AppleTV5,3_…_Restore` for an Apple TV),
     /// for configs written before the key.
     static func guestProductType(in folder: URL) -> String? {
         let config = NSDictionary(contentsOf: folder.appendingPathComponent("config.plist"))
@@ -162,7 +168,7 @@ nonisolated struct VPhoneLaunchpadMachine: Decodable, Hashable, Identifiable, Se
         let originals = folder.appendingPathComponent("FirmwareOriginals", isDirectory: true)
         let names = (try? FileManager.default.contentsOfDirectory(atPath: originals.path)) ?? []
         for name in names.sorted() where name.hasSuffix("_Restore") {
-            if let type = name.split(separator: "_").first(where: { $0.wholeMatch(of: /(iPhone|iPad)\d+,\d+/) != nil }) {
+            if let type = name.split(separator: "_").first(where: { $0.wholeMatch(of: /(iPhone|iPad|AppleTV)\d+,\d+/) != nil }) {
                 return String(type)
             }
         }
@@ -216,6 +222,11 @@ nonisolated struct VPhoneLaunchpadFirmwareCatalog: Decodable, Sendable {
     struct Image: Decodable, Hashable, Sendable {
         let name: String
         let url: String
+        /// The build, from a bundle that knows `url`'s name does not carry it.
+        var build: String?
+        /// The files the firmware needs in the IPSW cache, relative to it, from
+        /// a bundle that lists them: an OTA and the IPSW it is restored over.
+        var files: [String]?
     }
 
     struct Pairing: Decodable, Hashable, Identifiable, Sendable {
@@ -226,9 +237,13 @@ nonisolated struct VPhoneLaunchpadFirmwareCatalog: Decodable, Sendable {
             ios.url
         }
 
-        /// The build from an IPSW name such as `iPhone17,3_27.0_24A435_Restore.ipsw`
-        /// or `iPad_Pro_M4_27.0.1_24A446_Restore.ipsw`: the field before `Restore`.
+        /// The build the bundle gives, else the one from an IPSW name such as
+        /// `iPhone17,3_27.0_24A435_Restore.ipsw` or
+        /// `iPad_Pro_M4_27.0.1_24A446_Restore.ipsw`: the field before `Restore`.
         var build: String {
+            if let build = ios.build {
+                return build
+            }
             let fields = (ios.url as NSString).lastPathComponent.split(separator: "_")
             return fields.count >= 4 ? String(fields[fields.count - 2]) : ""
         }
@@ -243,7 +258,7 @@ nonisolated struct VPhoneLaunchpadFirmwareCatalog: Decodable, Sendable {
         /// The product type `fw prepare --device` takes.
         let productType: String
         let name: String
-        /// `iPhone` or `iPad`.
+        /// `iPhone`, `iPad` or `appleTV`.
         let family: String
         let pairings: [Pairing]
 
@@ -253,6 +268,15 @@ nonisolated struct VPhoneLaunchpadFirmwareCatalog: Decodable, Sendable {
 
         var isPad: Bool {
             family == "iPad"
+        }
+
+        var isAppleTV: Bool {
+            family == "appleTV"
+        }
+
+        /// The system its IPSWs install.
+        var osName: String {
+            isAppleTV ? "tvOS" : isPad ? "iPadOS" : "iOS"
         }
 
         /// The name with its product type, `iPhone 16 (iPhone17,3)`: Launchpad

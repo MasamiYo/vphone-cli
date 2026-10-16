@@ -114,6 +114,7 @@ class VPhoneVirtualMachineAppDelegate: NSObject, NSApplicationDelegate {
         self.control = control
         if !command.dfu {
             control.unlocksAtStartup = vm.unlocksAtStartup
+            control.syncsGuestEnvironment = !options.isTVGuest
             control.syncsHostLocation = vm.syncsHostLocation
             control.guestDeviceName = Self.guestDeviceName(forConfig: options.configURL)
             startNetworkServices(vm: vm, control: control)
@@ -166,7 +167,9 @@ class VPhoneVirtualMachineAppDelegate: NSObject, NSApplicationDelegate {
                     .resolvingSymlinksInPath()
                     .path,
             )
-            wc.captureView?.escapeIsBackGesture = !options.isPadGuest
+            wc.captureView?.escapeIsBackGesture = !options.isPadGuest && !options.isTVGuest
+            wc.captureView?.isTVGuest = options.isTVGuest
+            wc.homeButtonHoldsInGuest = options.isTVGuest
             windowController = wc
 
             let fileWC = VPhoneFileWindowController()
@@ -203,6 +206,7 @@ class VPhoneVirtualMachineAppDelegate: NSObject, NSApplicationDelegate {
                 try VPhoneHostFilePermissions.makeAccessible(at: config)
             }
             mc.captureView = wc.captureView
+            mc.showsTVControls = options.isTVGuest
             mc.touchIDMonitor = wc.touchIDMonitor
             mc.onFilesPressed = { [weak fileWC, weak control] in
                 guard let fileWC, let control else { return }

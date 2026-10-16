@@ -24,8 +24,16 @@ public enum FirmwareGuestSystemPatchSet {
     public static let gyroscope = "system-backboardd-cfw-gyroscope"
     public static let attitude = "system-apps-cfw-attitude"
 
+    public static let paravirtGPUIndexOffset = "system-paravirt_gpu-cfw-heap_index_offset"
+    public static let paravirtGPUDriverPath =
+        "System/Library/Extensions/AppleParavirtGPUMetalIOGPUFamily.bundle/AppleParavirtGPUMetalIOGPUFamily"
+
     public static let locationdCohorting = "system-locationd-cfw-disable_auto_cohort"
     public static let jetsamDisableAllowed = "system-jetsamproperties-cfw-disable_allowed"
+    public static let tvTPRO = "system-dyld-exp-tv_tpro"
+    /// Replaces the restored System volume with an Apple TV 4K userland
+    /// staged from its OTA. Research only: no IPSW exists for that device.
+    public static let tvOTAUserland = "system-tv-exp-ota_userland"
 
     private static let ios27 = VPhonePatchApplicability(iOSBase: .major(27))
 
@@ -50,6 +58,20 @@ public enum FirmwareGuestSystemPatchSet {
         name: "Guest System",
         summary: "Shared-cache policy gates, patched system daemons and the vphone guest payload",
         patches: [
+            VPhonePatchDeclaration(
+                identifier: tvTPRO,
+                title: "TV TPRO feature detection",
+                summary: "Plain-arm64 TVOS compatibility: stops standalone and cached dyld enabling cloudOS-advertised hardware TPRO and pager modes, preserving page-in linking and all fixups.",
+                target: .guestExecutable(path: "/usr/lib/dyld"),
+                applicability: VPhonePatchApplicability(iOSBase: .major(26)),
+            ),
+            VPhonePatchDeclaration(
+                identifier: tvOTAUserland,
+                title: "Apple TV 4K userland from OTA",
+                summary: "Research: replaces the System volume with the arm64e tvOS userland staged in the VM's OTAUserland folder, extracted with aa so ownership, modes, flags and compression survive.",
+                target: .guestFile(path: "/"),
+                applicability: VPhonePatchApplicability(iOSBase: .atLeast(major: 26, minor: 0)),
+            ),
             VPhonePatchDeclaration(
                 identifier: locationdCohorting,
                 title: "locationd startup stability",
@@ -209,6 +231,18 @@ public enum FirmwareGuestSystemPatchSet {
                 summary: "Installs the GPU bundle the virtual display needs.",
                 target: .guestFile(path: "/System/Library/Extensions"),
                 bootEssential: true,
+            ),
+            VPhonePatchDeclaration(
+                identifier: paravirtGPUIndexOffset,
+                title: "GPU heap index buffers",
+                summary: """
+                Makes the paravirtual GPU driver send every indexed draw with 64-bit offsets. Its \
+                compact command keeps an index buffer's heap offset in 16 bits, so meshes whose \
+                indices sit 64 KiB or more into an MTLHeap (Unity games) draw with another \
+                mesh's indices.
+                """,
+                target: .guestExecutable(path: "/\(paravirtGPUDriverPath)"),
+                applicability: VPhonePatchApplicability(cloudOS: .release(major: 26, minor: 4)),
             ),
             VPhonePatchDeclaration(
                 identifier: "system-vphoned-boot-install",

@@ -30,6 +30,9 @@ struct MachineProductTypeTests {
         let phone = root.appendingPathComponent("research-01", isDirectory: true)
         try manager.createDirectory(at: phone.appendingPathComponent("FirmwareOriginals/iPhone17,3_27.0_24A435_Restore"), withIntermediateDirectories: true)
         expect(VPhoneLaunchpadMachine.guestProductType(in: phone) == "iPhone17,3", "iPhone restore tree")
+        let tv = root.appendingPathComponent("tv-01", isDirectory: true)
+        try manager.createDirectory(at: tv.appendingPathComponent("FirmwareOriginals/iPhoneOS_AppleTV5,3_26.6_23L773_Restore"), withIntermediateDirectories: true)
+        expect(VPhoneLaunchpadMachine.guestProductType(in: tv) == "AppleTV5,3", "Apple TV restore tree")
         expect(VPhoneLaunchpadMachine.guestProductType(in: root.appendingPathComponent("missing")) == nil, "nothing to read")
 
         // restore-info.json's device is the restore identity's, not the guest's.
@@ -42,6 +45,18 @@ struct MachineProductTypeTests {
         expect(machine.osName == "iOS" && !machine.isPad, "unknown type reads as iOS")
         machine.guestProductType = VPhoneLaunchpadMachine.guestProductType(in: pad)
         expect(machine.isPad && machine.osName == "iPadOS", "iPad guest")
-        print("Machine product type tests passed: config, restore trees, OS name")
+        machine.guestProductType = VPhoneLaunchpadMachine.guestProductType(in: tv)
+        expect(machine.isAppleTV && !machine.isPad && machine.osName == "tvOS", "Apple TV guest")
+
+        // An OTA pairing's build comes from the bundle; an IPSW's from its name.
+        let catalog = #"""
+        {"device":"iPhone17,3","pairings":[],"devices":[{"productType":"AppleTV14,1","name":"Apple TV 4K (3rd generation)","family":"appleTV","pairings":[
+         {"ios":{"name":"tvOS 26.6","url":"https://example.com/AppleTV5,3_26.6_23L773_Restore.ipsw"},"recommendedCloudOS":{"name":"cloudOS 26.4","url":"https://example.com/c"}},
+         {"ios":{"name":"tvOS 27.0","url":"https://example.com/9bf3ad6a.aea","build":"24J361","files":["ota/AppleTV14,1_27.0_24J361_OTA.aea","AppleTV5,3_26.6_23L773_Restore.ipsw"]},"recommendedCloudOS":{"name":"cloudOS 26.4","url":"https://example.com/c"}}]}]}
+        """#
+        let tv4K = try JSONDecoder().decode(VPhoneLaunchpadFirmwareCatalog.self, from: Data(catalog.utf8)).guests[0]
+        expect(tv4K.pairings.map(\.build) == ["23L773", "24J361"], "OTA build from the bundle")
+        expect(tv4K.pairings[0].ios.files == nil && tv4K.pairings[1].ios.files?.count == 2, "OTA files")
+        print("Machine product type tests passed: config, restore trees, OS name, catalog builds")
     }
 }
