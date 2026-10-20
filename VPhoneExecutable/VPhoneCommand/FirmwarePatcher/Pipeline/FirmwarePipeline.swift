@@ -18,6 +18,7 @@
 
 import Darwin
 import Foundation
+import VPhoneCoreKit
 import VPhonePatchKit
 
 /// Orchestrates firmware patching for all boot-chain components.
@@ -139,6 +140,8 @@ public final class FirmwarePipeline {
     /// The cloudOS `ProductVersion` `patchAll()` read, if it found one.
     public private(set) var cloudOSProductVersion: VPhoneVersion?
 
+    public private(set) var notApplicablePatches: Set<String> = []
+
     // MARK: - Init
 
     public init(
@@ -188,15 +191,24 @@ public final class FirmwarePipeline {
         let cloudOSVersion = VPhoneVersion(Self.readCloudOSProductVersion(restoreDir))
         cloudOSProductVersion = cloudOSVersion
         log("[*] cloudOS kernel:    \(cloudOSVersion?.description ?? "unknown")")
+        if VPhoneBootROM.kind(ofMachineAt: vmDirectory) == .openAVB {
+            log("[*] Boot ROM:          OpenAVB, which needs no ROM patch")
+        }
 
         // The preset resolves here rather than in init: its version gates need the
         // two ProductVersions that were just read, and a conflict or a misnamed
         // patch must stop the run before a single byte is written.
         let plan = try resolvePlan(iOSBase: baseVersion, cloudOS: cloudOSVersion)
+        try resolveFirmwareApplicability(
+            restoreDir: restoreDir,
+            iOSBase: baseVersion,
+            cloudOS: cloudOSVersion,
+            plan: plan,
+        )
         resolvedPlan = plan
         let gate = plan.map { VPhonePatchGate(plan: $0) } ?? .unrestricted
 
-        let components = buildComponentList(
+        let components = try buildComponentList(
             restoreDir: restoreDir,
             iOSBase: baseVersion,
             plan: plan,
@@ -211,6 +223,24 @@ public final class FirmwarePipeline {
         log(String(repeating: "=", count: 60))
 
         return allRecords
+    }
+
+    func resolveFirmwareApplicability(
+        restoreDir: URL,
+        iOSBase: VPhoneVersion?,
+        cloudOS: VPhoneVersion?,
+        plan: VPhonePatchPlan?,
+    ) throws {
+        notApplicablePatches = []
+        let sealPatch = RestoreRamDiskSealPatcher.patchIdentifier
+        let sealSelected = plan?.isEnabled(sealPatch)
+            ?? (iOSBase?.major == 27 && cloudOS?.major == 26 && cloudOS?.minor == 4)
+        guard variant != .less, sealSelected else { return }
+        let hashType = try RestoreRamDiskSealPatcher.systemVolumeHashType(in: restoreDir)
+        if hashType == RestoreRamDiskSealPatcher.sha256Type {
+            notApplicablePatches.insert(sealPatch)
+            log("[=] \(sealPatch): SystemVolume root hash uses SHA-256; restore tools stay pristine")
+        }
     }
 
     /// Patch a kernelcache file in place with this VM's selection, without a
@@ -232,7 +262,7 @@ public final class FirmwarePipeline {
         // restoreDir is unused when building the kernelcache component's
         // patchers (they take the gate and versions, not files), so the VM
         // directory stands in for the parameter.
-        let components = buildComponentList(restoreDir: vmDirectory, iOSBase: iOSBase, plan: plan, gate: gate)
+        let components = try buildComponentList(restoreDir: vmDirectory, iOSBase: iOSBase, plan: plan, gate: gate)
         guard let kernel = components.first(where: { $0.name == "kernelcache" }) else {
             throw PatcherError.invalidFormat("this build has no kernelcache component to patch")
         }

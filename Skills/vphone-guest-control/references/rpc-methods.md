@@ -73,6 +73,8 @@ invalid-request error, read the source named there instead of guessing keys.
 | `input.key` | `name` (`return`, `cmd+v`, …) |
 | `input.type` | `text`, `delay_ms?` (30) |
 | `input.paste` | `text` |
+| `input.pointer` | `x`, `y` (0...1 of the interface as shown; iPad, capability `pointer_scroll`), `seq?` (increasing; a late move is dropped) |
+| `input.scroll` | `phase` (`began`/`changed`/`ended`/`cancelled`), `dx?`, `dy?` (points, wheel signs), `x?`, `y?` |
 
 ## UI inspection
 
@@ -151,9 +153,12 @@ Paths are real-root paths. All take `path` unless noted.
 | `files.plist` | `path` |
 | `files.plist_set` | `path`, `key`, and `value` or `remove:true` |
 
-Use `files.read` with `binary:true` to pull guest binaries and crash reports
-without ssh. Keep `limit` small; large reads are the usual way to hit the reply
-size problem.
+`files.write` replaces the whole file and takes one JSON line of at most
+1 MiB, so a binary over about 700 KiB does not fit. Copy files of any size with
+`vphone-launchpad-cli guest push` and `guest pull`, which stream
+([guest-layout](guest-layout.md), "Handing a file to vphoned"). `files.read`
+with `binary:true` is for small reads; keep `limit` small, since large reads
+are the usual way to hit the reply size problem.
 
 ## Processes, logs, services
 

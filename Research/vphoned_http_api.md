@@ -7,7 +7,9 @@ upgrade at `/v1/events` uses the same port. `vphone-vm` can expose that byte
 stream on a host TCP address. After it admits a connection's first request
 head with the API token (see [Access control](#access-control)), it opens one
 VSOCK connection for that TCP connection and forwards bytes in both
-directions; it does not translate HTTP or WebSocket messages. The host
+directions; it does not translate HTTP or WebSocket messages. The one
+exception is `GET /v1/host/screen`, which `vphone-vm` answers itself (see
+[Host screen](#host-screen)). The host
 listener is absent unless boot receives `--api-listen host:port`. Port `0`
 asks the OS for an available host port and the actual address is printed
 after the VM starts. The API is also usable from guest and host code that
@@ -202,6 +204,52 @@ installed record remains so the operation can be retried. Irisin's mobile
 Documents data outside the bootstrap is retained. Apps > Uninstall Bootstrap…
 shows every path in a destructive confirmation alert before sending the request.
 
+## Host screen
+
+`GET /v1/host/screen` on the host proxy is a WebSocket that `vphone-vm`
+serves itself; it never reaches vphoned. It is admitted with the same token
+as every other request, and a `vphone-token.<token>` subprotocol is selected
+in the 101 reply as vphoned does. A plain GET gets `426 Upgrade Required`.
+
+Frames come from the VM display that Virtualization keeps for its window
+(`_takeScreenshotWithCompletionHandler:`), with or without a window, so the
+guest does no work for them: no screenshot, no JPEG, no base64. The guest is
+asked only for `display.orientation`, at most once a second while a client is
+connected; the first frame waits up to 0.5 s for that answer. `vphone-vm`
+turns the frame upright, fits it into the requested box (the screen helper's
+own rule: no enlarging, short side at least 240, even sides) and encodes it
+with the hardware encoder in its own process: real time, low-latency rate
+control, no frame reordering, key frames only on request, Display P3
+primaries with the sRGB transfer and the BT.709 matrix in video range.
+
+The client pulls one frame per text message:
+
+```json
+{"id":7,"codec":"hevc","box":[1280,1280],"fps":60,"bitrate":4000000,"key":false}
+```
+
+`codec` is `hevc` or `h264`; `box` is 1 to 8192 on each side, `fps` 1 to
+240, `bitrate` 1 to 100 000 000. Each request gets one binary answer, in the
+order the requests came: a 4-byte little-endian header length, the JSON
+header, then the payload. The header always has `id` and then either
+`error` (`{code, message}`, no payload) or `status`:
+
+| `status` | Payload | Meaning |
+| --- | --- | --- |
+| `frame` | one access unit, 4-byte length-prefixed NAL units, no parameter sets | `key`, and on a key frame `record`: the `hvcC` / `avcC`, base64 |
+| `unchanged` | none | every pixel is what the last frame encoded showed, and no key frame was asked for |
+| `dropped` | none | the rate controller skipped the frame |
+
+Every header with a `status` also has `session` (it changes with the codec,
+the output size or the orientation, and the first frame of a session is a
+key frame), `width` and `height` (the encoded size), `sourceWidth`,
+`sourceHeight` and `scale` (the upright display in pixels and its pixels per
+interface point, the VM's screen scale), and `captureUs` and `encodeUs`.
+Each connection has its own encoder; a new connection starts at session 1.
+Error codes: `bad_request`, `codec_unavailable` (no hardware encoder for that
+codec or size), `display_unavailable`, `encoder_failed` (the next request
+starts a new session) and `too_many_requests` (more than 16 waiting).
+
 ## HTTP and WebSocket contract
 
 JSON resource routes cover device state, apps, input, location, Developer Mode, low power
@@ -323,8 +371,8 @@ request carries `"force": true`.
 | Area | Methods |
 | --- | --- |
 | Device | `device.snapshot`, `device.info` (snapshot plus network, screen, rotation, brightness, volume, low power, Developer Mode, agent, `device_name` `{name, own_name}`: the pinned name and the guest's own ComputerName), `device.screen`, `device.network`, `device.ioreg {plane}`, `device.environment`, `device.basebin {archive?}` |
-| Display, audio | `display.brightness {value?}`, `display.rotation {orientation?}`, `display.orientation` (`{degrees, source}`: SpringBoard's interface orientation without a screen capture, for polling; capability `display_orientation`), `display.rotation_lock {locked}`, `display.auto_lock` (`{auto_lock_seconds, never, lock_screen_minimum_seconds}`: Auto-Lock and the Lock Screen timeout vphoned keeps in step with it, see below; capability `display_auto_lock`), `screen.unlock {passcode?, timeout?}` (`{locked, screen_off, was_locked, was_screen_off}`: the display on and the Lock Screen passed, see below; capability `screen_unlock`), `audio.volume {value?, category?}`, `audio.state` |
-| Input | `input.touch`, `input.hid`, `input.button {name}`, `input.key {name}`, `input.type {text, delay_ms?}`, `input.paste {text}`, `input.tap`, `input.double_tap`, `input.long_press`, `input.swipe`, `input.drag {points}`, `input.touch_sequence {events}` — gesture coordinates are screen points |
+| Display, audio | `display.brightness {value?}`, `display.rotation {orientation?}`, `display.orientation` (`{degrees, source}`: SpringBoard's interface orientation without a screen capture, for polling; `degrees` is null while SpringBoard has no answer; capability `display_orientation`), `display.rotation_lock {locked}`, `display.auto_lock` (`{auto_lock_seconds, never, lock_screen_minimum_seconds}`: Auto-Lock and the Lock Screen timeout vphoned keeps in step with it, see below; capability `display_auto_lock`), `screen.unlock {passcode?, timeout?}` (`{locked, screen_off, was_locked, was_screen_off}`: the display on and the Lock Screen passed, see below; capability `screen_unlock`), `audio.volume {value?, category?}`, `audio.state` |
+| Input | `input.touch`, `input.hid`, `input.button {name}`, `input.key {name}`, `input.type {text, delay_ms?}`, `input.paste {text}`, `input.tap`, `input.double_tap`, `input.long_press`, `input.swipe`, `input.drag {points}`, `input.touch_sequence {events}` — gesture coordinates are screen points; `input.pointer {x, y, seq?}`, `input.scroll {phase, dx?, dy?, x?, y?}` (capability `pointer_scroll`, see below) |
 | UI | `ui.tree` (alias `accessibility.tree`), `ui.element_at`, `ui.tap_element`, `ui.wait`, `ui.wait_gone`, `ui.ocr {languages?, min_confidence?}`, `ui.describe`, `screen.screenshot` |
 | Processes | `processes.list {filter?}`, `processes.kill {pid, signal?}` **force**, `memory.jetsam`, `memory.pressure` (only the three kernel memory sysctls, for polling) |
 | launchd | `services.list`, `status`, `print`, `dump`, `disabled`, `start`, `enable`, `load`, `profile` (see below); `services.stop`, `disable`, `remove`, `signal`, `unload`, `profile.apply {profile, groups?, allow?}` **force**; `launchd.getenv`, `setenv`, `unsetenv`. On tvOS, which never enables user sessions, they read the system domain alone; before icli 0.8.6 the foreground-user lookup trapped there and killed vphoned |
@@ -415,6 +463,33 @@ answers `location_services_off`, the window says so once, and `vphone-vm`
 offers the last fix again every 10 s until the guest takes it, since the Mac
 sends a new one only when it moves. A preset or a replay pauses sync for that
 run without changing the setting.
+
+`input.pointer` and `input.scroll` (capability `pointer_scroll`, iPad guests
+only; REST `POST /v1/input/pointer`, `POST /v1/input/scroll`) scroll the way an
+iPad with a trackpad does, instead of with a dragging finger. On first use
+vphoned creates a virtual pointing device (a HID user device with an absolute
+position, `VPhoneDaemon/Native/vphoned_pointer.m`); iPadOS then shows a pointer,
+which hides itself after a few seconds without movement.
+
+- `input.pointer {x, y, seq?}` puts the pointer at x, y: 0...1 from the
+  top-left corner of the interface as it is shown, in any orientation.
+  Requests run concurrently, so a client that sends moves without waiting
+  for each answer numbers them with an increasing `seq` (a whole number up
+  to 2^53); a move that lands after a higher one is dropped, and still
+  answers. Without `seq` every move is applied.
+- `input.scroll {phase, dx?, dy?, x?, y?}` sends one scroll event to the view
+  under the pointer, after moving the pointer to x, y when they are given.
+  `phase` is `began`, `changed`, `ended` or `cancelled`: `began` first, a
+  `changed` per delta, then `ended`. `dx` and `dy` are interface points with a
+  browser wheel event's signs, positive `dy` toward the end of the content,
+  under the guest's natural scrolling setting (on by default); each is at most
+  10000.
+
+The view moves by the deltas and by nothing else: iPadOS does not run on
+after `ended`, so a client that wants a trackpad's momentum sends it as more
+`changed` deltas first. The first few points of a scroll start the gesture
+and do not move the view (about 15 points on iPadOS 26). Both answer
+`invalid_operation` when the device cannot be made or is not ready yet.
 
 `time.timezone` (capability `timezone`; REST `GET/PUT /v1/timezone`) returns
 `{identifier, automatic, seconds_from_gmt}`: the Olson name

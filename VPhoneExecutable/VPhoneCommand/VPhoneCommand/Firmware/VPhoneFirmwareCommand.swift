@@ -387,6 +387,7 @@ struct VPhoneFirmwarePatchCommand: ParsableCommand {
                     plan: plan,
                     iOSBase: pipeline.baseProductVersion,
                     cloudOS: pipeline.cloudOSProductVersion,
+                    notApplicablePatches: pipeline.notApplicablePatches,
                 ),
                 forVM: bundle.url,
             )
@@ -489,6 +490,8 @@ struct VPhoneFirmwareSetPatchesCommand: ParsableCommand {
 
           AVPBooter                     `fw patch`; read at the next boot. Needs
                                         the restore tree (`--keep-artifacts`).
+                                        A machine booting OpenAVB has no
+                                        AVPBooter to patch.
           kernelcache                   `cfw update-kernel` (root), which keeps the
                                         guest's data (no restore).
           Guest (system, dyld cache,    `cfw update-environment` (root), which

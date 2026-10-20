@@ -32,10 +32,13 @@ build_project -project "$root/VPhoneExecutable/VPhoneCommand/VPhoneCommand.xcode
     -destination 'platform=macOS,arch=arm64' \
     -derivedDataPath "$root/.build/XcodeCommand" CODE_SIGNING_ALLOWED=NO build
 
+# Select the device SDK and product suffix explicitly so SwiftPM paths stay iOS
+# even when Xcode only offers host destinations without a simulator runtime.
 build_project -project "$root/VPhoneDaemon/VPhoneDaemon.xcodeproj" \
     -scheme vphoned -configuration "$configuration" \
-    -destination 'generic/platform=iOS' \
-    -derivedDataPath "$root/.build/XcodeDaemon" CODE_SIGNING_ALLOWED=NO build
+    -sdk iphoneos \
+    -derivedDataPath "$root/.build/XcodeDaemon" CODE_SIGNING_ALLOWED=NO \
+    SUPPORTS_MACCATALYST=NO EFFECTIVE_PLATFORM_NAME=-iphoneos build
 
 build_project -project "$root/VPhoneExecutable/VPhoneEscalator/VPhoneEscalator.xcodeproj" \
     -scheme VPhoneEscalator -configuration "$configuration" \
@@ -104,6 +107,21 @@ if build_hash="$(/usr/bin/git -C "$root" rev-parse --verify --short HEAD 2>/dev/
 else
     /usr/bin/plutil -remove VPhoneBuildHash "$info_plist" 2>/dev/null || true
 fi
+
+# The boot ROM new machines copy (vm new), with the licences it is
+# distributed under. Checked in prebuilt; see Resources/OpenAVB/README.md.
+/bin/mkdir -p "$resources/OpenAVB"
+/bin/cp "$root/VPhoneExecutable/VPhoneVirtualization/Resources/OpenAVB/OpenAVB.bin" \
+    "$root/VPhoneExecutable/VPhoneVirtualization/Resources/OpenAVB/LICENSE" \
+    "$root/VPhoneExecutable/VPhoneVirtualization/Resources/OpenAVB/APSL-2.0.txt" \
+    "$resources/OpenAVB/"
+
+# The SEP ROM new machines copy, with its licence. Checked in prebuilt; see
+# Resources/OpenSEP/README.md.
+/bin/mkdir -p "$resources/OpenSEP"
+/bin/cp "$root/VPhoneExecutable/VPhoneVirtualization/Resources/OpenSEP/OpenSEP.bin" \
+    "$root/VPhoneExecutable/VPhoneVirtualization/Resources/OpenSEP/LICENSE" \
+    "$resources/OpenSEP/"
 
 # Patch presets. Prewritten plists, read by vphone-cli at patch time to decide
 # which declared patches apply. Nothing generates or edits these.

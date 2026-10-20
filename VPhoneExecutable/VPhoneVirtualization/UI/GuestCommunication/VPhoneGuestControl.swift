@@ -189,6 +189,8 @@ final class VPhoneGuestControl {
         monitor = nil
         orderedInput?.cancel()
         orderedInput = nil
+        openScroll = nil
+        pendingPointer = nil
         orderedLocation?.cancel()
         orderedLocation = nil
         device = nil
@@ -338,6 +340,91 @@ final class VPhoneGuestControl {
         enqueueInput("input.touch2", params: [
             "phase": name, "x1": x1, "y1": y1, "x2": x2, "y2": y2, "normalized": true,
         ])
+    }
+
+    /// Whether the guest scrolls under a virtual pointer (`input.pointer`,
+    /// `input.scroll`), as an iPad with a trackpad does.
+    var supportsPointerScroll: Bool {
+        isConnected && guestCapabilities.contains("pointer_scroll")
+    }
+
+    @ObservationIgnored private var pointersInFlight = 0
+    @ObservationIgnored private var pendingPointer: CGPoint?
+    @ObservationIgnored private var lastPointerSequence: UInt64 = 0
+
+    /// Moves in flight at once. Each request is its own connection; waiting
+    /// for one answer before the next put a round trip behind every move.
+    private static let maximumPointersInFlight = 4
+
+    /// Puts the guest's pointer at `point`, 0...1 of the interface as shown.
+    /// Not in the ordered input queue: where the pointer sits does not depend
+    /// on the order of touches, and a mouse that keeps moving would hold every
+    /// click behind it. Moves go out at once, numbered so that vphoned drops
+    /// one that lands after a later one; past `maximumPointersInFlight` the
+    /// newest position waits for the next free slot.
+    func movePointer(to point: CGPoint) {
+        guard pointersInFlight < Self.maximumPointersInFlight else {
+            pendingPointer = point
+            return
+        }
+        // Microseconds of uptime: increasing across reconnects and restarts of
+        // this process, which a guest that keeps running may still remember.
+        let now = UInt64(ProcessInfo.processInfo.systemUptime * 1_000_000)
+        lastPointerSequence = max(now, lastPointerSequence + 1)
+        let params: [String: Any] = ["x": Double(point.x), "y": Double(point.y), "seq": lastPointerSequence]
+        pointersInFlight += 1
+        Task {
+            _ = try? await call("input.pointer", params: params)
+            pointersInFlight -= 1
+            if let next = pendingPointer {
+                pendingPointer = nil
+                movePointer(to: next)
+            }
+        }
+    }
+
+    /// The `changed` deltas waiting in the input queue, added up until that
+    /// request goes out.
+    private final class PendingScroll {
+        var delta = CGVector.zero
+    }
+
+    @ObservationIgnored private var openScroll: PendingScroll?
+
+    /// One native scroll event, in order with the other input. `delta` is in
+    /// interface points with a browser wheel event's signs. `changed` deltas
+    /// that arrive while one waits in the queue are added to it, so a guest
+    /// slower than the trackpad gets fewer, larger deltas and loses none.
+    func sendScroll(phase: String, delta: CGVector = .zero, pointer: CGPoint? = nil) {
+        if phase == "changed" {
+            if let open = openScroll {
+                open.delta.dx += delta.dx
+                open.delta.dy += delta.dy
+                return
+            }
+            let open = PendingScroll()
+            open.delta = delta
+            openScroll = open
+            let previous = orderedInput
+            orderedInput = Task {
+                await previous?.value
+                if openScroll === open {
+                    openScroll = nil
+                }
+                guard !Task.isCancelled else { return }
+                let params: [String: Any] = ["phase": "changed", "dx": Double(open.delta.dx), "dy": Double(open.delta.dy)]
+                do { _ = try await call("input.scroll", params: params) } catch { print("[control] input.scroll: \(error)") }
+            }
+            return
+        }
+        // A delta after this event belongs to the next scroll, not to one queued before it.
+        openScroll = nil
+        var params: [String: Any] = ["phase": phase]
+        if let pointer {
+            params["x"] = Double(pointer.x)
+            params["y"] = Double(pointer.y)
+        }
+        enqueueInput("input.scroll", params: params)
     }
 
     private func enqueueInput(_ method: String, params: [String: Any]) {
@@ -495,6 +582,54 @@ final class VPhoneGuestControl {
             limits: .upload,
         )
         guard response.status == 200 else { throw try httpError(response) }
+    }
+
+    /// Streams the host file at `localURL` to `path` in the guest, a chunk at
+    /// a time, so its size is not limited by memory or by a JSON body.
+    /// vphoned writes it beside `path` and renames it once every byte is in.
+    /// Returns the size written.
+    func pushFile(from localURL: URL, to path: String, permissions: String) async throws -> Int64 {
+        let response = try await http(
+            method: "PUT",
+            path: filePath(path, mode: permissions),
+            contentType: "application/octet-stream",
+            limits: .fileTransfer,
+            upload: localURL,
+        )
+        guard response.status == 200 else { throw try httpError(response) }
+        let reply = try? JSONSerialization.jsonObject(with: response.body) as? [String: Any]
+        let result = reply?["result"] as? [String: Any]
+        return (result?["size"] as? NSNumber)?.int64Value ?? 0
+    }
+
+    /// Streams the guest file at `path` to `localURL` on the host. The bytes
+    /// go to a hidden file beside `localURL`, which replaces it only once the
+    /// whole file has arrived. Returns the size written.
+    func pullFile(_ path: String, to localURL: URL) async throws -> Int64 {
+        let temporary = localURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(localURL.lastPathComponent).vphone-\(UUID().uuidString).part")
+        guard FileManager.default.createFile(atPath: temporary.path, contents: nil) else {
+            throw ControlError.guestError("Could not create \(temporary.path)")
+        }
+        do {
+            let handle = try FileHandle(forWritingTo: temporary)
+            let response: VPhoneHTTPResponse
+            do {
+                response = try await http(method: "GET", path: filePath(path), limits: .fileTransfer, download: handle)
+                try handle.close()
+            } catch {
+                try? handle.close()
+                throw error
+            }
+            guard response.status == 200 else { throw try httpError(response) }
+            guard rename(temporary.path, localURL.path) == 0 else {
+                throw ControlError.guestError("Could not replace \(localURL.path): \(String(cString: strerror(errno)))")
+            }
+            return response.streamedLength
+        } catch {
+            unlink(temporary.path)
+            throw error
+        }
     }
 
     func createDirectory(path: String) async throws {
@@ -747,6 +882,8 @@ final class VPhoneGuestControl {
         body: Data = Data(),
         contentType: String = "application/json",
         limits: VPhoneHTTPLimits = .rpc,
+        upload: URL? = nil,
+        download: FileHandle? = nil,
     ) async throws -> VPhoneHTTPResponse {
         guard let device else { throw ControlError.notConnected }
         let socket = await withCheckedContinuation {
@@ -761,6 +898,8 @@ final class VPhoneGuestControl {
             body: body,
             contentType: contentType,
             limits: limits,
+            upload: upload,
+            download: download,
         )
         return try await withCheckedThrowingContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
@@ -775,6 +914,8 @@ final class VPhoneGuestControl {
 private struct VPhoneHTTPResponse: Sendable {
     let status: Int
     let body: Data
+    /// The bytes written to the transaction's `download` handle instead of `body`.
+    var streamedLength: Int64 = 0
 }
 
 // MARK: - Limits
@@ -793,6 +934,11 @@ private struct VPhoneHTTPLimits: Sendable {
     static let download = VPhoneHTTPLimits(maxBodyLength: 2_147_483_647, deadline: .seconds(30 * 60))
     /// Uploads: the request body is large, the response is a small JSON reply.
     static let upload = VPhoneHTTPLimits(maxBodyLength: 64 * 1024 * 1024, deadline: .seconds(30 * 60))
+    /// `push` and `pull` on vphone.sock: the file streams between the guest
+    /// and a host file, so only an error reply is held in memory. The
+    /// deadline allows a few GiB over a slow guest; a stall still ends at the
+    /// per-read timeout.
+    static let fileTransfer = VPhoneHTTPLimits(maxBodyLength: 64 * 1024 * 1024, deadline: .seconds(2 * 60 * 60))
 }
 
 private struct VPhoneSocketResult: @unchecked Sendable {
@@ -811,6 +957,10 @@ private final class VPhoneHTTPTransaction: @unchecked Sendable {
     let body: Data
     let contentType: String
     let limits: VPhoneHTTPLimits
+    /// A file sent as the request body in place of `body`.
+    let upload: URL?
+    /// Where a 200 response body goes in place of memory.
+    let download: FileHandle?
     private let deadline: ContinuousClock.Instant
 
     /// Per-read and per-write socket timeout.
@@ -823,8 +973,12 @@ private final class VPhoneHTTPTransaction: @unchecked Sendable {
         body: Data,
         contentType: String,
         limits: VPhoneHTTPLimits,
+        upload: URL? = nil,
+        download: FileHandle? = nil,
     ) {
         self.connection = connection
+        self.upload = upload
+        self.download = download
         self.method = method
         self.path = path
         self.body = body
@@ -854,10 +1008,22 @@ private final class VPhoneHTTPTransaction: @unchecked Sendable {
         else {
             throw VPhoneGuestControl.ControlError.notConnected
         }
+        let source = try upload.map { try FileHandle(forReadingFrom: $0) }
+        defer { try? source?.close() }
+        let bodyLength: Int64 = if let source { Int64(try source.seekToEnd()) } else { Int64(body.count) }
+        try source?.seek(toOffset: 0)
         let headers =
-            "\(method) \(path) HTTP/1.1\r\nHost: vphoned\r\nConnection: close\r\nContent-Type: \(contentType)\r\nContent-Length: \(body.count)\r\n\r\n"
+            "\(method) \(path) HTTP/1.1\r\nHost: vphoned\r\nConnection: close\r\nContent-Type: \(contentType)\r\nContent-Length: \(bodyLength)\r\n\r\n"
         try write(fd, data: Data(headers.utf8))
-        if !body.isEmpty {
+        if let source {
+            var sent: Int64 = 0
+            while sent < bodyLength {
+                guard let chunk = try source.read(upToCount: Int(min(1 << 20, bodyLength - sent))), !chunk.isEmpty
+                else { throw VPhoneGuestControl.ControlError.protocolError("the file shrank while it was sent") }
+                try write(fd, data: chunk)
+                sent += Int64(chunk.count)
+            }
+        } else if !body.isEmpty {
             try write(fd, data: body)
         }
 
@@ -876,6 +1042,19 @@ private final class VPhoneHTTPTransaction: @unchecked Sendable {
             throw VPhoneGuestControl.ControlError.protocolError("invalid HTTP status")
         }
         let length = try Self.contentLength(lines.dropFirst())
+        if let download, status == 200 {
+            var payload = Data(received[boundary.upperBound...])
+            var written: Int64 = 0
+            while true {
+                let part = payload.prefix(Int(min(Int64(payload.count), Int64(length) - written)))
+                try download.write(contentsOf: part)
+                written += Int64(part.count)
+                guard written < Int64(length) else { break }
+                payload.removeAll(keepingCapacity: true)
+                try readMore(fd, into: &payload)
+            }
+            return VPhoneHTTPResponse(status: status, body: Data(), streamedLength: written)
+        }
         guard length <= limits.maxBodyLength else {
             throw VPhoneGuestControl.ControlError.protocolError("HTTP body of \(length) bytes exceeds the \(limits.maxBodyLength)-byte limit")
         }

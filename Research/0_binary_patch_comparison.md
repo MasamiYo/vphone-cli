@@ -1,5 +1,80 @@
 # Patch Comparison: Regular / Development / Jailbreak / Experimental
 
+> **iPhone19,2 / ARM64E_X1 compatibility (validated 2026-10-17):** the tested
+> pairing is iPhone 18 Pro 27.0.1 (24A446), V63AP, with cloudOS 26.4
+> (23E5207q). Cache discovery selects `dyld_shared_cache_arm64e_x1` and its
+> matching subcaches; ordinary arm64e caches remain on their existing path.
+> MachOKit 0.54.1 supplies the X1 cache format support. The `standard` preset
+> selects the following boot-essential patches when their iOS 27 applicability
+> matches; non-X1 Mach-O inputs are unchanged.
+>
+> | Patch | Target | Final role |
+> | --- | --- | --- |
+> | `kernel-boot-arm64e_x1` | vphone600 kernel | Admit subtype 12 at grading, exec-PAC and authenticated shared-region gates |
+> | `system-dyld-boot-arm64e_x1_bootstrap` | `/usr/lib/dyld` | Reach PID 1 before runtime handling exists |
+> | `system-launchd-boot-arm64e_x1_bootstrap` | `/sbin/launchd` | Reach exception-service installation |
+> | `system-fsck-boot-arm64e_x1_bootstrap` | `/sbin/fsck` | Keep the forked checker off runtime-modified signed pages |
+> | `system-mount-boot-arm64e_x1_bootstrap` | `/sbin/mount` | Keep forked mount helpers off runtime-modified signed pages |
+> | `dyld-boot-arm64e_x1_bootstrap` | 38 shared-cache images | Lower the measured pre-handler and pre-fork closure; re-attest pages and refresh corecrypto's FIPS HMAC |
+> | `restoreramdisk-boot-apfs_sha3_hash` | RestoreRamDisk and RestoreTrustCache | Select the iOS 27 root-hash algorithm and admit the re-attested sealing tool |
+>
+> **Kernel reveal.** The analyzed image is `kernelcache.research.vphone600`,
+> XNU `12377.100.591.502.1`, UUID
+> `784F88D3-2AF5-3D4A-AB00-365607646E44`. Its symbol JSON is absent from this
+> checkout, so the `ml_grade_binary` and `exec_mach_imgact` names are XNU and
+> control-flow correlations rather than recovered symbols. The measured subtype
+> comparisons are `0xfffffe000933ceb4`, `0xfffffe00091bad94` and
+> `0xfffffe00091bb088`. Runtime patching does not embed those addresses: it
+> finds the unique subtype-2 grading tail, follows real BL callers to the
+> IMGPF_NOJOP/EBADARCH gate, then finds the shared-region gate and its subtype-2
+> success assignment. All three must resolve uniquely. Each site branches to an
+> allocated cave containing `cmp Wn,#12; ccmp Wn,#2,#6,ne; b resume`, preserving
+> subtype 2 and making subtype 12 take the same authenticated paths.
+>
+> **Instruction path.** `VPhoneArm64eX1Lowering` converts the supported
+> PAuth_LR return/authentication forms to their SP-only forms and scalar
+> ADDPT/SUBPT/MADDPT/MSUBPT to existing arithmetic encodings. This removes PC
+> binding and CPA overflow poisoning; it provides instruction compatibility,
+> not hardware-equivalent X1 security. Before installing the exception service,
+> launchd forks an isolated child that executes `PACIBSPPC` and `ADDPT`. Native
+> success leaves compatibility disabled. A trap or probe failure installs the
+> service and propagates its port through spawn before child execution.
+> Supported faults suspend the target, validate the faulting word, create a
+> private writable copy of that process's page, write one lowered instruction,
+> restore RX, flush the instruction cache and retry the same PC. PID 1 uses the
+> per-thread fallback because it hosts the service; other tasks use
+> `task_suspend` to close the thread-creation race. Unknown or unsupported
+> instructions are forwarded to the captured kernel exception destination.
+>
+> **Restore seal.** For iOS 27 with cloudOS 26.4, the restore patch resolves the
+> manifest-selected `SystemVolume` `isys` root-hash payload first. Only hash type
+> `0x106` (`sha3_256_4k`) needs a changed restore tool. For that image, the
+> patch resolves the manifest-selected ramdisk, locates `apfs_sealvolume`'s
+> options template from its unique getopt xref and decoded copy sequence,
+> changes hash type `1` (`sha256`) to `0x106`, and re-attests the modified
+> CodeDirectory page. The ordered trust-cache pass replaces exactly that
+> executable's cdhash, preserves the two metadata bytes and restores v1 sort
+> order. The 27.0.1 (24A446) IPSWs for iPhone17,1–5 and iPhone18,1–5 all
+> have root-hash type `1` in both SystemVolume entries; iPhone19,2 has `0x106`.
+> SHA-256 images leave both cloudOS restore files pristine. The logical plan
+> and template key keep the user's selection stable; `PatchPlan.plist` records
+> the patch as not applicable and omits it from the effective plan and restore
+> receipt. Unknown
+> hash types or malformed metadata abort before patching; discovery,
+> signature coverage or uniqueness failures also abort the SHA3 patch.
+>
+> **Validation and limits.** On an M5 Max guest, the unsupported-feature path
+> completed a clean offline restore, logged `Sealing System Volume`, and the
+> first disk boot logged successful on-disk root-hash authentication. Settings,
+> Safari and Calculator launched; the instruction probe completed 20,000 calls
+> without a repeat fault or file change, the unknown-opcode case retained
+> SIGILL, and the task-suspension fix passed 240 concurrent vphoned snapshot
+> requests across ten restarts. Focused Swift/C tests, strict arm64e compilation
+> and analysis, the signer suite, the complete Debug bundle build and bundle
+> admission pass. The native fast path still requires validation on a host whose
+> virtual CPU exposes both probed X1 features. The tvOS presets block all seven
+> iPhone-specific X1 and restore patches, including for a tvOS 27 userland.
+>
 > **tvOS 26.4 support (2026-10-15).** AppleTV5,3 / J42d uses a
 > monolithic arm64 TVOS userland with the cloudOS 26.4 vphone600ap kernel.
 > `devicetree-cfw-tv_app_architecture` copies the donor's concrete app architecture.
@@ -533,11 +608,28 @@
 
 ## Boot Chain Patches
 
+### Restore environment (iOS 27 + cloudOS 26.4)
+
+| # | Patch | Component | Purpose | Regular | Dev | JB |
+| --- | --- | --- | --- | :---: | :---: | :---: |
+| 1 | `restoreramdisk-boot-apfs_sha3_hash.hash_type` | `RestoreRamDisk` / `apfs_sealvolume` | When the manifest-selected SystemVolume root hash names `0x106`, select `sha3_256_4k` and re-attest the modified Mach-O page; SHA-256 images remain unchanged | Y | Y | Y |
+| 2 | `restoreramdisk-boot-apfs_sha3_hash.trustcache` | `RestoreTrustCache` | Replace the old sealing-tool cdhash with the re-attested cdhash and restore v1 entry order | Y | Y | Y |
+
+The patch is gated to an iOS 27 base paired with cloudOS 26.4. Both paths are
+resolved from `BuildManifest.plist`; discovery requires one semantic match and
+the trust-cache update requires exactly one old cdhash, so an unknown restore
+environment fails before publishing a partially patched tree.
+
 ### AVPBooter
 
 | #   | Patch        | Purpose                          | Regular | Dev | JB  |
 | --- | ------------ | -------------------------------- | :-----: | :-: | :-: |
 | 1   | `mov x0, #0` | DGST signature validation bypass |    Y    |  Y  |  Y  |
+
+New machines boot OpenAVB instead of AVPBooter, and OpenAVB checks no image
+digest: `fw patch` skips this component on them (the patch stays selected and
+planned, which is what the machine behaves as). Machines created before keep
+Apple's ROM and this patch. See `Firmware/openavb_boot_rom.md`.
 
 ### iBSS
 
@@ -1468,7 +1560,8 @@ cache rebuild.
 | DeviceTree base properties         |       4 |   4 |   4 |   4 |
 | DeviceTree EXP identity properties |       - |   - |   - |   8 |
 | DeviceTree EXP node additions      |       - |   - |   - |   1 (`/product/camera`) |
-| Boot chain total                   |      46 |  58 | 117 | 132 |
+| Restore environment                |       2 |   2 |   2 |   2 |
+| Boot chain total                   |      48 |  60 | 119 | 134 |
 | CFW binary patches (base)          |       4 |   5 |   6 |   6 |
 | CFW EXP-only steps                 |       - |   - |   - |   5 (hv_vmm DSC, camera DSC ×12, watchdogd EXP-JB-3.5, post-restore DT EXP-JB-6, build-version EXP-JB-7 opt-in) |
 | CFW installed components           |       6 |   7 |   9 |   9 |
@@ -3088,3 +3181,44 @@ steps run there too, without the restore tree, over the driver already in place.
 `-[PGSerializerBlitCommandEncoder copyFromTexture:…toBuffer:…]` store
 `parentResourceOffset` in 16 bits too. They were not measured and are left as
 they are.
+
+## OpenAVB replaces AVPBooter on new machines (2026-10-18)
+
+New machines boot OpenAVB (`Resources/OpenAVB/OpenAVB.bin`, built from
+`owngoal-dev/OpenAVB` at `3c7e7f6`, with no carried patches; upstream
+includes vphone's six Virtualization.framework fixes, the last of which lets a
+guest reboot: the ROM waits for a SEP restarted by the reset) instead of
+Virtualization.framework's `AVPBooter.vresearch1.bin`. OpenAVB checks no image
+digest, so `avpbooter-boot-dgst_bypass` has nothing to patch on such a machine:
+`fw patch` drops the AVPBooter component when `romImages.avpBooter` names an
+OpenAVB image and logs `Boot ROM: OpenAVB, which needs no ROM patch`. The patch
+stays in presets and plans, so `fw patches` reports no drift. Machines created
+before keep Apple's ROM and the patch; `vm config --rom openavb|apple` switches
+one without a restore.
+
+Two boot-chain files change form, not content:
+
+| Component | Before | Now | Why |
+| --- | --- | --- | --- |
+| iBSS IM4P | patched payload written back uncompressed | written back LZFSE-compressed, as Apple ships it | OpenAVB decodes only LZFSE; Apple's ROM takes either |
+| iBSS over DFU | sent as is | preceded by a 112-byte stage-0 identity (payload and image sizes and SHA-256, load base `0x7006c000`, EL2) when the ROM answers OpenAVB's patch-store report | OpenAVB refuses an iBSS nobody described |
+
+No patch site moved and no patch was added or removed. The OpenAVB-side
+changes (read-only ROM aperture, chip ID 0, DFU suffix CRC, remote-boot bit,
+USB device left running, SEP not ready after a warm reset) were carried as
+patches at first and are now upstream (owngoal-dev/OpenAVB#1 and #2).
+`Firmware/openavb_boot_rom.md` describes
+each one and how it was found.
+
+## OpenSEP replaces AVPSEPBooter on new machines (2026-10-18)
+
+New machines start the SEP from OpenSEP (`Resources/OpenSEP/OpenSEP.bin`,
+built from `owngoal-dev/OpenSEP` at `39ff3d7` for its `vresearch1` platform,
+with no carried patches) instead of Virtualization.framework's
+`AVPSEPBooter.vresearch1.bin`. Apple's SEP ROM was never patched and OpenSEP is
+not either, so no patch, preset or plan changes: there is no SEP ROM component
+in `fw patch`. The SEP firmware (`sep-firmware.vphone600.RELEASE.im4p`, sent as
+`RestoreSEP` and loaded by iBoot) is unchanged and unpatched. Machines created
+before keep Apple's SEP ROM; `vm config --seprom opensep|apple` switches one
+without a restore. `Firmware/opensep_sep_rom.md` has the contract and the
+validation.
