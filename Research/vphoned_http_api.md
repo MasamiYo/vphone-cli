@@ -372,10 +372,10 @@ request carries `"force": true`.
 | --- | --- |
 | Device | `device.snapshot`, `device.info` (snapshot plus network, screen, rotation, brightness, volume, low power, Developer Mode, agent, `device_name` `{name, own_name}`: the pinned name and the guest's own ComputerName), `device.screen`, `device.network`, `device.ioreg {plane}`, `device.environment`, `device.basebin {archive?}` |
 | Display, audio | `display.brightness {value?}`, `display.rotation {orientation?}`, `display.orientation` (`{degrees, source}`: SpringBoard's interface orientation without a screen capture, for polling; `degrees` is null while SpringBoard has no answer; capability `display_orientation`), `display.rotation_lock {locked}`, `display.auto_lock` (`{auto_lock_seconds, never, lock_screen_minimum_seconds}`: Auto-Lock and the Lock Screen timeout vphoned keeps in step with it, see below; capability `display_auto_lock`), `screen.unlock {passcode?, timeout?}` (`{locked, screen_off, was_locked, was_screen_off}`: the display on and the Lock Screen passed, see below; capability `screen_unlock`), `audio.volume {value?, category?}`, `audio.state` |
-| Input | `input.touch`, `input.hid`, `input.button {name}`, `input.key {name}`, `input.type {text, delay_ms?}`, `input.paste {text}`, `input.tap`, `input.double_tap`, `input.long_press`, `input.swipe`, `input.drag {points}`, `input.touch_sequence {events}` — gesture coordinates are screen points; `input.pointer {x, y, seq?}`, `input.scroll {phase, dx?, dy?, x?, y?}` (capability `pointer_scroll`, see below) |
+| Input | `input.touch`, `input.hid`, `input.button {name}`, `input.key {name}`, `input.type {text, delay_ms?}`, `input.paste {text}`, `input.tap`, `input.double_tap`, `input.long_press`, `input.swipe`, `input.drag {points}`, `input.touch_sequence {events}` — gesture coordinates are screen points; `input.pointer {x, y, seq?, buttons?}`, `input.scroll {phase, dx?, dy?, x?, y?}` (capabilities `pointer_scroll` and `pointer_buttons`, see below) |
 | UI | `ui.tree` (alias `accessibility.tree`), `ui.element_at`, `ui.tap_element`, `ui.wait`, `ui.wait_gone`, `ui.ocr {languages?, min_confidence?}`, `ui.describe`, `screen.screenshot` |
 | Processes | `processes.list {filter?}`, `processes.kill {pid, signal?}` **force**, `memory.jetsam`, `memory.pressure` (only the three kernel memory sysctls, for polling) |
-| launchd | `services.list`, `status`, `print`, `dump`, `disabled`, `start`, `enable`, `load`, `profile` (see below); `services.stop`, `disable`, `remove`, `signal`, `unload`, `profile.apply {profile, groups?, allow?}` **force**; `launchd.getenv`, `setenv`, `unsetenv`. On tvOS, which never enables user sessions, they read the system domain alone; before icli 0.8.6 the foreground-user lookup trapped there and killed vphoned |
+| launchd | `services.list`, `status`, `print`, `dump`, `disabled`, `start`, `enable`, `load`, `profile` (see below), `kickstart {label, kill?}` (`launchctl kickstart`, capability `service_kickstart`, see below); `services.stop`, `disable`, `remove`, `signal`, `unload`, `profile.apply {profile, groups?, allow?}` **force**, and `kickstart` with `kill` **force**; `launchd.getenv`, `setenv`, `unsetenv`. On tvOS, which never enables user sessions, they read the system domain alone; before icli 0.8.6 the foreground-user lookup trapped there and killed vphoned |
 | Logs | `logs.syslog {seconds, process?, level?, max_lines?}` (a bounded capture of at most 60 s), `logs.crashes {bundle_id?}`, `logs.crash {path}` |
 | Darwin notifications | `notify.post {name, state?}` (`postDarwinNotification`; `state` is a UInt64, as a number or a decimal string, stored before the post), `notify.state {name}` (`darwinNotificationState`) |
 | Network, security | `network.capture {seconds, interface?, filter?}` (writes a pcap in the guest scratch directory and returns its path), `network.ipv4.get {interface?}`, `network.ipv4.set {interface?, method, address?, subnet_mask?, router?, dns?}`, `network.hostname.get`, `network.hostname.set {local_host_name?}`, `device.name.get`, `device.name.set {name}` (see below), `network.static_names.get`, `network.static_names.set {entries}`, `network.resolve {host, family?, port?, first_only?, timeout_ms?}` (see below), `security.ssl_killswitch` |
@@ -392,6 +392,19 @@ request carries `"force": true`.
 | Environment | `environment.status` (SHA-256 of each vphone library in `/usr/lib`, or null when absent, plus the staging directory), `environment.install {libraries: [{name, sha256}]}` (see below) |
 | Profile UDID | `udid.get`, `udid.set {udid}`, `udid.clear` — each returns `{udid, path}`, the UDID the guest gives its profile checks and the host (null: the guest's own) and the settings file it came from; `set` and `clear` also return `restarted_pids`, `usb_serial` and `usb_reenumerated` (see below) |
 | Setup Assistant | `setup.status` (`{pending, running, pid, setup_done, setup_version, current_version, data_migration_done}`), `setup.skip` **force** (sets `SetupDone`, `SetupFinishedAllSteps` and `SetupVersion` in `com.apple.purplebuddy`, restarts SpringBoard, returns the status plus `respring`; while the first boot's data migration is still running it does not restart SpringBoard, which reads the keys when migration ends, and `respring` is `{restarted: false, reason: "data_migration_pending"}`; a restart FrontBoard ignored is refused with `reason: busy`, `retryable: true`, the keys already written); `setup.settle {timeout_s?, poll_s?, stable_polls?}` (read-only wait for first-boot work, see below); `/v1/health` carries `setup_pending` — see `Research/Guest/setup_assistant_skip.md` |
+
+`display.rotation` also reads `accelerometer`: its persisted `degrees`,
+`provider_running`, and the backboardd HID provider's status (enumeration,
+service ID, pid, report interval, dispatch/failure counts and last error).
+`orientation_sink` separately reports the native backboardd bridge's readiness,
+last device orientation and delivery count. This is distinct from raw HID
+dispatch, which by itself did not drive orientation on the research board.
+When the provider is running, setting rotation first publishes a stationary
+gravity pose matching the requested orientation. The existing SpringBoard
+request and interface-orientation readback still decide success; a running HID
+provider is not an acknowledgement that SpringBoard rotated. The selected
+`system-backboardd-cfw-accelerometer` patch installs this provider; older or
+disabled guests retain their existing rotation path.
 
 `display.auto_lock` reads Settings' Auto-Lock (`maxInactivity` in profiled's
 `EffectiveUserSettings.plist`) and SpringBoard's `SBMinimumLockscreenIdleTime`.
@@ -464,32 +477,53 @@ offers the last fix again every 10 s until the guest takes it, since the Mac
 sends a new one only when it moves. A preset or a replay pauses sync for that
 run without changing the setting.
 
-`input.pointer` and `input.scroll` (capability `pointer_scroll`, iPad guests
-only; REST `POST /v1/input/pointer`, `POST /v1/input/scroll`) scroll the way an
-iPad with a trackpad does, instead of with a dragging finger. On first use
-vphoned creates a virtual pointing device (a HID user device with an absolute
-position, `VPhoneDaemon/Native/vphoned_pointer.m`); iPadOS then shows a pointer,
+`input.pointer` and `input.scroll` (capabilities `pointer_scroll` and
+`pointer_buttons`, iPad guests only; REST `POST /v1/input/pointer`,
+`POST /v1/input/scroll`) point, click and scroll the way an iPad with a
+trackpad does, instead of with a finger. They drive IcliKit's virtual
+pointing device (`pointerMove`, `pointerScroll`; a HID user device with an
+absolute position, `Sources/IcliPrivate/Pointer.m` in icli), which vphoned
+creates on first use and keeps while it runs; iPadOS then shows a pointer,
 which hides itself after a few seconds without movement.
 
-- `input.pointer {x, y, seq?}` puts the pointer at x, y: 0...1 from the
-  top-left corner of the interface as it is shown, in any orientation.
-  Requests run concurrently, so a client that sends moves without waiting
-  for each answer numbers them with an increasing `seq` (a whole number up
-  to 2^53); a move that lands after a higher one is dropped, and still
-  answers. Without `seq` every move is applied.
+- `input.pointer {x, y, seq?, buttons?}` puts the pointer at x, y: 0...1 from
+  the top-left corner of the interface as it is shown, in any orientation.
+  `buttons` are the buttons held from that move on, a whole number 0...7: bit
+  0 primary, bit 1 secondary, bit 2 middle; without it none are held. Holding
+  one is a pointer click, which iPadOS answers as a trackpad's, not as a
+  touch. Requests run concurrently, so a client that sends moves without
+  waiting for each answer numbers them with an increasing `seq` (a whole
+  number up to 2^53); a move that lands after a higher one is dropped,
+  buttons and all, and still answers. Without `seq` every move is applied. A
+  client therefore sends button changes in order, and no move numbered past
+  one until it has been answered.
 - `input.scroll {phase, dx?, dy?, x?, y?}` sends one scroll event to the view
-  under the pointer, after moving the pointer to x, y when they are given.
+  under the pointer, after moving the pointer to x, y when they are given; the
+  buttons held stay as they are.
   `phase` is `began`, `changed`, `ended` or `cancelled`: `began` first, a
   `changed` per delta, then `ended`. `dx` and `dy` are interface points with a
   browser wheel event's signs, positive `dy` toward the end of the content,
   under the guest's natural scrolling setting (on by default); each is at most
   10000.
 
+A click under a visible pointer has to be the pointer's. iPadOS ignores a
+touch on an alert's button while the pointer hovers it, until the pointer has
+hidden itself: on an iPadOS 26.6.2 guest a touch within 0.3 s of the pointer
+moving onto SpringBoard's Remove App Cancel button failed 6 times out of 6;
+with a Mac click sent as `buttons` the VM window closed it on the first
+click every time, after resting on the button. The window therefore sends a
+Mac click as `buttons` on a `pointer_buttons` guest, and keeps touches for
+`vphone.sock`'s `tap` and `swipe` and the back gesture. IcliKit sends a
+button change as a button event rather than a report bit: backboardd never
+releases a button that a report pressed, and a stuck button loses every
+later click of every pointing device.
+
 The view moves by the deltas and by nothing else: iPadOS does not run on
 after `ended`, so a client that wants a trackpad's momentum sends it as more
 `changed` deltas first. The first few points of a scroll start the gesture
-and do not move the view (about 15 points on iPadOS 26). Both answer
-`invalid_operation` when the device cannot be made or is not ready yet.
+and do not move the view (about 15 points on iPadOS 26). Both answer with
+IcliKit's error, `unavailable` or `failed`, when the device cannot be made or
+is not ready yet.
 
 `time.timezone` (capability `timezone`; REST `GET/PUT /v1/timezone`) returns
 `{identifier, automatic, seconds_from_gmt}`: the Olson name
@@ -577,6 +611,22 @@ template's pin until `vphone-vm` connects. `device.info` carries
 `device_name: {name, own_name}`: the pinned name (null when none) and the
 guest's own `System/System/ComputerName` in configd's preferences, which a
 clone inherits.
+
+`services.kickstart {label, kill?}` (capability `service_kickstart`, icli
+0.9.2) is `launchctl kickstart`: launchd spawns the job now, whether or not
+its launch conditions hold, and answers the new `pid`. A running instance is
+left alone and the answer says `unchanged`. With `"kill": true` (**force**)
+launchd kills the running instance, waits for it to exit and spawns a new
+one, which runs the program as it is on disk now. This is how a re-deployed
+daemon takes over: `services.load` of a label launchd already holds is a
+no-op, so a new binary would otherwise wait for the next reboot. Kickstarting
+vphoned's own label with `kill` ends the process answering the call; the
+caller sees the connection drop and reconnects to the new instance.
+On iOS 27 launchd allows kickstart only to a caller holding
+`com.apple.private.xpc.service-configure` and `service-attach`, which
+vphoned's entitlements carry; it answers success with the running pid
+rather than EALREADY when nothing changed, and icli reports that as
+`unchanged` too.
 
 `services.profile` (capability `service_profile`) reports the service profile
 and `services.profile.apply` **force** applies one
@@ -671,7 +721,7 @@ Account passwords, boot logo rendering and package installation, removal and
 repository changes are deliberately not exposed. `/v1/health` lists the new
 areas in `capabilities` (`device_info`, `display`, `audio`, `input_gestures`,
 `ui_inspection`, `processes`, `services`, `logs`, `network_capture`,
-`app_details`, `system_control`, `system_shutdown`, `file_tools`, `packages`, `environment_update`, `udid_override`, `setup_skip`, `setup_settle`, `service_profile`, `network_ipv4`, `network_hostname`, `device_name`, `network_static_names`, `network_resolve`, `display_auto_lock`, `screen_unlock`) so a host can hide
+`app_details`, `system_control`, `system_shutdown`, `file_tools`, `packages`, `environment_update`, `udid_override`, `setup_skip`, `setup_settle`, `service_profile`, `service_kickstart`, `network_ipv4`, `network_hostname`, `device_name`, `network_static_names`, `network_resolve`, `display_auto_lock`, `screen_unlock`) so a host can hide
 panels an older agent cannot serve. icli failures reach the caller with
 icli's own error `code` (`failed`, `unavailable`, `device_locked`, …) and
 message.
