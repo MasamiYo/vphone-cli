@@ -141,7 +141,8 @@ under 10. The numbers are in [`service_trimming.md`](service_trimming.md#idle-co
 Camera frames were not checked live after the change: an iPhone 27.0 guest
 publishes no synthetic camera at all (`libvcamcaptured` logs `_sSourceList not
 located` on every boot), so nothing can start the drive there. That is a
-separate open item ([iOS 27 capture sources](ios27_capture_microphone_source.md#4-the-virtual-camera-does-not-change-this)).
+separate open item ([iOS 27 capture sources](ios27_capture_microphone_source.md#4-the-virtual-camera-does-not-change-this)),
+since closed ([below](#ios-27-the-camera-through-the-backings-provider-2026-10-22)).
 On 26.6.2 the synthetic source is published and the Camera app starts.
 
 ## Front-camera clients and data-output frames (2026-10-10)
@@ -185,4 +186,146 @@ uploaded its clip, and its back-camera photo capture still worked in the same
 process. Limits: a 420f request gets 420v; delivery does not consult camera
 authorization (the fallback calls the delegate directly, as before), so a
 denied-permission path cannot be exercised; an iPhone 27.0 guest still
-publishes no synthetic source.
+publishes no synthetic source (until the change below).
+
+## iOS 27: the camera through the backings provider (2026-10-22)
+
+[Issue #707](https://github.com/Lakr233/vphone-cli/issues/707) reported that
+on an iOS 27.0.1 guest the Camera shutter and Safari's "Save Image" did
+nothing, and blamed missing `photolibraryd`, `camerawriterd` and
+`mediaassetd`. None of the three exists on stock iOS 27 (checked on the
+mounted 24A435 System volume; `assetsd` is the Photos writer and is
+present). On `photo707` (iPhone17,3, 27.0 24A435, default slimmed template,
+bundle 2.10.1 from main) PhotoKit `performChanges` with an image, with
+`addResourceWithType:fileURL:` and `UIImageWriteToSavedPhotosAlbum` all
+saved, and so did Safari's "Save to Photos". The one real failure was the
+Camera shutter: iOS 27 published no virtual camera at all, the open item
+above.
+
+### Where iOS 27 publishes sources
+
+`_sSourceList` is gone. `-[FigCaptureSourceManager copySourcesWithType:
+clientAuditToken:clientIsBincompat:]` makes each client's sources on
+request: for every `FigCaptureSourceBacking` in
+`+[FigCaptureSourceBackingsProvider sharedCaptureSourceBackingsProvider]
+.sourceBackings` it calls `FigVideoCaptureSourceCreateFromBacking` (video)
+or `FigAudioCaptureSourceCreateFromBacking` (audio), after filtering on the
+backing's `attributes.deviceType` and `position`. The shared manager itself
+is made from the same array (`+sharedCaptureSourceManager`'s once block ->
+`-initWithBackings:fineGrainThermalMonitoringEnabled:…`). The provider keeps
+the backings in an `NSMutableArray *_sourceBackings`, which
+`-_addBackingsForSourceInfoDictionaries:` fills with
+`-initWithMediaType:attributes:cachedProperties:formats:missingFormatNames:
+synchronizedStreamUniqueIDs:unsynchronizedStreamUniqueIDs:` — the same
+initializer `vcc_build_backing()` already used for 26.x, which wraps the
+attributes dictionary in `FigCaptureSourceAttributes`. iOS 26.6.2 (23G90)
+has the provider class but no `FigCaptureSourceManager`, and still serves
+`_sSourceList`.
+
+### The change
+
+- `VCamCaptured/Synthetic/VCamProviderSource.m`: where
+  `FigCaptureSourceManager` exists, the synthetic backing is appended to the
+  provider's `_sourceBackings` once, when the microphone hook
+  (`VCamMicrophoneSource.m`) builds the provider the daemon could not. That
+  happens at the daemon's first source query, before the source manager is
+  made. `vcc_install_synthetic` (the `_sSourceList` path) returns early there.
+- `CamFix/Photo/CamFixCapturePhoto.m`: Camera.app on 27 takes photos with
+  `-capturePhotoWithSettings:delegate:`, not the moment-capture trio. When the
+  delegate is its `CAMCaptureEngine` (it answers
+  `_resultsQueueRegisteredStillImageRequests`; the ivar is
+  `__resultsQueueRegisteredStillImageRequests`), the hook now runs the
+  moment-capture driver: the engine's request for the settings' uniqueID,
+  then will/did/finish for it. With only `didFinishProcessingPhoto:` the
+  engine filed the photo under captureID 0, logged "Have not received final
+  callback", and saved nothing. Other delegates keep the single callback.
+- `CamFix/Session/CamFixSessionGuards.m`: the `isRunning` lie made Camera.app
+  log "Session is already running. Skipping call to startRunning", so
+  `_setRunning:YES`, which started the preview-layer scan, never came and the
+  viewfinder stayed black. The lie now starts the scan too.
+
+The daemon only parses the session configuration (`cameraCfgs.count=1`,
+"Wide back BGRA/1280x720"); it never builds a graph or asks the vendor for
+the device, so preview and photos come from `libcamfix` in the client, as
+the hook was designed.
+
+### Validation
+
+On `photo707` (iPhone17,3, 27.0 24A435):
+
+- With a 1280x720 BGRA test frame written into the shared frame file,
+  Camera.app showed the frame in its viewfinder, and each shutter press saved
+  a 1280x720 JPEG of it to `DCIM/100APPLE` with the library thumbnail
+  updated (three in a row).
+- With the host streaming its test pattern (Features -> Source: Test
+  Pattern -> Start Streaming), the viewfinder moved with the stream and the
+  shutter saved the streamed frame.
+- A third-party app got `vphone:vcam:0` from `+defaultDeviceWithMediaType:`,
+  ran an `AVCaptureSession` and received a 24,635-byte photo from
+  `AVCapturePhotoOutput`.
+- Voice Memos recorded and saved a 14 s memo with the camera backing in the
+  provider.
+- No crash reports from Camera, cameracaptured or Voice Memos.
+
+On `cam26` (iPhone17,3, 26.6.2 23G90), the source still goes into
+`_sSourceList` (`appended source — list 0 -> 1`; no provider line). Camera.app
+there also shoots with `-capturePhotoWithSettings:delegate:`: with the
+previous `libcamfix` the shutter saved nothing, with this one it saved the
+streamed frame, through the same callback sequence.
+
+Camera.app video recording did not work on either at this point; see
+[the next section](#cameraapp-video-recording-2026-10-22).
+
+Restarting vphoned (or replacing the shared frame file) leaves the host
+streaming into the old mapping: the host notices a dead connection only when
+a send fails. Restart the VM, then start streaming again.
+
+## Camera.app video recording (2026-10-22)
+
+Camera.app's VIDEO mode records with `-[AVCaptureMovieFileOutput
+startRecordingToOutputFileURL:recordingDelegate:]` into
+`DCIM/.MISC/Incoming/<id>.MOV` and stops with `-stopRecording`; its
+`CAMCaptureEngine` saves the file once the delegate gets
+`-captureOutput:didFinishRecordingToOutputFileAtURL:fromConnections:error:`.
+A vcam session's graph never runs, so the output never started: the timer
+stayed at 00:00:00, no file was written, and with the request still open the
+engine refused photos until Camera.app was relaunched.
+
+`CamFix/Movie/CamFixMovieRecording.m` takes both calls for a vcam-bound
+movie output and never calls the original:
+
+- A recorder on its own queue writes the shm frame at 30 Hz with
+  AVAssetWriter: H.264, 1280x720 (the frame as photos get it), in a
+  QuickTime movie at the requested URL, timed from the first frame.
+- After the first frame the delegate gets
+  `-captureOutput:didStartRecordingToOutputFileAtURL:fromConnections:`; after
+  `-stopRecording`, once the writer has finished, the didFinish callback
+  with no error (or with one if the writer failed or no frame arrived).
+- `-isRecording`, `-recordedDuration` and `-outputFileURL` answer for the
+  recorder while it runs.
+- When the session has an audio input the daemon records no sound either,
+  so an AVAudioEngine input tap records the microphone into an AAC track,
+  timed on the same uptime clock as the frames. The tap's buffer is copied
+  into a CMSampleBuffer on the tap's thread, since the engine reuses it.
+
+iOS 26.6.2's Camera.app lists VIDEO only when `-[CAMCaptureCapabilities
+isVideoSupported]` is set. `-initWithHostProcess:` fills the `_videoSupported`
+ivar behind it from `AVGestaltGetBoolAnswer(AVGQVideoCameraCapability)`,
+which is NO on a guest, and other CameraUI code reads the ivar directly. The
+hook sets the ivar after the initializer when the vcam device exists. iOS 27
+dropped the ivar: `-[CAMUserPreferences supportedCaptureModesForCapabilities:
+emulatingImagePicker:]` always adds photo and video, and
+`-isSupportedMode:withDevice:` answers both with the camera. The hook does not
+install there.
+
+Validation, with the host streaming its test pattern:
+
+| Guest | Result |
+| --- | --- |
+| `photo707`, iPhone17,3 27.0 | Timer counts; IMG_0013.MOV: H.264 1280x720 126 frames 4.13 s, AAC 44.1 kHz mono 4.12 s (mean -42 dB, the Mac's microphone); first and last frames differ; a photo right after the recording saves |
+| `cam26`, iPhone17,3 26.6.2 | VIDEO tab appears; timer counts; IMG_0003.MOV: H.264 1280x720 130 frames 4.29 s, no audio track (the iPhone 26.x guest's Camera session has no microphone input); a photo right after saves |
+
+No Camera, cameracaptured or assetsd crash reports on either. Not done: the
+movie is landscape with no rotation metadata, like the photos; pause/resume,
+slo-mo, time-lapse and cinematic modes; `-startRecordingMovieWithSettings:`
+(the moment-capture movie path), which Camera.app did not call here.

@@ -57,7 +57,15 @@ struct VPhoneVirtualMachineLaunchCommand: ParsableCommand {
             throw ExitCode(1)
         }
         if !dfu {
-            _ = try layout.stageVphoned(into: bundle)
+            // A system the restore installed customised (`minimal`) is sealed and
+            // boots on a stock AMFI: a vphoned the host pushed would never run,
+            // and the host would push it again on every probe. Without the
+            // staged copy, vphone-vm pushes none.
+            if VPhoneCustomFirmwareInstaller.restoredCustomisedSystem(VPhonePatchPresetStore.plan(forVM: bundle.url)) {
+                try? FileManager.default.removeItem(at: bundle.url.appendingPathComponent(".vphoned.signed"))
+            } else {
+                _ = try layout.stageVphoned(into: bundle)
+            }
         }
 
         let boot = VPhoneBootCommand(
@@ -77,6 +85,10 @@ struct VPhoneVirtualMachineLaunchCommand: ParsableCommand {
         // `vm launch` always streams the guest serial console (inherits our
         // stdio); it is intentionally not gated on verbosity. run() also hands
         // the terminal to the child, which is what lets Ctrl-C reach the guest.
+        defer {
+            do { try VPhoneShaderCache.checkpoint(machineDirectory: bundle.url) }
+            catch { fputs("warning: could not save shader cache: \(error)\n", stderr) }
+        }
         throw try ExitCode(launcher.run(args, cwd: bundle.url))
     }
 }

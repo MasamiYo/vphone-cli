@@ -1,5 +1,38 @@
 # Patch Comparison: Regular / Development / Jailbreak / Experimental
 
+> **Experimental full OTA System update (2026-10-20):**
+> `system-exp-ota_userland` is off in Standard and the TV presets. For a stopped
+> iPhone/iPad guest with a snapshot and prepared target firmware, it replaces
+> System from a matching full OTA and reapplies the target Guest patches from
+> a fresh receipt state. Data/User volumes and SEPStorage are retained. The same
+> private disk clone receives the target kernelcache and TXM payloads under their existing IMG4
+> manifest; this reuses the existing declared TXM patches, adding no instruction
+> patch or fixed offset. The whole System/kernel/TXM transaction aborts on compatibility
+> patch failure. This is host-driven payload installation; Apple's UpdateBrain
+> protocol and application migration are not implied. See
+> [the implementation and validation record](Restore/data_preserving_full_ota.md).
+> **2026-10-21 correction:** full updates also stage, validate and install
+> `payloadv2/links.txt`. The 24A446 iPad OTA omits 24,835 duplicate paths from
+> its numbered chunks. Missing J410 media resources made audiomxd trap in
+> CFRetain(NULL), blocking migration through liveactivitiesd and locationd.
+> No new binary patch is used; the installer restores the OTA's own hard links
+> through confined parent descriptors and checks the resulting inode.
+> Corrected migration and the reference-machine clone subsequently booted with
+> retained data. The clone's protected app reopened its existing data offline
+> at 4/3/2 GB with service profile none. Separate explicit compatibility steps
+> preserved a legacy re-signed app container and synchronized 38 retained Apple
+> app programs from the target IPSW; these are not new binary patches.
+> **2026-10-21 orchestration:** `fw ota` now captures guest policies, takes one
+> disk/SEP/NVRAM checkpoint with separate host configuration/firmware backups,
+> prepares a pinned target, verifies real target migration, restores Auto-Lock
+> through Settings with effective-policy readback, and reapplies the saved service
+> profile. The installer stages target removable-app programs on System;
+> `ota.apps.apply` updates matching, already-installed Apple app programs at their
+> original container paths and quarantines old serialized placeholders. Legacy
+> third-party container signing is a preflight refusal, never an implicit repair.
+> This adds no instruction patches. Full application and performance equivalence
+> remain outside this result; see the runbook for current verification scope.
+
 > **iPhone19,2 / ARM64E_X1 compatibility (validated 2026-10-17):** the tested
 > pairing is iPhone 18 Pro 27.0.1 (24A446), V63AP, with cloudOS 26.4
 > (23E5207q). Cache discovery selects `dyld_shared_cache_arm64e_x1` and its
@@ -178,7 +211,7 @@
 > Two presets ship, prewritten, in
 > `VPhone.bundle/Contents/Resources/patches_presets/`. Both name all nine sets and
 > differ only in their selection: `standard` (the default, and what a VM gets
-> unless `--preset` says otherwise) blocks the two Frida Stalker relaxations, the
+> unless `--preset` says otherwise) blocks the four Frida relaxations, the
 > three `hv_vmm_present` concealment patches, and the iPhone17,3 identity rewrites;
 > `extended` blocks nothing.
 >
@@ -401,6 +434,29 @@
 > data-output frames at the session preset's size, orientation and pixel
 > format with device exposure values. Details and validation:
 > [`Guest/virtual_camera_transport.md`](Guest/virtual_camera_transport.md#front-camera-clients-and-data-output-frames-2026-10-10).
+
+> **Camera hook: the virtual camera on iOS 27 (2026-10-22):** no new patch
+> and no new library; `libvcamcaptured.dylib` and `libcamfix.dylib` change
+> behaviour only. iOS 27 has no `_sSourceList`, so `libvcamcaptured` adds
+> the synthetic backing to the `FigCaptureSourceBackingsProvider` its
+> microphone hook builds, which `FigCaptureSourceManager` publishes from.
+> `libcamfix` gives Camera.app's `-capturePhotoWithSettings:delegate:` the
+> full callback sequence it waits for before saving, and starts the preview
+> scan for a client that skips `-startRunning`. Camera.app's shutter saves
+> photos again on 27 (issue #707) and on 26.6.2, which shoots the same way.
+> Camera.app video recording followed (see the next note). Details and validation:
+> [`Guest/virtual_camera_transport.md`](Guest/virtual_camera_transport.md#ios-27-the-camera-through-the-backings-provider-2026-10-22).
+
+> **Camera hook: Camera.app video recording (2026-10-22):** no new patch and
+> no new library; `libcamfix.dylib` changes behaviour only. For a vcam-bound
+> `AVCaptureMovieFileOutput` it writes the shm frames (and, when the session
+> has a microphone input, an AVAudioEngine microphone track) to the
+> requested movie with AVAssetWriter and sends the recording delegate its
+> start and finish callbacks, so Camera.app's VIDEO mode saves movies on 27.0
+> and 26.6.2. On 26.x it also sets `CAMCaptureCapabilities._videoSupported`,
+> which comes from `AVGQVideoCameraCapability` and is NO on a guest, so the
+> VIDEO tab appears. Details and validation:
+> [`Guest/virtual_camera_transport.md`](Guest/virtual_camera_transport.md#cameraapp-video-recording-2026-10-22).
 
 > **3D gyroscope core (2026-10-08; guest acceptance pending):**
 > `system-backboardd-cfw-gyroscope`, declared in the Guest System set and
@@ -746,7 +802,7 @@ Apple's ROM and this patch. See `Firmware/openavb_boot_rom.md`.
 
 > **⚠ iOS-27 hard-gate (2026-07-20).** Every patch below whose Purpose cites "iOS 27" / "27.0 on the 26.4 kernel" is **hard-gated to a 27.x base** via `KernelJBPatcher.applyIOS27` — set by `FirmwarePipeline` from the iPhone base `ProductVersion` (mirroring the `applyExcGuard`/iOS-18 mechanism at patch 27 above; standalone `patch-component` defaults it true, override with `--target-os`). Gated set: **JB-02b, JB-02d, JB-09 (the `ops[124]` add, plus on 27 the `ops[267]` removal — handed to JB-29; the other 201..316 hooks stay), JB-10b, JB-26, JB-27, JB-28, JB-29**. On an 18.x/26.x base **none** of them run. This supersedes the per-row "No-op-in-effect for version-matched userlands" notes: those describe the effect *if applied*, but **JB-27 is NOT a no-op on 26.x** — its `cmp 0x588→0x6e0` retarget makes the 26.x userclient reject its own native 0x588 SwapEnd → dead display (the 26.5 regression that motivated the hard-gate). **Verified 2026-07-20 (JB-29 addendum 2026-07-23):** a 26.5 base produces a **byte-identical** kernelcache to pre-branch `main` (`patch-component --component kernel-jb --target-os 26.5` vs main's output — `cmp` clean, 83 records each; re-confirmed unchanged after JB-29 by `sha256`, since `ops[267]` stays blanket-neutered on 26.5), and a 27.0 base emits **95** records on the `c0ecdb4b` deployment kernel: the 11 gated records above **plus JB-29's 2** (`jb.fpfs_scoped_open.{ops_retarget,cave}`), with `sandbox_ext_267` suppressed (JB-29 owns `ops[267]` on 27 → the FileProvider-scoped trampoline instead of the blanket allow-stub).
 
-> **Frida Stalker support is opt-in (`--frida`).** JB-23b and JB-25c run only when firmware patching is invoked with `--frida` (`vphone-cli vm create … --frida`, `vphone-cli fw patch <vm> -V jb --frida`, `patch-firmware … --frida`, `patch-component --component kernel-jb --frida`, or `make fw_patch_jb FRIDA=1`), gated by `KernelJBPatcher.applyFrida` (set by `FirmwarePipeline` from `enableFrida`). Baseline JB/EXP output is **byte-identical** when off (26.4 emits 83 records without `--frida`, 87 with — the 4 being JB-23b's 2 thread_set_state setters and JB-25c's 2 vm_map_delete gates). Frida itself is installed through the existing extra-debs mechanism: on a `--frida` create the orchestrator sets `VPHONE_FRIDA=1`, `fetch_debs.sh` resolves the latest `frida_<ver>_iphoneos-arm64.deb` (== `re.frida.server`: no `Depends`, rootless `/var/jb` layout) from the Frida GitHub releases into the debs cache, `cfw_install_{jb,exp}.sh` stage it, and the first-boot "5b/8 INSTALL EXTRA DEBS" step `dpkg -i`'s it — no APT source, marker, or dependency resolution.
+> **Frida Stalker support is opt-in (`--frida`).** JB-23b and JB-25c run only when firmware patching is invoked with `--frida` (`vphone-cli vm create … --frida`, `vphone-cli fw patch <vm> -V jb --frida`, `patch-firmware … --frida`, `patch-component --component kernel-jb --frida`, or `make fw_patch_jb FRIDA=1`), gated by `KernelJBPatcher.applyFrida` (set by `FirmwarePipeline` from `enableFrida`). Baseline JB/EXP output is **byte-identical** when off (26.4 emits 83 records without `--frida`, 87 with — the 4 being JB-23b's 2 thread_set_state setters and JB-25c's 2 vm_map_delete gates). **2026-10-22:** the Frida set also carries JB-33 (`kernel-exp-frida_tpro_off`, spawn) and JB-34 (`kernel-exp-frida_syscall_filter_off`, syscall-filtered daemons), ported from mowisec/frida_patches_srd; `standard` blocks all four. Frida itself is installed through the existing extra-debs mechanism: on a `--frida` create the orchestrator sets `VPHONE_FRIDA=1`, `fetch_debs.sh` resolves the latest `frida_<ver>_iphoneos-arm64.deb` (== `re.frida.server`: no `Depends`, rootless `/var/jb` layout) from the Frida GitHub releases into the debs cache, `cfw_install_{jb,exp}.sh` stage it, and the first-boot "5b/8 INSTALL EXTRA DEBS" step `dpkg -i`'s it — no APT source, marker, or dependency resolution.
 
 | #     | Group | Method                                | Function                                                                                             | Purpose                                                                                                                                                                              | JB Enabled |
 | ----- | ----- | ------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | :--------: |
@@ -787,6 +843,9 @@ Apple's ROM and this patch. See `Firmware/openavb_boot_rom.md`.
 | JB-29 | C     | `patch_fpfs_scoped_vnode_open`        | Sandbox MACF `mpo_vnode_check_open` (`ops[267]`) → per-process trampoline code cave                  | **iOS-27 random-respring fix (fpfs balloon).** JB-09 blanket-neuters `mpo_vnode_check_open` (`ops[267]` → allow) so processes can read `/var/jb`. But FileProvider's fpfs parent-walk (`fpfs_pkg_fd_lookup` → `openbyid` climbing via `getattrlistat(ATTR_CMN_PAROBJID)`) uses the stock check's EACCES at the domain-container boundary as its terminus; neutered, the walk climbs unbounded → `ResolverService` (FileProviderResolver) balloons to ~12 GB → `vm-compressor-space-shortage` jetsam → backboardd killed → **respring** (seen on 27b4/24A5390f). Fix keeps the global bypass and enforces the real check for the FileProvider daemons only: on 27, `ops[267]` is left un-neutered (removed from JB-09's blanket list — conditional `if !applyIOS27` in `patchSandboxHooksExtended`), then retargeted to a 20-insn code-cave trampoline that inlines `current_proc` (`mrs tpidr_el1` → `ldr [+0x3F0]` uthread → `ldr [+0x18]` proc), loads `p_comm` (`+0x56C`), compares the first 8 bytes to `"Resolver"`/`"fileprov"`, and on match `b`s to the real `vnode_check_open` (restores the terminus) else returns allow (`mov x0,#0 ; ret` → `/var/jb` reads + Sileo/TrollStore icons unaffected). Register-only (x8–x10), no frame/call (~18 insns/open). Struct offsets recovered via the VZ gdb stub on vphone600; cave bytes from the Keystone-backed `ARM64Encoder`, verified by Capstone round-trip; the `ops[267]` retarget preserves the auth-rebase high bits (same encoder family as JB-09). **VALIDATED on-device (2026-07-23, `17,3_27.0_24A5390f` + cloudOS 26.4, JB, `setup_machine` deploy): resprings stop; Sileo/TrollStoreLite icons render.** Backward-compat: a 26.5 base is unaffected (`ops[267]` still blanket-neutered there) — verified byte-identical kernelcache pre-vs-post (`cmp` clean, `sha256` unchanged). See `KernelJBPatchFpfsScopedOpen.swift`. |     Y      |
 | JB-30 | B     | `patchParavirtDisplayRefreshRate` (record `kernel-cfw-display_promotion`; introduced as `kernel-exp-display_refresh_120hz`, renamed when `standard` turned it on) | `AppleParavirtDisplay::createDisplayAttributes` (AppleParavirtGPUIOGPUFamily), the per-mode timing element call | **ProMotion: 120 Hz display timing (on in `standard` since 2026-10-09; it shipped opt-in from 2.4.2).** The host VM service builds its one `PGDisplayMode` with a constant 60.0 Hz and writes it into the display shared state page as a 16-byte entry (u16 width, u16 height, u32 refresh in 16.16 Hz, flags); the guest turns each entry into an IOAV timing element with `ldurh w1,[xN,#-8]; ldurh w2,[xN,#-6]; ldur w3,[xN,#-4]; bl`. The `ldur w3` becomes `movz w3,#120,lsl #16`. Anchor: the `createDisplayAttributes` logger cstring (all refs in one function) + the only w1/w2/w3 load triple off one base at -8/-6/-4 ahead of a call. Gated by `KernelCustomFirmwarePatcher.applyProMotion`, set from the plan. See `Research/Guest/display_refresh_rate.md`. |     Y      |
 | JB-31 | C     | `patchParavirtUserClientsNarrow` (records `kernel-cfw-paravirt_user_clients.redirect` / `.cave`; introduced as `kernel-exp-paravirt_user_clients`, renamed when `standard` turned it on) | Same IOUserClient Sandbox gate; the deny block's `ldr Xt,[sp,#imm]` eight bytes before the fail-log `adrp` | **Paravirtual device access on a 26.x / 18.x base (on in `standard` since 2026-10-04; it shipped opt-in).** Narrow replacement for the broad gate-off: at the deny point the class-name C string is already in x0, so a code-cave trampoline reads its first eight bytes and branches to the gate's NotPermitted allow target only for `ApplePar` / `AppleVid` / `AppleVir` / `IOSurfac` (AppleParavirt\*, AppleVideoToolboxParavirt\*, AppleVirtIO\*, IOSurfaceAcceleratorParavirtClient); every other denial runs the displaced `ldr` and falls through to the real deny. Fixes `MTLCreateSystemDefaultDevice()` nil in daemons/CLI and the VideoToolbox/ANE/IOSurface denials (upstream issue #22) without opening the rest. Cave words verified by clang/as + capstone round-trip; the two `b` words via `ARM64Encoder`. Gated by `KernelCustomFirmwarePatcher.applyParavirtUserClients`, set from the plan when `applyIOS27` is false. See `Research/Guest/gpu_acceleration.md`. |     Y      |
+| JB-32 | B/C | `patchParavirtTask3Version` (`kernel-cfw-paravirt_gpu_task3.request`, `.features`, `.features_code`, `.identity_hook`, `.identity_code`) | `setupVersion`; task initializer's `Failed to create Page Table Lock`; superclass task retain/store; XNU flow-divert CDHASH log and proc/task inverse getter | **Persistent per-executable host shader caches through Task3, enabled in Standard.** Phase 1 (2026-10-19) requests binary version 252 while computing guest features from the lower of the granted version and the original 245 (`.features` branches to `.features_code`, a five-instruction clamp after the identity trampoline in the same cave; a refusal passes through). Phase 2 (2026-10-20) writes the owning executable's 20-byte code-signing cdhash at TaskRoot+0x28 before descriptor preparation and task registration. The host uses `task-<40 hex>` and retains that directory. A missing proc/hash leaves twenty zero bytes and preserves the ephemeral fallback. The owning task field is recovered from the superclass initializer, not guessed or taken from current_proc. Kernel helpers are found through source-backed semantic call flow (`cs_get_cdhash`) and the dynamically recovered proc_struct_size global (`get_bsdtask_info`); no task/proc layout offsets or kernel VAs are hardcoded. The trampoline preserves x0–x18, LR and SP, copies exactly 20 bytes and replays the displaced descriptor load. All four sites must resolve before any is emitted; failure aborts a selected install. Replacements use ARM64Encoder; new encoders have Keystone 0.9.2 parity tests. Gated by applyParavirtTask3 and declared for cloudOS 26.4 only; Standard enables it there and tvOS presets block it. Static fixture, missing-anchor and register-clobber execution tests pass. Lychee on macOS 27.0.1 / cloudOS 26.4 / iOS 27.0.1 negotiated 252 across three full boots, retained the same nine executable keys, and passed Camera with zero GPU resets. Host GPU compilation events fell 631 → 17 → 12; the Settings windows fell 121 → 5 → 0. Frame-counter gaps do not establish visible animation stutter; the user reports smooth warmed animations. Measurements, cdhash checks and crash analysis are in `Research/Guest/gpu_acceleration.md`. Older hosts remain untested. | Y |
+| JB-33 | B     | `patchTproOff` (record `kernel-exp-frida_tpro_off`) | `_xprr_tpro_enabled` (`__DATA_CONST`), found via the `if (xprr_tpro_enabled)` guard of the VM_REGION_FLAG_TPRO_ENABLED store | **Frida spawn support (opt-in, Frida set; port of mowisec/frida_patches_srd `tpro-off`).** libdyld asserts on every API entry that TPRO pages are read-only and aborts (`TPRO regions should not be writable on entry to dyld`); Frida's spawn handshake re-enters libdyld inside dyld's own TPRO window, so `frida -f` and spawn-gated apps abort. Clearing the flag takes the kernel's existing no-TPRO path for every process (global). Anchor: unique `adrp/ldr/cbz/ldr/cmp/b.lo/ldrh/orr #2/strh` window, decoded with Capstone; the flag must resolve into `__DATA_CONST` and hold 1, else fail closed. 26.4 `c0ecdb4b`: flag at file-off `0x7526D4` (1 → 0). See `Research/KernelCustomFirmwarePatches/patch_tpro_off.md`. | Frida set |
+| JB-34 | B     | `patchSyscallFilterOff` (record `kernel-exp-frida_syscall_filter_off`) | `_task_get_mach_trap_filter_mask`, `_task_get_mach_kobj_filter_mask`, `_mac_proc_check_syscall_unix` | **Frida in syscall-filtered processes (opt-in, Frida set; port of mowisec/frida_patches_srd `syscall-filter-off`).** Sandbox syscall filters (`syscall-unix/-mach/-mig`) deny the agent's own calls inside the target: attaching to trustd, apsd, cfprefsd, backboardd or runningboardd kills them, and in locationd `thread_get_state` returns `KERN_DENIED` (no threads for Stalker). The two mask accessors return NULL ("no filter", XNU `bsd_arm64.c:249`, `ipc_kobject.c:563`) and the MACF BSD check returns 0 (`systemcalls.c:162`); the rest of the sandbox is untouched. JB-07 (`kernel-boot-syscallmask`, which rewrites the masks as they are installed) does not reach these processes; this is the NULL-mask alternative that row mentions. Anchors: the inlined `bitstr_test` of each check (kobject one behind `cmn #1 ; b.eq`), and `and w1,#0xffff ; mov x0 ; bl ; mov ; cbnz w0` in unix_syscall; each must match once and the three functions must open `pacibsp ; stp`, else fail closed. 26.4 `c0ecdb4b`: file-off `0x1D43090`, `0x1D43120`, `0x24CCAE8` (2 words each). See `Research/KernelCustomFirmwarePatches/patch_syscall_filter_off.md`. | Frida set |
 
 ### EXP-Only Kernel Methods (Reference List)
 
@@ -832,6 +891,7 @@ do NOT execute these).
 | 26  | No binary change: both spawn hooks insert `libdevicehubfix.dylib` into `cryptexd`, the DDI's `dtremotedisplayd` and `dtdeviceinfod`, and `avconferenced`. In `cryptexd` it interposes `fcntl` and reports an `EPERM` from `F_SETPROTECTIONCLASS` as `ENOTSUP`; in `dtremotedisplayd` it interposes `MediaStreamSupportedFeatures.current` (answers `0x8c`) and `CurrentDevice.isCustomerRestricted` (answers false) from the DDI's `CoreDeviceUtilities`; in `dtdeviceinfod` it interposes `MGCopyAnswer` and fills a missing `FramebufferIdentifier` for `phone11` chrome; in `avconferenced` it replaces `VCPSideCarMetal`'s two band reads through the Objective-C runtime and runs one synchronous scaler transform before the first read of each frame — **all bases** | none (new guest dylib `VPhoneGuestComponents/DeviceHubFix/libdevicehubfix.c`, installed at `/usr/lib/libdevicehubfix.dylib`) | **Let Xcode 27's DeviceHub show the guest's screen.** On iOS 27 `cryptexd` stages each DDI asset with `open(O_RDWR)` + `fcntl(F_SETPROTECTIONCLASS, 4)` and accepts only `ENOTSUP` as a failure; a guest answers `EPERM` (`set protection class: [1: Operation not permitted]`, `staging failed`), so CoreDevice shows the device as "connected (no DDI)" for good. With the DDI mounted, DeviceHub asks `dtremotedisplayd` for its media stream features and gets 0 from CoreDeviceUtilities' policy: `isCustomerRestricted` (`isProductionFused && !hasInternalOSBuild && hasInternalDDI == false`) refuses every pre-27.0 device, and remote control is limited to iPhone, Apple Watch and Apple TV, which refuses every iPad. `0x8c` is what a Mac host reports for itself (mirrored primary display 0x4, system audio 0x8, display information 0x80). The 27.x iPhone guest reports `phone11` chrome with no `FramebufferIdentifier`, so DeviceHub drew the screen over the bezel corners; the hook answers only that missing key with Xcode's matching mask `4E5532ED-1470-47D1-BDF4-7AA90C26957A` from `/Library/Developer/DeviceKit/chrome_map.plist`. Interposing reaches all of them because `cryptexd`, `dtremotedisplayd`, `dtdeviceinfod` and `CoreDeviceUtilities` are standalone images; the two Swift symbols are weak flat-namespace imports, resolving to nothing outside `dtremotedisplayd`. On 27.x the view also needs row 11's conditional dispatch, or the capture display stays black. A stream that splits each frame into four bands (`tilesPerFrame` 4) deadlocked the host GPU within 16–35 s of screen activity: `VCPSideCarMetal` reads every frame once per band while the paravirtual scaler's write of that frame can still be unregistered on the host, and a band read that registers the first of the frame's two planes before the write and the second after it waits on the write, which waits on it (`Timeout in timestamp wait`, the guest loses its GPU). Waiting for one synchronous transform puts the band reads behind the frame's write. `VideoProcessing` is in the shared cache, so this part is a method replacement, not an interpose. Ships with `system-launchdaemons-boot-environment`; an existing guest gets it from the environment update. Details: `Research/Guest/devicehub_screen_viewing.md`. **Validated (2026-10-06/07):** `iPad16,1 26.6.2 (23G90)`: DeviceHub receives `supportedFeatures: 140`, `MediaStreamStart` succeeds and the view shows the live home screen. `iPhone17,3 27.0.1 (24A446)`: the DDI mounts (`F_SETPROTECTIONCLASS EPERM, reported as ENOTSUP`), and with row 11's conditional dispatch DeviceHub shows the home screen and Settings live, clipped inside the chrome (`Found FramebufferMaskIdentifier from displayInfo`). **Band reads validated (2026-10-07/08, `iPhone17,3 27.0.1 (24A446)`):** a four-band stream with screen activity deadlocked after 18 s without the barrier and ran 60, 180 and 300 s with it without a GPU error; in the host trace of the 180 s run no IOSurface access waited, and every band read of 6258 frames registered after the frame's write was released, a median 0.76 ms after it. Open: latency that grows over a long session and occasional stalls after a cold start, both upstream of the Mac receiver. |    Y    |  Y  |  Y  |
 | 27  | No binary change: both spawn hooks insert `libdevicename.dylib` into `configd` and `lockdownd` (after `libmisfix.dylib`, the first process to take two inserted libraries). In `configd` it interposes `SCDynamicStoreSetMultiple` and `SCDynamicStoreSetValue` and pins `Setup:/System`'s `ComputerName`; in `lockdownd` it interposes `SCPreferencesSetComputerName`, `SCPreferencesSetHostName` and `SCPreferencesSetLocalHostName` and refuses every rename with `kSCStatusAccessError`. Inert unless `/var/db/vphone/devicename.plist` holds a valid `DeviceName` — **all bases** | none (new guest dylib `VPhoneGuestComponents/DeviceName/libdevicename.c`, installed at `/usr/lib/libdevicename.dylib`; vphoned `device.name.get`/`device.name.set`) | **Pin the guest's device name to the VM's name.** The name is `System/System/ComputerName` in `preferences.plist`; configd's PreferencesMonitor (`updateConfiguration`, 24A435 `0x100062098`) flattens it into `Setup:/System` with one `SCDynamicStoreSetMultiple`, and every reader (`SCDynamicStoreCopyComputerName` in lockdownd's `copy_device_name`, MobileGestalt `UserAssignedDeviceName`, `UIDevice.name`) reads the store. The hook rewrites that publication, not the preferences read: the monitor's model-change path (`sub_10006155c`) writes the `kSCPrefSystem` value it reads back to disk, and the publication route leaves `preferences.plist` with the guest's own name. A publication that leaves `Setup:/System` out as unchanged gets the store's value pinned; one that removes it gets the pinned name instead. `vphone-vm` sends the VM's name to vphoned's `device.name.set` after every connect; vphoned writes the file (one rename, 0644) and applies the preferences unchanged, so configd publishes again and the new pin, or the guest's own name when the file is removed, is live within a second. The file outlives a reboot, so configd's first publication at boot carries it. The library re-reads the file when its inode, size or mtime change. lockdownd's `set_device_name` (`0x1000073b0`) is the only caller of the three setters; it logs their failure and still commits, and the `SetValue DeviceName` handler ignores the result, so a host rename reports success and the name stays. The pinned name itself is refused too: lockdownd runs `set_device_name(copy_device_name())` whenever it starts, and a lockdownd restarted after configd published would otherwise write the pinned name and derived host names into `preferences.plist` (seen once). An NVRAM variable was the first channel and never reached the guest: iBoot keeps only the variables it knows (even `vphone-vm`'s `boot-args` write is replaced). Interposing works because both daemons are standalone images. Ships with `system-launchdaemons-boot-environment` and the environment update; takes effect at the next boot. Verified on iOS 27.0 (24A435) on 2026-10-07: pin at boot and live, host rename refused, `vm rename` followed, preferences untouched. CoreDevice (`devicectl`, DeviceHub) reads the name when the device appears and can lag one boot after a rename. Details: `Research/Guest/device_name_pinning.md`. |    Y    |  Y  |  Y  |
 | 28  | `cbz`/`cbnz` -> `b` at the four compact-command choices in `-[PGSerializerRenderCommandEncoder drawIndexedPrimitives:…]` (`0x140b0`, `0x1421c`, `0x143b4`, `0x143c4` in 23E5207q) — **cloudOS 26.4** | `AppleParavirtGPUMetalIOGPUFamily` (`/System/Library/Extensions/AppleParavirtGPUMetalIOGPUFamily.bundle`) | **Heap index buffer fix.** The compact command stores `parentResourceOffset + indexBufferOffset` in 16 bits but is chosen by testing `indexBufferOffset` alone, so an index buffer 64 KiB or more into an `MTLHeap` is read from the wrong address and meshes (Unity games) draw with another mesh's indices. Every indexed draw takes the 64-bit command instead. `system-paravirt_gpu-cfw-heap_index_offset`; see "Heap index buffers reach the host whole (2026-10-14)" and `Research/Guest/gpu_acceleration.md` |    Y    |  Y  |  Y  |
+| 29  | No binary change: SystemHook calls `setenv("FS_CACHE_REUSE_ON_REBOOT", "1", 0)` first thing in its constructor, in every process it is inserted into, while `/usr/lib/vphone-metal-cache-reuse` exists — **all bases** | none (`VPhoneGuestComponents/SystemHook/SystemHook-vphone.c`; marker written by `cfw install` / `cfw update-environment`) | **Keep the guest's Metal shader caches across a reboot.** `libCoreFSCache` stamps each cache with `kern.bootsessionuuid` and resets it at the next boot unless the variable is set; on the paravirtual GPU CoreAnimation's precompiled pipelines are disabled, so backboardd rebuilt every pipeline after every boot. `system-systemhook-cfw-metal_cache_reuse`; see "Guest Metal caches survive a reboot (2026-10-19)" |    Y    |  Y  |  Y  |
 
 
 ### Swift port status — the eight DSC patchers (2026-09-23)
@@ -1970,9 +2030,10 @@ the restore left it.
 `BuildManifest.plist`, but neither is a patcher over that one file — the first
 rewrites cryptex images across the restore tree, the second rewrites hashes that
 describe files other steps produced. Restoring the manifest alone would describe
-a tree that no longer exists. Both are `.less`-only, and `.less` is excluded from
-the mechanism outright so a `.less` run over a CFW-patched VM cannot read "this
-variant builds no boot-chain patchers" as "put the boot chain back".
+a tree that no longer exists. Both run only for the `minimal` preset (see "The `minimal`
+preset" below), which names no boot chain, kernel or TXM set: a `minimal` run over
+a CFW-patched VM puts that boot chain back, which is what the restore image
+expects.
 
 **Existing VMs.** A machine patched by an earlier build has no stash, so the
 first run under the new code would adopt its already-patched bytes as the
@@ -3261,3 +3322,512 @@ in `fw patch`. The SEP firmware (`sep-firmware.vphone600.RELEASE.im4p`, sent as
 before keep Apple's SEP ROM; `vm config --seprom opensep|apple` switches one
 without a restore. `Firmware/opensep_sep_rom.md` has the contract and the
 validation.
+
+## Guest Metal caches survive a reboot (2026-10-19)
+
+Row 29. `system-systemhook-cfw-metal_cache_reuse`, declared in the Guest
+System set, is on in `standard` and `experimental` and blocked in both Apple TV
+presets (they carry no SystemHook). Its target is the marker
+`/usr/lib/vphone-metal-cache-reuse`: `cfw install` and `cfw update-environment`
+write it when the patch is selected and remove it when it is not, so it is
+revertible. While the marker exists, SystemHook's constructor sets
+`FS_CACHE_REUSE_ON_REBOOT=1` before anything else unless the variable already
+has an explicit value, so `libCoreFSCache` can keep
+each Metal cache stamped by an earlier boot instead of resetting it. No system
+binary, shared cache or kernel byte changes.
+
+Verified on `Lychee` (iPhone, iOS 27.0.1, cloudOS 26.4) with real reboots:
+backboardd's `functions.list` keeps its boot UUID header and size across three
+boots, guest compiles for backboardd during five Settings rounds fall from
+about 145 to 0, no GPU restart, and the first go-home goes from about 31% to
+37–44% on time. Numbers and method: `Guest/gpu_acceleration.md`, "Real reboots
+with the patch (2026-10-19)".
+
+Host cache storage (2026-10-20): the launcher keeps a durable whole-directory
+snapshot in `<machine>/ShaderCache`, seeds Apple's normal ECID working cache
+before boot, and checkpoints after guest shutdown and again in the parent CLI
+after vphone-vm exits. A symlink experiment was rejected after sandbox denials
+and repeated compilation; the working root remains a real directory. This adds
+no binary patch and changes no Task3 key bytes. Index/data pairs stay together;
+copies are staged before whole-directory replacement and never merged across
+independent trees. Permissions use the shared symlink-safe host-file walker.
+The final bundle passed two Settings/Camera boot cycles with zero host GPU task
+compiles and zero GPU resets, including restoration after moving aside Apple's
+working directory. All 14 cache file checksums matched after each shutdown.
+Migration checks and runtime evidence are in `Guest/gpu_acceleration.md`,
+"Cache location and migration".
+
+Deletion correction: a missing machine snapshot now clears an already managed
+host working copy on the next boot, instead of importing it again. A shutdown
+checkpoint does not recreate a deleted snapshot. The working copy's existing
+`.host-ecid` marker distinguishes this reset from the first-use import. This
+resets host caches only; guest caches inside `Disk.img` remain. Frame-counter
+gaps in the earlier measurements do not independently demonstrate visible
+animation stutter; the user reports smooth warmed animations.
+The corrected bundle's reset/reboot test recorded 607 then seven host GPU task
+compilation events (129 then one during Settings), with zero GPU resets on both
+boots. Fourteen cache/permission tests and the complete bundle build pass.
+
+Standard promotion (2026-10-20): JB-32 is now enabled by Standard as
+`kernel-cfw-paravirt_gpu_task3`; all four record suffixes and kernel writes are
+unchanged. The shipped plist and catalog fallback agree. tvOS presets retain
+an explicit block. The old `kernel-exp-paravirt_gpu_task3` identifier migrates
+in VM selections, plans and receipts, including explicit opt-outs. New template
+keys include the enabled kernel patch, so a pre-Task3 template cannot satisfy
+the new Standard plan. Existing VMs bind the new bundle and run
+`cfw update-environment` and `cfw update-kernel` while stopped, keeping data.
+See `Documents/Guides/shader-cache.md` and the Standard promotion section in
+`Guest/gpu_acceleration.md`. The previous opt-in notes describe development
+validation; older host compatibility remains untested.
+Promotion validation: 62 focused tests passed, as did the full `VPhone` bundle
+build and admission check. The built CLI recognized Lychee's old Task3 receipt
+under the new name as applied, enabled by its preset and not pending.
+
+Review fixes (2026-10-21): JB-32 is declared for cloudOS 26.4 only. On the
+cloudOS 26.1, 26.2 and 26.3 research kernels the owning-task anchor in the
+superclass initializer does not resolve, and an ungated Standard patch made
+`fw patch` and `cfw update-kernel` abort for every iOS 18.6.2–26.3.1 machine.
+The `.features` site no longer loads a fixed 245: it branches to
+`.features_code` (`sub x0,xV,#246; tbnz x0,#63; tbnz wV,#31; mov w0,#245`,
+else `mov x0,xV`), which passes the granted version through when it is the
+kext's own or lower, and a refusal unchanged. A host that does not know the
+requested version grants its own maximum without the refusal bit
+(`-[_PGDevice setBinaryVersion:]`: macOS 15.6.1 → 209, 26.0 → 233,
+26.4 → 245, 27.0.1 → 252), so the fixed 245 had claimed 8 feature flags on a
+15.6.1 host and 4 on 26.0 that the host never enabled. The clamp uses only
+existing Keystone-checked encoders; the Task3 fixture test executes it for
+252, 246, 245, 233, 209 and a refusal. The persistent host shader cache is no
+longer required to launch: a VM that cannot prepare one logs a warning and
+boots without it.
+## Apply selected Preboot identity during guest updates (2026-10-21)
+
+`preboot-exp-devicetree_identity` was advertised as an `update-environment`
+guest patch but its installer call enabled identity only for full installs.
+Launchpad's Apply to Guest therefore completed with the identity still pending.
+Environment updates now run the existing identity rewrite when the current
+resolved plan selects it, using the installed tree without a restore directory.
+The patch bytes, presets, board-presenting guest guard, post-identity repair
+backup and existing off-state behavior are unchanged. This fixes the same
+delivery path for CLI updates, bundle changes and template guest-patch steps;
+other Preboot repairs already used it. It does not enable the eight firmware
+DeviceTree identity edits or establish that Apple will deliver Photos models.
+
+Validation on `upstream/main` `047642f8` (2.10.1): 77 existing tests in eight
+suites pass, covering guest device trees, patch resolution/catalogue/drift,
+board audio, microphone-array removal, iPhone product properties and haptics.
+The complete `VPhone` Debug build and bundle admission also pass.
+
+## The `minimal` preset: a restore image instead of patches (2026-10-19)
+
+The patchless variant (`FirmwarePipeline.Variant.less`) was unreachable: every
+caller passed `.jb`. It is a preset now, `minimal`, and the variant is
+gone. The preset names three sets:
+
+- `com.vphone.patchset.bootchain`, allowing only iBEC's and LLB's patches,
+  which the old `.less` variant applied too ("for the serial logs"). AVPBooter,
+  iBSS, TXM and the restore ramdisk stay stock, and the pipeline builds no
+  patcher for a boot chain component none of whose patches is on. A stock LLB
+  does not get the restored guest to its kernel: on 26.6 with cloudOS
+  23E5207q it restarts right after its banner, with Apple's ROMs as with
+  OpenAVB and OpenSEP (2026-10-19). Which of LLB's patches it needs is open.
+- `com.vphone.patchset.devicetree`, allowing only the board presentation
+  (`devicetree-cfw-serial_number`, `-home_button_type`,
+  `-artwork_device_subtype`, `-island_notch_location`) and the haptics and
+  microphone-array removals. They change no code.
+- `com.vphone.patchset.restore.image` (`FirmwareRestoreImagePatchSet`), new,
+  named by no other preset:
+
+| Identifier | What `fw patch` does |
+| --- | --- |
+| `filesystem-boot-cryptex_merge` | Merges the AppOS and SystemOS cryptexes into the OS image, adds the dyld symlinks, then rebuilds the static trust cache, the mtree and the digest database and root hash (`apfs_sealvolume`) |
+| `filesystem-boot-gpu_driver` | Installs the PCC paravirtual GPU driver `fw prepare` staged |
+| `filesystem-boot-mobileactivationd_should_hactivate` | The `should_hactivate` patch, in the image |
+| `filesystem-boot-vphoned` | vphoned and its launch daemon, in the image |
+| `filesystem-boot-launchd_cache_loader_unsecure_cache_gate` | Lets launchd read the launch daemons from the volume |
+| `manifest-boot-digest_rehash` | Rewrites every BuildManifest digest to the files the restore now sends; for an AEA archive, the digest of its decrypted image, which is what Apple's manifests hold and what an 18.x restore checks the written image against |
+
+The kernel and TXM stay stock, and the restore installs a system whose seal
+the stock kernel verifies. `CryptexFilesystemPatcher` and `ManifestHashPatcher` used
+to emit `filesystem.cryptex.merge` and `manifest.hash`, which no set declared;
+they emit the identifiers above, and the pipeline builds each patcher only when
+its patch is enabled.
+
+Nothing may write the System volume after the restore, because that breaks the
+seal. So for a VM whose plan enables `filesystem-boot-cryptex_merge`:
+
+- `cfw install` touches no disk: it records an empty `Guest` receipt part and
+  the install, so the boot gate (`restore-info.json`) passes as for any VM.
+  `cfw update-environment` and `cfw update-kernel` refuse.
+- `vm create` builds without a template (the offline trim and setup boot write
+  the system) and refuses `--template` and the slimming switches, as for an
+  Apple TV.
+- `fw patch` needs root for the merge (owner-preserving copies on a mounted
+  image) and says so. Launchpad runs it through its helper's new
+  `patchRestoreImage` verb, which runs `fw patch <vm> --restore-image-only`
+  from the receipt-checked store bundle; that flag refuses any selection that
+  does not merge the restore image.
+- `fw prepare` stages `apfs_sealvolume_<iOS version>` into `<restore>/.tools`
+  (the `fw seal-tool` fetch; iOS 18.x.y takes macOS 15.x.y, or without a twin
+  the newest macOS 15 below it) and the GPU driver for
+  `filesystem-boot-gpu_driver` as for `system-extensions-boot-gpu_bundle`.
+  `vm create` and Launchpad now record the preset before `fw prepare`, which
+  read `standard` before: the GPU staging followed the wrong selection for any
+  other preset as well.
+
+The merged image must not carry the host's `.fseventsd`. `diskutil image
+attach` mounts it browsable, so fseventsd starts a log on every writable
+mount, and Apple's system volumes have none. With the log in the image, the
+mtree listed `.fseventsd`, the restore wrote `.fseventsd/.ramdisk-boot-done`
+into the restored volume, and `seal_system_volume` failed ("mtree: cannot
+generate the XML dictionary", 26.6 on cloudOS 23E5207q, 2026-10-19). Each
+writable mount now deletes the directory before it unmounts, which also stops
+fseventsd writing it again for that mount.
+
+The root hash `fw patch` computes has to be the one the restore computes, and
+it was not ("Invalid root hash", `apfs_sealvolume` exit 65 in
+`seal_system_volume`):
+
+- The remap's `MODIFICATION` was the time of `/private/var` in the mtree,
+  on the assumption that `removeSpecificSystemFiles` changes it last. The
+  restore's own `mtree -m` sets it from the root entry (`.`), not from the
+  newest one: run on 2026-10-19, the device took the root's
+  `1792405582.069334279` while `/private/var` said `…582.936736187`. The
+  remap takes the root's time now.
+- `createDigestAndHash` mounted the image writable only to unmount it again
+  for `apfs_sealvolume`, which needs the device; the mount changed the volume
+  after the mtree described it. It attaches the image with `-noMount` now.
+
+The binaries the merge patches (`launchd_cache_loader`, `mobileactivationd`)
+are re-signed in Apple's ad-hoc shape (`VPhoneSignOptions.Style.appleAdHoc`),
+like the stock binaries around them. The guest's TXM is stock here: it takes
+an ad-hoc binary from the static trust cache the merge rebuilds, but rejected
+ldid's signature (no ad-hoc flag, empty CMS blob), and launchd panicked at its
+first boot task ("launchd_cache_loader - posix_spawn: 85: Bad executable").
+vphoned, its launch daemon plist and the rewritten `launchd.plist` belong to
+root:wheel, as the system's own; they kept the host user's owner and group.
+
+## The research board stands in for vphone600 (2026-10-19)
+
+Only the 26.1–26.4 beta cloudOS releases (up to 23E5207q) carry a vphone600ap
+build identity. The 26.4 release and every one up to 26.7, and the 18.x
+releases, have the research board alone (vresearch101ap). `FirmwareManifest`
+now takes the research identities for the vphone600 components when there is
+no vphone600ap, and leaves `RecoveryMode` out when the identity has none.
+The new set `com.vphone.patchset.research.board` turns those components into
+vphone600's. Every shipped preset names it. When the restore tree's
+`RestoreDeviceTree` is not the research board's, `fw patch` records its patches
+as not applicable (`FirmwarePipeline.resolveFirmwareApplicability`), so a
+cloudOS with vphone600 components builds no SEP component, converts nothing
+and stays byte-identical, and receipts do not claim the patches.
+
+**`devicetree-boot-vresearch101_conversion`**
+(`DeviceTreeResearchBoardConversion.swift`) rewrites the research tree before
+any other device tree patch runs, whatever the selection, because those are
+written against vphone600 paths and values. It finds the research tree by its
+root `target-type` (`VRESEARCH101`) and then:
+
+- sets the root identity (`VPHONE600AP`, `iPhone99,11`);
+- adds the seven nodes the research board lacks: `/buttons`,
+  `/arm-io/multi-touch`, `/arm-io/bluetooth`,
+  `/product/vphone600-gestalt-variants` with its `d47vm2025vre-variant`,
+  `/product/maps` and `/product/haptics`. Each goes where vphone600 has it and
+  gets an unused `AAPL,phandle`;
+- sets the phone's `/product`, `/defaults`, `/filesystems` and gestalt
+  variant properties, most of them `syscfg/` placeholders (flag 0x8000);
+- removes `/defaults/pmap-max-asids` and `/product/kernel-core-dump-location`.
+
+Existing phandles are kept, so `interrupt-parent`, `device-interrupt-parent`
+and `serial-device` keep naming the nodes they named. The earlier port
+renumbered every node and repaired those three references by hand, which
+would have broken any other reference.
+
+Checked against Apple: converting the vresearch101 tree of cloudOS 26.1
+(`399b664d`) and of the 26.4 beta (`c0ecdb4b`) gives their vphone600 tree
+property for property. The only differences are the build `time-stamp`, the
+order properties are stored in, and the phandle numbers, which are compared
+through the node each reference names. `DeviceTreeResearchBoardTests` runs
+that comparison whenever an IPSW in `ipsws/` carries both trees.
+
+**`sep-boot-vresearch101_sepd_dispatch`** (`SEPResearchBoardPatcher.swift`)
+patches SEPD in the research board's SEP firmware. On the 26.4 beta, which
+carries both, vphone600's SEPD sends operation 0x31 to the handler it shares
+with 0x12 and others, which zeroes the reply; vresearch101's gives 0x31 a
+handler of its own, which replies with a constant from `__const`. The patch
+copies 0x12's switch table entry into 0x31's. The table is found on decoded
+operands, as the bounds-checked switch (`cmp`, `csel ls`, `adrp` + `add` or
+`adr` + `nop`, `ldrsw … lsl #2`, `adr`, `add`, `br`) whose bound covers 0x31,
+and must be the only one. SEPD is found through the root argument object after
+the "Built by legion2P" banner. The table lies in `__text`, and from 26.4 on SEPD
+carries `__TEXT,__fipspost_hmac`, an HMAC-SHA256 of `__text` with an all-zero
+key (both stock 26.4 SEPDs match it), which is recomputed. 26.1's SEPD has no
+such section. A rebuilt `sepi` container keeps its `PAYP` load properties
+(`arms`, `tz0s`): `IM4PHandler` now finds the `PAYP` element by its DER length,
+which gives the same 10-byte header for TXM and the kernel as before and 6
+bytes for the SEP image. `SEPResearchBoardTests` checks all of this against
+Apple's 26.1 and 26.4 beta images when an IPSW in `ipsws/` carries both.
+
+### The research board's kernelcache
+
+**`kernel-boot-vresearch101_kext_mix`** (`KernelCacheMixer`) gives the research
+board's kernelcache the iPhone virtualisation kexts it lacks (paravirtual GPU,
+touch, audio, FairPlay, ...). For the cloudOS's `kernelcache.release.vresearch101`
+it finds the recipe in `Contents/Resources/kernelcache_recipes` by SHA-256, then:
+
+1. extracts the donor, the vphone600 kernelcache of the 26.4 beta (23E5207q,
+   read once from its cloudOS IPSW), and the base into KDKs with
+   `ipsw kernel extract --kdk --symbols`, naming the stripped symbols from the
+   recipe's maps;
+2. keeps the recipe's bundle list: the base without its research-board-only
+   kexts, plus the donor kexts that link against the base kernel;
+3. stages the bundles as a root-owned volume (kmutil reads no other kexts and
+   takes the host's own in their place without a word) and links it with
+   `kmutil create -a arm64e -n boot -s all -z -x --compress --img4-encode
+   --split-ro-rx-tags`;
+4. puts back Apple's CPU subtype if the builder wrote another, and checks that
+   every requested bundle was linked.
+
+The mix replaces both `KernelCache` and `RestoreKernelCache`, so restore boots
+it too. The pipeline keeps kmutil's container (its `PAYP` properties describe
+the new layout) and saves the preset's kernel patches into it
+(`ComponentDescriptor.replacement`); `minimal` adds none. The shipped kernels stay
+in `FirmwareOriginals`. Mixes are cached in `~/.vphone/kernelcache/mix`, keyed
+by the kernelcaches, the maps and bundle list and the builder layout.
+
+Only the link needs root, and root runs no `ipsw`. `fw kernelcache <vm>` stages
+the mix as the user (both extractions and the volume) and links it under sudo:
+root copies the staged volume into a fresh root-only directory, walking it by
+descriptor, refusing every symbolic link but the KDK's pointer to the volume's
+extensions and normalising modes (kmutil skips a kext with a group- or
+world-writable file as silently as one root does not own), and runs kmutil on
+the copy. The Launchpad helper's link runs with `--link-only`, which never
+stages. kmutil records the absolute path of every codeless kext, which moves
+the end of `__PRELINK_INFO`: the volume path takes the length of the build root
+Apple linked the base in, read from the base's own prelink info, so a mix no
+longer depends on where it is built. The 26.6 mix then has the segment layout
+of the hand-built research mix that booted.
+
+Requirements: an `ipsw` with `kernel extract --kdk`, named by `VPHONE_IPSW`
+(vphone-cli does not ship it); root; and for every base here (26.4–26.7, all
+`kernel-last`) the kmutil of macOS 26.4 or later. `fw prepare` now pairs a
+cloudOS without vphone600ap and refuses one whose kernelcache no recipe covers.
+`cfw update-kernel` refuses on a mixed kernel, whose originals are the research
+board's.
+
+Checked on 2026-10-19: a `minimal` VM of iOS 26.6 on cloudOS 26.6 (23G71) restores
+and boots, and vphoned answers. Checked on 2026-10-20 with the standard preset:
+iOS 26.5 (23F77) on cloudOS 26.5 (23F75) and iOS 26.4 (23E246) on cloudOS 26.4
+(23E244) restore and boot the same way, their GPU driver taken from a temporary
+cloudOS restore. The 26.7 recipe is one the research workflow built and
+validated statically; it has not run through this pipeline yet (26.7 has no
+iPhone release to pair it with).
+
+## Apple Watch guests (2026-10-20)
+
+A Watch7,18 (Apple Watch Series 11, N227b) IPSW restores as a guest of its own
+family (`VPhoneGuestDevice.watch7_18`, 416x496 at 330 ppi, scale 2). No
+cloudOS ships a kernel for a watch VM, and the vphone600 kexts are iOS builds,
+so the watch boots the 26.4 research board kernel (23E244) rebuilt with the
+watchOS kexts of its own IPSW. It takes the `watchos` preset: `minimal` with the
+watch board's device tree in place of the iPhone17,3 identity, and activation
+stock (`filesystem-boot-mobileactivationd_should_hactivate` is off; pairing
+needs it).
+
+### The watch kernelcache
+
+`kernel-boot-vresearch101_kext_mix` with the recipe `watch_26.4_23T240`. A
+recipe now names the guest family it is for (`guest`) and its kext sources in
+order (`sources`); each kext comes from the first source that has it, the KPI
+bundles (System.kext) always from the base, so the base kernel resolves them.
+A donor without a cloudOS URL is read from the guest's own restore tree.
+
+| Source | Kexts |
+| --- | --- |
+| `watch7c_26.4_23T240`: `kernelcache.release.watch7c` of the Watch7,18 IPSW | 105: the watchOS families and drivers a vphone600 target built with `OSPRODUCT=WatchOS` takes, per the KDK's KernelCacheBuilder makefiles |
+| base: 23E244 `kernelcache.release.vresearch101` | 11: ARMGIC, PVPanic, ParavirtGPU, VPIOP, VirtIO, VirtualPlatform, usb.cdc, ParavirtIOSurface, VirtIOStorage, and AppleUSBXHCI/XHCIPCI for the VM's USB touch screen; plus the 7 KPI bundles |
+| `vphone600_26.4_23E5207q` | 6: VideoToolboxParavirtualization, AvpFairPlayDriver, driverkit.serial, usb.cdc.acm, usb.serial, VirtIONeuralEngineDevice |
+
+The 23E244 kernel was chosen because its KPI symbol sets, C++ class sizes and
+syscall, Mach trap and MIG tables equal the watch kernel's. Both maps are the
+research results: the watch kernelcache symbolicated with BinDiff against the
+23E5207i KDK, and the 23E244 map of the iPhone recipe with about 2,400 fixes the
+watch kexts' imports need (70 kernel-import binds resolved by three-way
+alignment against the macOS 26.5.1 vmapple kernel, every `__ZTV`/MetaClass
+label from `ipsw kernel cpp`, and IOSurface getters labelled 0x14 before their
+entry, which failed PAC on `retab`). On 2026-10-20 the staged volume's kernel
+and all 124 kext executables were byte-identical to the research mix that
+booted to Setup with working touch.
+
+### Device tree
+
+The installed tree presents N227b through the board copy iPad and Apple TV
+guests use (`devicetree-cfw-ipad_*`). A watch needs two more:
+
+| Patch | Change |
+| --- | --- |
+| `devicetree-cfw-watch_presentation` | `/product` `artwork-display-gamut`, `artwork-dynamic-displaymode` and `framebuffer-identifier` from N227b; the `vphone600-gestalt-variants/d47vm2025vre-variant` tags MobileGestalt reads in place of syscfg on the VM (`tag-ards`, `-arsf`, `-codf`, `-tprt`, `-crid`, `-dcrd`, `-fbid`, `-prde` from the matching N227b properties, `-isnl` and `-waco` 0). With the D47's values the watch UI finds no screen class ("unsupported screen class, no apple logo found") and stays black. |
+| `devicetree-cfw-watch_driverkit` | `/product/supports-driverkit = 1`. The VM's touch screen is a USB device behind XHCI whose HID driver is the dext `com.apple.AppleUserHIDDrivers`; launchd starts driverkitd only on a tree that says so, and N227b's does not (a watch has no USB touch screen). |
+
+### Restore image
+
+A watchOS image has no cryptexes: its dyld caches (arm64_32 and arm64e) are in
+the OS image. For a watch `filesystem-boot-cryptex_merge` skips the cryptex
+copies and dyld symlinks and only reseals the image with the guest payload.
+`filesystem-boot-gpu_driver` marks the iOS driver and its compiler plugin
+watchOS (`MachOBuildPlatform.watchOS`, re-signed, bundle resealed), as the
+tvOS installer does; all its imports are in the watchOS 26.4 arm64e cache.
+`filesystem-boot-launchd_cache_loader_unsecure_cache_gate` thins the universal
+binary to its arm64e slice first (`MachOFatSlice`). vphoned is the arm64 daemon
+marked watchOS (`vphoned-watchos`); its HID presses reach the crown as Home
+(consumer 0x40). The side button is consumer Help (0x0C/0x95), not Power:
+N227b's `/buttons` node names two buttons, `help` and `menu`, and Carousel's
+`-[CSLHIDEventStreamWriter _eventForUsagePage:usage:down:]` maps 0x0C/0x40 to
+the crown, 0x0C/0x95 to the side button (to the Action button only when
+`shouldSimulateSting`) and vendor 0xFF01/0x200 to the Action button, which a
+Series 11 lacks. `-[CSLUIHIDHandler init]` reads consumer Power (0x30) as the
+separate `power` mask, which only sleeps or wakes the display. The VM window's
+Device › Side Button (watch guests only) and the host automation key `side`
+send 0x95; on 2026-10-20 it woke the `pair-watch` guest and opened Control
+Center from the watch face, where 0x30 turned the display off.
+
+vphoned links Vision (IcliKit's OCR) weakly: watchOS ships no Vision, and dyld
+refused the daemon. Every other library it links strongly, and every symbol it
+imports from them, is in the watchOS 26.4 arm64e cache; `ui.ocr` and
+`ui.describe` report that the guest has no text recognition.
+
+Checked on 2026-10-20: `vm create --device Watch7,18` with the Watch7,18 26.4
+(23T240) IPSW and cloudOS 26.4 (23E244) links the mix, restores, boots, and
+vphoned answers the first-boot ping.
+
+### Pairing with a phone
+
+See `Research/Guest/watch_pairing.md`. The watch preset now patches activation
+(`filesystem-boot-mobileactivationd_should_hactivate`, on the arm64e slice of
+the universal binary), and three patches are new:
+
+| Patch | Target | Change |
+| --- | --- | --- |
+| `devicetree-cfw-watch_companion` | an iPhone guest's tree | `/product/watch-companion = 1`, added where the board copy removed a placeholder. vphone600's `syscfg/waco` has no syscfg value on a VM, so iBoot drops it and the phone pairs with no watch. |
+| `system-bluetoothd-cfw-btvc_le_connection` | `/System/Library/FeatureFlags/Domain/BluetoothFeatures.plist`, `cfw install`, iOS 26+ | `EnableBTVCLeConnection.Enabled = true`: bluetoothd's virtual LE controller may connect. Reverted from the `.bak` when turned off; blocked for tvOS. |
+| `filesystem-exp-btvc_le_connection` | the same file in the restore image (`minimal`, `watchos`) | The same flag, written before the seal. |
+
+## iOS 18 guests on the research board (2026-10-21)
+
+iOS 18.1 to 18.7.2 run on their own release's research board kernel, rebuilt
+with the vphone600 kexts of the public cloudOS 26.1 (23B78), which still ships
+vphone600 components. The userland comes from the iPhone XS family's IPSWs
+(iPhone11,2/4/6), the only ones carrying every 18.x release, 18.7.x included.
+Only `minimal` boots these kernels: `standard`'s kernel patches panic them early
+in `kmem_init` (not investigated).
+
+### The kernelcache
+
+`kernel-boot-vresearch101_kext_mix` with the bases `18.1_22B83` to
+`18.7.2_22H124` and the donor `vphone600_26.1_23B78`. Across versions an
+import cannot be bound by name, so every donor import was resolved by code
+identity, from 26.1 to 18.7.2 and from 18.7.2 to each release, checked against
+the Apple-symbolicated macOS 26.1 (25B5062e) and 15.7.3 (24G419) KDKs; both
+maps carry the names those targets have. The 26.1 map and the 18.x maps had
+given 60 donor imports a neighbour's name, consistently on both sides, so the
+research builds bound them correctly: the `IORegistryEntry` twins below, and
+54 `OSMetaClass`, `IORegistryEntry`, `IOService`, `IOUserClient`,
+`IOHIDDevice`, `IOHIDEventService` and `IOSCSIProtocolServices` virtuals
+(the SCSI task management run was three slots off). The recipes give them
+their real names. Every virtual one is proven by its vtable slot: the PAC
+discriminator a donor kext signs the slot with is the
+`ptrauth_string_discriminator` of the method's mangled name, the same slot in
+both KDKs carries it, and each of the eight kernelcaches holds a signed
+pointer with it to the renamed address. The `IORegistryEntry` twins also
+have code markers:
+
+| Function | Marker |
+| --- | --- |
+| `setLocation(const char *, plane)` | `OSSymbol::withCString`, then a virtual call with PAC diversifier 0x3025 |
+| `setName(const char *, plane)` | the same, diversifier 0x848a |
+| `setLocation(const OSSymbol *, plane)` | `plane + 0x30` (pathLocationKey), else `gIOLocationKey` |
+| `setName(const OSSymbol *, plane)` | `plane + 0x28` (pathNameKey), else `gIONameKey`, and a `kernel_debug_string` call |
+| `applyToChildren` / `applyToParents` | the same code but `ldr x1, [plane, #0x20]` (childKey) or `#0x18` (parentKey) |
+
+`setName(const OSSymbol *)` had carried an extraction placeholder
+(`_IOFreeDataSharable`, an unused KPI name of the 26.1 kernel) that no 18.x
+symbol set lists; with the real names every donor import is a name the base's
+own `com.apple.kpi.iokit` lists, and the symbol sets stay as Apple built them.
+One import had been bound wrongly in every 18.x map: the donor's
+`AppleEmbeddedHIDEventService::dispatchBiometricEvent` went to the base's
+`IOHIDEventService` version (15 vtable slots in AppleEmbeddedLightSensor and
+AppleSPU); in 18.7.2 the two are instruction-identical, and the recipes bind it
+to the base's own `AppleEmbeddedHIDEventService` override.
+18.5 to 18.7.2 take 18 donor kexts (the 16 of the 26.x recipes plus
+IISAudioIsolatedStreamECProxy and ExclavesAudioKext, which the 26.1
+AppleARMIISAudio needs); 18.1 to 18.3.1 take 15, without those three: 18.1
+lacks the tightbeam API they import, and its addresses in 18.2.1 and 18.3.1
+are not mapped reliably.
+
+The 18.x kernels are kernel-first. On macOS 26.4 and later the mix is linked
+on another Mac or macOS VM with an older kmutil over ssh (`VPHONE_KMUTIL_SSH`,
+`RemoteKernelCollectionBuilder`): the staged volume goes into a fresh
+directory of the remote `/private/var/tmp`, at a path as long as the base's
+build root, root links it there, and the result comes back. Linked with the
+kmutil of macOS 15.6.1, the 18.7.2 mix differs from the research build that
+booted only in the 15 rebound pointers and the symbol sets that build had
+extended.
+
+### The iPhone XS Max guest
+
+`VPhoneGuestDevice.iPhone11_6` (1242x2688 at 458 ppi, scale 3; iPhone11,4
+maps onto it) keeps the iPhone17,3 presentation of the converted tree, with
+two changes its userland needs. Its asset catalogs only carry 2436 and 2688
+artwork and its SpringBoard has no Dynamic Island, so
+`devicetree-cfw-artwork_device_subtype` writes 2688 and
+`devicetree-cfw-island_notch_location` removes `island-notch-location`
+instead of setting it; without them Hello and the wallpaper stay empty and the
+home gesture breaks.
+
+### Restore image
+
+| Patch | Target | Change |
+| --- | --- | --- |
+| `filesystem-boot-ios18_surface_compression` | the image's `/private/var/preferences/.GlobalPreferences.plist`, iOS 18 only | `CAEnableIOSurfaceCompression`, `CAEnableFramebufferCompression` and `CAEnableDeepFramebuffer` = false. iOS 18's AppleParavirtIOSurface maps only address format 0 and rejects the compressed surfaces CoreAnimation asks for ("invalid address format (3)"); backboardd retries its framebuffer allocation forever and the screen stays black. A backboardd restart comes up without the keys too; only a reboot shows the fix. |
+
+The GPU driver is the cloudOS's own, as for 26.x: 26.x drivers do not load on
+iOS 18 (`_OBJC_IVAR_$_IOGPUMetalHeap._device` is missing). cloudOS 18.7.2
+ships the 18.7 driver, so a driver now has to be of the cloudOS's release
+(major and minor version), not its exact version. The compiler plugin is the
+bundle's own, as for every guest.
+
+Touch: iOS 18 guests take every touch through vphoned; a touch that starts at
+an edge carries the digitizer edge flags (the edge swipe fix), so SpringBoard's
+home gesture works there too.
+
+Checked on 2026-10-21: `vm create --device iPhone11,6` with the XS family's
+18.7.2 (22H124) IPSW and cloudOS 18.7.2 (22H43) recovered the GPU driver in a
+temporary cloudOS restore, linked the mix over ssh with the kmutil of macOS
+15.6.1, restored, booted, and vphoned answered. Setup's Hello screen and the
+lock screen show their artwork, the bottom-edge swipe unlocks, and from
+Settings it returns to the home screen. 18.1 (22B83) on cloudOS 18.1, the
+oldest base and one of the three with 15 donor kexts, and 18.5 (22F76) on
+cloudOS 18.5 passed the same checks. The other four recipes resolve every
+donor import but have not been booted yet.
+
+### 2026-10-23 — Integrating the minimal, research-board, watch and iOS 18 presets
+
+The combined PR stack retains its declared patch sets and version gates. The
+integration adds host-side confinement without changing instruction matching or
+replacement bytes. Privileged `fw patch` clones only firmware inputs into a
+private directory, rejects links and foreign-owned inputs, and publishes regular
+files back through the pinned machine directory. Disk.img is never copied or
+rewritten by this step. Guest image mounts also live below the private work tree;
+guest file edits use descriptor-relative reads and atomic replacement.
+
+External patch sets are refused before any native plugin is loaded as root.
+Kernel extraction runs as the invoking user; root only links a staged private
+copy. The root restore-image step ignores user seal-tool overrides and downloads
+the matching tool again from an Apple HTTPS restore CDN into its private tree,
+rather than executing the user-writable staged copy. This requires network access
+for privileged resealing. The advanced kernel extraction tool remains a firmware
+preparation/build tool, not a dependency for starting an already prepared guest.
+
+Validation covers malicious input/guest symlinks, snapshot publication, large SSH
+stderr/stdin streams, legacy fixed-address NAT reporting, patch catalog and recipe
+consistency, plus full bundle/Launchpad builds. Firmware fixture tests still
+require the separately held reference IPSWs; a build or synthetic test is not a
+claim that every newly supported OS has been restored and booted on this host.

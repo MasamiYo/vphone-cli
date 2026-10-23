@@ -21,6 +21,8 @@ public enum FirmwareGuestSystemPatchSet {
 
     public static let installCoordinationPersona = "system-installcoordination_proxy-cfw-persona_lookup"
     public static let installCoordinationPersonaMarker = "/usr/lib/vphone-installcoordination-persona-lookup"
+    public static let metalCacheReuse = "system-systemhook-cfw-metal_cache_reuse"
+    public static let metalCacheReuseMarker = "/usr/lib/vphone-metal-cache-reuse"
     public static let gyroscope = "system-backboardd-cfw-gyroscope"
     public static let accelerometer = "system-backboardd-cfw-accelerometer"
     public static let attitude = "system-apps-cfw-attitude"
@@ -35,11 +37,13 @@ public enum FirmwareGuestSystemPatchSet {
         "System/Library/Extensions/AppleParavirtGPUMetalIOGPUFamily.bundle/AppleParavirtGPUMetalIOGPUFamily"
 
     public static let locationdCohorting = "system-locationd-cfw-disable_auto_cohort"
+    public static let virtualBluetooth = "system-bluetoothd-cfw-btvc_le_connection"
     public static let jetsamDisableAllowed = "system-jetsamproperties-cfw-disable_allowed"
     public static let tvTPRO = "system-dyld-exp-tv_tpro"
     /// Replaces the restored System volume with an Apple TV 4K userland
     /// staged from its OTA. Research only: no IPSW exists for that device.
     public static let tvOTAUserland = "system-tv-exp-ota_userland"
+    public static let otaUserland = "system-exp-ota_userland"
 
     private static let ios27 = VPhonePatchApplicability(iOSBase: .major(27))
 
@@ -65,6 +69,13 @@ public enum FirmwareGuestSystemPatchSet {
         summary: "Shared-cache policy gates, patched system daemons and the vphone guest payload",
         patches: [
             VPhonePatchDeclaration(
+                identifier: otaUserland,
+                title: "Full OTA system update",
+                summary: "Experimental: replaces the System volume from a staged full OTA, retaining Data, xART, NVRAM and SEPStorage. Requires a stopped disk/SEP/NVRAM snapshot and a prepared target; installs the target kernelcache and TXM in the same transaction. Use fw ota to verify migration and roll back.",
+                target: .guestFile(path: "/"),
+                applicability: ios27,
+            ),
+            VPhonePatchDeclaration(
                 identifier: tvTPRO,
                 title: "TV TPRO feature detection",
                 summary: "Plain-arm64 TVOS compatibility: stops standalone and cached dyld enabling cloudOS-advertised hardware TPRO and pager modes, preserving page-in linking and all fixups.",
@@ -76,6 +87,13 @@ public enum FirmwareGuestSystemPatchSet {
                 title: "Apple TV 4K userland from OTA",
                 summary: "Research: replaces the System volume with the arm64e tvOS userland staged in the VM's OTAUserland folder, extracted with aa so ownership, modes, flags and compression survive.",
                 target: .guestFile(path: "/"),
+                applicability: VPhonePatchApplicability(iOSBase: .atLeast(major: 26, minor: 0)),
+            ),
+            VPhonePatchDeclaration(
+                identifier: virtualBluetooth,
+                title: "Virtual Bluetooth",
+                summary: "Turns on the feature flag that lets bluetoothd connect over its virtual controller, which a paired watch and phone talk over.",
+                target: .guestFile(path: "/" + CustomFirmwareBluetoothVirtualController.relativePath),
                 applicability: VPhonePatchApplicability(iOSBase: .atLeast(major: 26, minor: 0)),
             ),
             VPhonePatchDeclaration(
@@ -261,6 +279,16 @@ public enum FirmwareGuestSystemPatchSet {
                 summary: "Allows only the CoreDevice installation proxy to look up UserManager through the launchd hook on the hybrid guest.",
                 target: .guestFile(path: installCoordinationPersonaMarker),
                 applicability: ios27,
+            ),
+            VPhonePatchDeclaration(
+                identifier: metalCacheReuse,
+                title: "Keep Metal shader caches",
+                summary: """
+                Has SystemHook request FS_CACHE_REUSE_ON_REBOOT=1 at process startup, \
+                allowing Metal's guest shader caches to survive a reboot and reducing \
+                repeated shader compilation. An explicit environment setting takes precedence.
+                """,
+                target: .guestFile(path: metalCacheReuseMarker),
             ),
 
             // MARK: Guest Payload

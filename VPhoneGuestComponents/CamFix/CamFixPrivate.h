@@ -60,6 +60,17 @@ CFX_HIDDEN void cfx_install_photo_representation_hooks(void);
 CFX_HIDDEN void cfx_install_capturePhoto_hook(void);
 CFX_HIDDEN void cfx_install_moment_capture_hooks(void);
 CFX_HIDDEN void cfx_install_capturerequest_stubs(void);
+// YES for Camera.app's CAMCaptureEngine, which registers each still request
+// by uniqueID and waits for the whole callback sequence before saving.
+CFX_HIDDEN BOOL cfx_delegate_registers_still_requests(id delegate);
+// Delivers a photo built from the shm frame to such a delegate, with the
+// full will/did/finish callback sequence for the settings' uniqueID.
+CFX_HIDDEN void cfx_drive_capture(id output, id delegate, id settings);
+
+// MARK: - movies (Movie/)
+
+CFX_HIDDEN void cfx_install_movie_recording_hooks(void);
+CFX_HIDDEN void cfx_install_video_mode_capability(void);
 
 // MARK: - preview (Preview/)
 

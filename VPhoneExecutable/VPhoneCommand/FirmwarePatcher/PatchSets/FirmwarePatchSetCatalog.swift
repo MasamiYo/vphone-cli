@@ -16,19 +16,26 @@ public enum FirmwarePatchSetCatalog {
         FirmwareKernelCustomFirmwarePatchSet.manifest,
         FirmwareKernelHypervisorPatchSet.manifest,
         FirmwareKernelFridaPatchSet.manifest,
+        FirmwareResearchBoardPatchSet.manifest,
         FirmwareDeviceTreePatchSet.manifest,
         FirmwareGuestSystemPatchSet.manifest,
         FirmwareGuestDisplayPatchSet.manifest,
         FirmwareGuestIdentityPatchSet.manifest,
+        FirmwareRestoreImagePatchSet.manifest,
     ]
 
-    /// Every bundled set, as a preset references them.
+    /// Every bundled set but the restore image, as a preset references them.
     ///
-    /// Both shipped presets name all of them. A preset picks patches with its
-    /// selection, not by leaving a set out, so the editor always sees the whole
+    /// Every custom-firmware preset names all of them. A preset picks patches with
+    /// its selection, not by leaving a set out, so the editor always sees the whole
     /// catalogue and can turn any patch on or off.
+    ///
+    /// The restore image is the exception, in both directions: it customises the
+    /// system before the restore, which the custom-firmware sets do after it, and
+    /// only ``minimalPreset`` names it. See ``FirmwareRestoreImagePatchSet``.
     public static let bundledReferences: [VPhonePatchSetReference] =
-        bundled.map { .bundled($0.identifier) }
+        bundled.filter { $0.identifier != FirmwareRestoreImagePatchSet.identifier }
+            .map { .bundled($0.identifier) }
 
     public static func manifest(identifier: String) -> VPhonePatchSetManifest? {
         bundled.first { $0.identifier == identifier }
@@ -61,6 +68,7 @@ public enum FirmwarePatchSetCatalog {
         Set(FirmwareKernelFridaPatchSet.manifest.patches.map(\.identifier))
             .union(hypervisorConcealmentPatches)
             .union(experimentalIdentityPatches)
+            .union([FirmwareGuestSystemPatchSet.otaUserland])
             .union([FirmwareKernelCustomFirmwarePatchSet.tvTPROPagers, misTrustAuthPatch, FirmwareGuestSystemPatchSet.settingsRootRows, FirmwareGuestSystemPatchSet.settingsSoftwareUpdate, FirmwareGuestSystemPatchSet.tvTPRO, FirmwareGuestSystemPatchSet.tvOTAUserland])
 
     /// ProMotion: the 120 Hz timing for the paravirtual display.
@@ -78,14 +86,23 @@ public enum FirmwarePatchSetCatalog {
     /// `Research/Guest/display_refresh_rate.md`.
     public static let proMotionPatch = "kernel-cfw-display_promotion"
 
-    /// Identifiers a released bundle declared that a later one renamed, old to new.
+    /// Paravirtual GPU Task3: keep the guest's features and supply each owning
+    /// executable's cdhash so the host retains separate shader caches across
+    /// boots. On in `standard`; tvOS presets leave it off. Introduced as
+    /// `kernel-exp-paravirt_gpu_task3` in development bundles; existing VM
+    /// records migrate through ``renamedPatches``. See
+    /// `Research/Guest/gpu_acceleration.md`.
+    public static let paravirtTask3Patch = "kernel-cfw-paravirt_gpu_task3"
+
+    /// Identifiers an installed bundle declared that a later one renamed, old to new.
     ///
     /// A VM's `PatchSelection.plist` and `PatchReceipt.plist` outlive the bundle
     /// that wrote them, and `fw patch` throws `unknownPatch` for an identifier
-    /// nothing declares. Only renames that reached a release are listed: one that
-    /// never left a development branch has no record to carry.
+    /// nothing declares. Include development bundles used on real VMs as well
+    /// as releases: their records need the same migration.
     public static let renamedPatches: [String: String] = [
         "kernel-exp-display_refresh_120hz": proMotionPatch,
+        "kernel-exp-paravirt_gpu_task3": paravirtTask3Patch,
     ]
 
     /// The identifiers this bundle declares for ones a VM recorded, in order, each
@@ -217,7 +234,9 @@ public enum FirmwarePatchSetCatalog {
     /// plain-arm64 HD cannot load it), debugserver, the environment hooks, and
     /// the iPhone 19 ARM64E_X1 boot path.
     public static let tvOSBlockedPatches: Set<String> = [
+        paravirtTask3Patch,
         FirmwareGuestSystemPatchSet.arm64eX1CacheBootstrap,
+        FirmwareGuestSystemPatchSet.virtualBluetooth,
         "dyld-boot-iomfb_force_kern",
         "dyld-boot-iomfb_swapend",
         "dyld-boot-lockdown_mode",
@@ -249,6 +268,7 @@ public enum FirmwarePatchSetCatalog {
         "system-mobileactivationd-boot-should_hactivate",
         FirmwareGuestSystemPatchSet.arm64eX1MountBootstrap,
         "system-paravirt_gpu-cfw-heap_index_offset",
+        "system-systemhook-cfw-metal_cache_reuse",
         "system-systemversion-cfw-build_version",
         "system-virtiosound-cfw-hal_plugin",
         "system-virtualaudio-cfw-microphone_graph_chains",
@@ -303,6 +323,90 @@ public enum FirmwarePatchSetCatalog {
         ),
     )
 
+    /// The device tree patches ``minimalPreset`` keeps: the board presentation the
+    /// guest UI lays out against, and the haptics and microphone array no VM
+    /// has. They change no code, so they are no system modification.
+    public static let minimalDeviceTreePatches: Set<String> = [
+        "devicetree-cfw-serial_number",
+        "devicetree-cfw-home_button_type",
+        "devicetree-cfw-artwork_device_subtype",
+        "devicetree-cfw-island_notch_location",
+        "devicetree-cfw-product_haptics_node",
+        "devicetree-cfw-product_audio_microphone_array",
+        "devicetree-cfw-watch_companion",
+    ]
+
+    /// The boot chain patches ``minimalPreset`` keeps: iBEC's and LLB's, which the
+    /// old `.less` variant applied too. A stock LLB does not get the restored
+    /// guest to its kernel (it restarts after its banner, with Apple's ROMs as
+    /// with OpenAVB and OpenSEP). AVPBooter, iBSS, TXM and the restore ramdisk
+    /// stay stock.
+    public static let minimalBootChainPatches: Set<String> = [
+        "ibec-cfw-serial_label",
+        "ibec-boot-image4_callback",
+        "ibec-boot-boot_args",
+        "ibec-boot-bootx_precondition",
+        "llb-cfw-serial_label",
+        "llb-boot-image4_callback",
+        "llb-boot-boot_args",
+        "llb-boot-rootfs",
+        "llb-boot-panic_bypass",
+        "llb-cfw-display_scale",
+    ]
+
+    /// A guest on a stock kernel and TXM, with only iBEC and LLB patched: the
+    /// system is customised before the restore instead
+    /// (``FirmwareRestoreImagePatchSet``), and nothing after it. Names only the
+    /// sets it draws on, so no kernel or guest patcher is built.
+    /// The shipped `minimal.plist` must match this.
+    public static let minimalPreset = VPhonePatchPreset(
+        identifier: VPhonePatchPreset.minimalIdentifier,
+        title: "Minimal",
+        summary: "No kernel or TXM patches and only iBEC and LLB in the boot chain: the restore installs a resealed system with vphoned, the GPU driver and activation, and nothing writes it afterwards.",
+        patchSets: [
+            .bundled(FirmwareBootChainPatchSet.identifier),
+            .bundled(FirmwareResearchBoardPatchSet.identifier),
+            .bundled(FirmwareDeviceTreePatchSet.identifier),
+            .bundled(FirmwareRestoreImagePatchSet.identifier),
+        ],
+        selection: .allow(
+            minimalBootChainPatches
+                .union(minimalDeviceTreePatches)
+                .union(FirmwareResearchBoardPatchSet.manifest.patches.map(\.identifier))
+                .union(FirmwareRestoreImagePatchSet.manifest.patches.map(\.identifier)),
+        ),
+    )
+
+    /// The device tree patches ``watchOSPreset`` keeps: the board presentation
+    /// of its own tree, the watch display and DriverKit, and what no VM has.
+    public static let watchOSDeviceTreePatches: Set<String> = [
+        "devicetree-cfw-serial_number",
+        "devicetree-cfw-ipad_artwork",
+        "devicetree-cfw-ipad_product",
+        "devicetree-cfw-ipad_buttons",
+        "devicetree-cfw-ipad_identity",
+        "devicetree-cfw-ipad_audio",
+        "devicetree-cfw-watch_presentation",
+        "devicetree-cfw-watch_driverkit",
+        "devicetree-cfw-product_haptics_node",
+        "devicetree-cfw-product_audio_microphone_array",
+    ]
+
+    /// ``minimalPreset`` for an Apple Watch: its device tree presents the watch
+    /// board. The shipped `watchos.plist` must match this.
+    public static let watchOSPreset = VPhonePatchPreset(
+        identifier: VPhonePatchPreset.watchOSIdentifier,
+        title: "Apple Watch",
+        summary: "Minimal for an Apple Watch guest: the watch board's device tree, and a resealed system with vphoned, the GPU driver and activation restored onto a stock kernel and TXM.",
+        patchSets: minimalPreset.patchSets,
+        selection: .allow(
+            minimalBootChainPatches
+                .union(watchOSDeviceTreePatches)
+                .union(FirmwareResearchBoardPatchSet.manifest.patches.map(\.identifier))
+                .union(FirmwareRestoreImagePatchSet.manifest.patches.map(\.identifier)),
+        ),
+    )
+
     /// The presets the bundle ships.
-    public static let builtInPresets: [VPhonePatchPreset] = [standardPreset, experimentalPreset, tvOSPreset, tvOS4KPreset]
+    public static let builtInPresets: [VPhonePatchPreset] = [standardPreset, experimentalPreset, tvOSPreset, tvOS4KPreset, minimalPreset, watchOSPreset]
 }

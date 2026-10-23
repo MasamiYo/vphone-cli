@@ -136,9 +136,19 @@ struct FirmwarePatchSetCatalogTests {
                     // patch: these are the combinations we claim boot. The tvOS
                     // presets drop exactly the iOS ones an Apple TV has no port of.
                     let tvPresets = [VPhonePatchPreset.tvOSIdentifier, VPhonePatchPreset.tvOS4KIdentifier]
-                    let expected = tvPresets.contains(preset.identifier)
-                        ? Set(plan.droppedBootEssentials).isSubset(of: FirmwarePatchSetCatalog.tvOSBlockedPatches)
-                        : plan.droppedBootEssentials.isEmpty
+                    // `minimal` drops every boot chain patch but iBEC's and LLB's:
+                    // its system is customised before the restore instead.
+                    let restoreImagePresets = [VPhonePatchPreset.minimalIdentifier, VPhonePatchPreset.watchOSIdentifier]
+                    let expected = if tvPresets.contains(preset.identifier) {
+                        Set(plan.droppedBootEssentials).isSubset(of: FirmwarePatchSetCatalog.tvOSBlockedPatches)
+                    } else if restoreImagePresets.contains(preset.identifier) {
+                        Set(plan.droppedBootEssentials).isDisjoint(with: FirmwarePatchSetCatalog.minimalBootChainPatches)
+                            && plan.droppedBootEssentials.allSatisfy {
+                                FirmwareBootChainPatchSet.manifest.patches.map(\.identifier).contains($0)
+                            }
+                    } else {
+                        plan.droppedBootEssentials.isEmpty
+                    }
                     #expect(
                         expected,
                         "\(preset.identifier) on \(base)/\(cloud) drops \(plan.droppedBootEssentials)",
@@ -160,6 +170,35 @@ struct FirmwarePatchSetCatalogTests {
         )
         #expect(!plan.enabled.isEmpty)
         #expect(!plan.skippedByVersion.isEmpty)
+    }
+
+    @Test
+    func `Only minimal and its watch form name the restore image, and patch only iBEC, LLB, the device tree and the research board besides`() throws {
+        for preset in FirmwarePatchSetCatalog.builtInPresets {
+            let namesRestoreImage = preset.patchSets.map(\.identifier).contains(FirmwareRestoreImagePatchSet.identifier)
+            let restoreImagePresets = [VPhonePatchPreset.minimalIdentifier, VPhonePatchPreset.watchOSIdentifier]
+            #expect(namesRestoreImage == restoreImagePresets.contains(preset.identifier), "\(preset.identifier)")
+        }
+        let plan = try VPhonePatchPlan.resolve(
+            preset: FirmwarePatchSetCatalog.minimalPreset,
+            patchSets: FirmwarePatchSetCatalog.bundled,
+            iOSBase: VPhoneVersion("26.4"),
+            cloudOS: VPhoneVersion("26.4"),
+        )
+        let restoreImage = Set(FirmwareRestoreImagePatchSet.manifest.patches.map(\.identifier))
+        let bootChain = FirmwarePatchSetCatalog.minimalBootChainPatches
+        let researchBoard = Set(FirmwareResearchBoardPatchSet.manifest.patches.map(\.identifier))
+        #expect(plan.enabled == restoreImage.union(FirmwarePatchSetCatalog.minimalDeviceTreePatches).union(bootChain).union(researchBoard))
+        #expect(plan.droppedBootEssentials.allSatisfy { !$0.hasPrefix("ibec-") && !$0.hasPrefix("llb-") })
+
+        let watch = try VPhonePatchPlan.resolve(
+            preset: FirmwarePatchSetCatalog.watchOSPreset,
+            patchSets: FirmwarePatchSetCatalog.bundled,
+            iOSBase: VPhoneVersion("26.4"),
+            cloudOS: VPhoneVersion("26.4"),
+        )
+        #expect(watch.enabled == restoreImage
+            .union(FirmwarePatchSetCatalog.watchOSDeviceTreePatches).union(bootChain).union(researchBoard))
     }
 
     @Test
@@ -281,20 +320,62 @@ struct FirmwarePatchSetCatalogTests {
     }
 
     @Test
+    func `Standard enables persistent GPU caches while explicit blocks and tvOS stay off`() throws {
+        let patch = FirmwarePatchSetCatalog.paravirtTask3Patch
+        let guest = FirmwareGuestSystemPatchSet.metalCacheReuse
+        let standard = try VPhonePatchPlan.resolve(
+            preset: FirmwarePatchSetCatalog.standardPreset,
+            patchSets: FirmwarePatchSetCatalog.bundled,
+            iOSBase: VPhoneVersion("27.0.1"), cloudOS: VPhoneVersion("26.4"),
+        )
+        #expect(standard.isEnabled(patch))
+        #expect(standard.isEnabled(guest))
+        // Existing records use the experimental identifier. A saved opt-out
+        // must still win when the preset now turns the renamed patch on.
+        let blocked = try VPhonePatchPlan.resolve(
+            preset: FirmwarePatchSetCatalog.standardPreset,
+            patchSets: FirmwarePatchSetCatalog.bundled,
+            iOSBase: VPhoneVersion("27.0.1"), cloudOS: VPhoneVersion("26.4"),
+            blocked: Set(FirmwarePatchSetCatalog.currentIdentifiers(["kernel-exp-paravirt_gpu_task3"])),
+        )
+        #expect(!blocked.isEnabled(patch))
+        // The kernel anchors exist only in cloudOS 26.4; earlier kernels must
+        // not select a patch whose discovery would abort the kernel install.
+        for (iOS, cloudOS) in [("18.6.2", "26.1"), ("26.2", "26.2"), ("26.3.1", "26.3")] {
+            let plan = try VPhonePatchPlan.resolve(
+                preset: FirmwarePatchSetCatalog.standardPreset,
+                patchSets: FirmwarePatchSetCatalog.bundled,
+                iOSBase: VPhoneVersion(iOS), cloudOS: VPhoneVersion(cloudOS),
+            )
+            #expect(!plan.isEnabled(patch))
+        }
+        for preset in [FirmwarePatchSetCatalog.tvOSPreset, FirmwarePatchSetCatalog.tvOS4KPreset] {
+            let plan = try VPhonePatchPlan.resolve(
+                preset: preset, patchSets: FirmwarePatchSetCatalog.bundled,
+                iOSBase: VPhoneVersion("27.0"), cloudOS: VPhoneVersion("26.4"),
+            )
+            #expect(!plan.isEnabled(patch))
+            #expect(!plan.isEnabled(guest))
+        }
+    }
+
+    @Test
     func `A renamed patch maps to one the catalogue declares`() {
         let declared = Set(FirmwarePatchSetCatalog.allDeclarations.map(\.identifier))
         for (old, new) in FirmwarePatchSetCatalog.renamedPatches {
             #expect(!declared.contains(old), "\(old) is still declared")
             #expect(declared.contains(new), "\(old) maps to \(new), which nothing declares")
         }
-        // A record that named the old 120 Hz identifier, possibly beside the new
-        // one, reads as the new one, once, in place.
+        // Records using an old identifier, possibly beside its replacement,
+        // read as the new one, once, in place.
         #expect(
             FirmwarePatchSetCatalog.currentIdentifiers([
                 "kernel-exp-hv_vmm",
                 "kernel-exp-display_refresh_120hz",
                 FirmwarePatchSetCatalog.proMotionPatch,
-            ]) == ["kernel-exp-hv_vmm", FirmwarePatchSetCatalog.proMotionPatch],
+                "kernel-exp-paravirt_gpu_task3",
+                FirmwarePatchSetCatalog.paravirtTask3Patch,
+            ]) == ["kernel-exp-hv_vmm", FirmwarePatchSetCatalog.proMotionPatch, FirmwarePatchSetCatalog.paravirtTask3Patch],
         )
     }
 
