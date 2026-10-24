@@ -205,7 +205,7 @@ struct VPhoneFirmwareCatalogCommand: ParsableCommand {
             let ownColumn = entry.pairings.contains { $0.matchingCloudOS != nil }
             print("\(os.padding(toLength: width, withPad: " ", startingAt: 0))  "
                 + "recommended cloudOS".padding(toLength: recommendedWidth, withPad: " ", startingAt: 0)
-                + (ownColumn ? "  own cloudOS (research board: root, VPHONE_IPSW)" : ""))
+                + (ownColumn ? "  own cloudOS (research board: root for link)" : ""))
             for e in entry.pairings {
                 let ios = e.ios.name.padding(toLength: width, withPad: " ", startingAt: 0)
                 if let own = e.matchingCloudOS {
@@ -244,7 +244,7 @@ struct VPhoneFirmwarePrepareCommand: ParsableCommand {
     ))
     var device: String?
     @Option(help: ArgumentHelp(
-        "Full OTA (.aea) URL or local path for a device Apple ships no IPSW for (AppleTV14,1), restored over its base's IPSW of the same build (default: the catalog's OTA of that build)",
+        "Full OTA (.aea or .zip) URL or local path for an OTA userland guest, including Apple TV 4K and HomePod mini (default: the catalog's OTA when required)",
         valueName: "ota",
     ))
     var otaSource: String?
@@ -268,8 +268,10 @@ struct VPhoneFirmwarePrepareCommand: ParsableCommand {
         if let device, VPhoneGuestDevice.named(device) == nil {
             throw ValidationError("vphone runs \(VPhoneGuestDevice.known.map(\.productType).joined(separator: ", ")) guests, not \(device).")
         }
-        if otaSource != nil || otaKey != nil, VPhoneGuestDevice.named(device)?.restoreBase == nil {
-            throw ValidationError("--ota-source and --ota-key are for a device Apple ships no IPSW for, such as --device AppleTV14,1.")
+        if otaSource != nil || otaKey != nil,
+           VPhoneGuestDevice.named(device)?.restoreBase == nil,
+           VPhoneGuestDevice.named(device)?.family != .homePod {
+            throw ValidationError("--ota-source and --ota-key require an OTA userland device, such as --device AppleTV14,1 or AudioAccessory5,1.")
         }
         guard (1 ... 16).contains(downloadConnections) else {
             throw ValidationError("--download-connections takes 1 to 16, not \(downloadConnections).")
@@ -694,23 +696,23 @@ extension VPhoneLibraryOption {
 // MARK: - kernelcache
 
 /// Builds the kernelcache mix of a VM on a cloudOS without vphone600
-/// components, in the two steps that need different users: staging runs `ipsw`
-/// and is the invoking user's, linking runs kmutil and is root's. `fw patch`
+/// components, in two steps: native extraction stages the volume as the user
+/// and linking runs kmutil as root. `fw patch`
 /// then takes the mix from the cache. See KernelCacheMixer.
 struct VPhoneFirmwareKernelcacheCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "kernelcache",
-        abstract: "Build a research board VM's kernelcache mix: stage it as yourself (VPHONE_IPSW), link it with sudo",
+        abstract: "Build a research board VM's kernelcache mix: stage it natively as yourself, link it with sudo",
     )
 
     @OptionGroup var lib: VPhoneLibraryOption
     @Argument(help: "VM name") var name: String?
     @Flag(help: ArgumentHelp(
-        "Only link a staged volume; never stage, so no ipsw runs (the Launchpad helper's root run)",
+        "Only link a staged volume; never stage (the Launchpad helper's root run)",
         visibility: .hidden,
     ))
     var linkOnly = false
-    @Option(help: ArgumentHelp("The ipsw to stage with (default: $VPHONE_IPSW)", valueName: "path"))
+    @Option(help: ArgumentHelp("Legacy compatibility option; native extraction ignores this path", valueName: "path", visibility: .hidden))
     var ipsw: String?
     @Option(name: .customLong("work-parent"), help: ArgumentHelp("Private kernelcache work directory", visibility: .hidden))
     var workParent = "/private/var/tmp"
@@ -733,7 +735,7 @@ struct VPhoneFirmwareKernelcacheCommand: ParsableCommand {
         if geteuid() == 0 {
             if state == .missing {
                 guard !linkOnly else {
-                    throw ValidationError("\(name)'s kernelcache mix is not staged. Stage it first, as yourself: \(KernelCacheMixer.ipswEnvironmentVariable)=<ipsw> vphone-cli fw kernelcache \(name)")
+                    throw ValidationError("\(name)'s kernelcache mix is not staged. Stage it first, as yourself: vphone-cli fw kernelcache \(name)")
                 }
                 try mixer.stage(input, ipsw: ipsw)
             }
@@ -748,7 +750,7 @@ struct VPhoneFirmwareKernelcacheCommand: ParsableCommand {
         }
         if state == .missing {
             guard !linkOnly else {
-                throw ValidationError("\(name)'s kernelcache mix is not staged. Stage it first: \(KernelCacheMixer.ipswEnvironmentVariable)=<ipsw> vphone-cli fw kernelcache \(name)")
+                throw ValidationError("\(name)'s kernelcache mix is not staged. Stage it first: vphone-cli fw kernelcache \(name)")
             }
             try mixer.stage(input, ipsw: ipsw)
         }

@@ -48,7 +48,11 @@ enum VPhoneFirmwarePreparer {
         // A source naming a catalog OTA, such as a tvOS the Apple TV HD never
         // got, restores the OTA's base IPSW and stages that OTA.
         var iPhoneSource = iPhoneSource, otaSource = otaSource, productType = productType
-        if let release = VPhoneFirmwareCatalog.otaRelease(source: iPhoneSource) {
+        let requestedOTA = VPhoneFirmwareCatalog.otaRelease(source: iPhoneSource)
+        // An OTA this Mac cannot unpack is refused before any IPSW is
+        // downloaded for it, whether it comes as the iPhone source or on its own.
+        try (requestedOTA ?? otaSource.flatMap(VPhoneFirmwareCatalog.otaRelease(source:)))?.checkHost()
+        if let release = requestedOTA {
             guard let base = VPhoneFirmwareCatalog.restoreBaseURL(for: release) else {
                 throw ValidationError("The firmware catalog has no \(release.baseVersion) IPSW to restore the \(release.productType) OTA \(release.version) over.")
             }
@@ -93,18 +97,19 @@ enum VPhoneFirmwarePreparer {
             device: productType,
             downloadConnections: downloadConnections,
         )
-        let ota = try device.restoreBase.map { _ in
-            try resolveOTA(
+        let ota: (file: URL, key: String?, version: String, build: String)?
+        if device.restoreBase != nil || (device.family == .homePod && otaSource != nil) {
+            ota = try resolveOTA(
                 otaSource,
                 key: otaKey,
                 device: device,
-                build: phone.build,
+                build: requestedOTA?.build ?? phone.build,
                 ipswCacheDirectory: ipswCacheDirectory,
                 downloadConnections: downloadConnections,
             )
-        }
+        } else { ota = nil }
         if ota == nil, otaSource != nil || otaKey != nil {
-            throw ValidationError("--ota-source and --ota-key are for a device Apple ships no IPSW for, such as AppleTV14,1, not \(device.productType).")
+            throw ValidationError("--ota-source and --ota-key require an OTA userland device, such as AppleTV14,1 or HomePod mini.")
         }
         // Such a device is restored from its base's IPSW, so the tree and its
         // manifest are the base's; the VM records the device itself.
@@ -256,6 +261,14 @@ enum VPhoneFirmwarePreparer {
         device productType: String? = nil,
         downloadConnections: Int = VPhoneIPSWCache.defaultDownloadConnections,
     ) throws -> (phone: VPhoneIPSWCache.Archive, cloud: VPhoneIPSWCache.Archive, device: VPhoneGuestDevice) {
+        let ota = VPhoneFirmwareCatalog.otaRelease(source: iPhoneSource)
+        if let ota, let productType, ota.productType != productType {
+            throw Error.deviceNotInSource(productType, available: [ota.productType])
+        }
+        // Before its base IPSW is downloaded (`fw ota` and template builds come here first).
+        try ota?.checkHost()
+        let iPhoneSource = ota.flatMap(VPhoneFirmwareCatalog.restoreBaseURL(for:)) ?? iPhoneSource
+        let productType = productType ?? ota?.productType
         // Remote IPSWs go to one cache shared by every machine; keeping them
         // inside the machine downloaded both again for each new one (#513).
         // Local IPSWs are read in place and are never copied into the cache.
@@ -302,6 +315,7 @@ enum VPhoneFirmwarePreparer {
         // when it is restored over its base's last release.
         let release = source.flatMap(VPhoneFirmwareCatalog.otaRelease(source:))
             ?? VPhoneFirmwareCatalog.otaRelease(for: device.productType, build: build)
+        try release?.checkHost()
         let build = release?.build ?? build
         guard source != nil || release != nil else {
             throw ValidationError("The firmware catalog has no \(device.productType) OTA for build \(build). Pass the device's full OTA of that build with --ota-source, and its key with --ota-key.")
@@ -321,7 +335,16 @@ enum VPhoneFirmwarePreparer {
         bar.finish()
         // A local file of the catalog's build takes the catalog's key too.
         let key = key ?? release?.key
-        let identity = try VPhoneOTAArchive.checkIdentity(of: file, key: key, device: device, build: build)
+        // A HomePod owner may supply a renamed local full OTA over the last
+        // restore IPSW. Its manifest gives the target identity; catalog sources
+        // remain pinned to the catalog build. Staging checks that identity again.
+        let expectedBuild: String? = device.family == .homePod && release == nil ? nil : build
+        let identity = try VPhoneOTAArchive.checkIdentity(of: file, key: key, device: device, build: expectedBuild)
+        if device.family == .homePod {
+            guard let version = VPhoneVersion(identity.version), version.major == 27, version.minor >= 2 else {
+                throw ValidationError("HomePod OTA userland preparation requires HomePod Software 27.2 or later in the 27 series.")
+            }
+        }
         print("[+] \(device.productType) OTA \(identity.version) (\(identity.build)): \(file.path)")
         return (file, key, identity.version, identity.build)
     }
@@ -347,10 +370,16 @@ enum VPhoneFirmwarePreparer {
             build: ota.build,
             deviceTreeDirectory: flash,
             userlandDirectory: userland,
+            requireFullUpdate: device.family == .homePod,
         ) { name in
             if VPhoneOTAArchive.isChunkName(name) {
                 print("    \(name)")
             }
+        }
+        if device.family == .homePod {
+            let metadata = ["Device": device.productType, "Version": staged.version, "Build": staged.build]
+            try PropertyListSerialization.data(fromPropertyList: metadata, format: .xml, options: 0)
+                .write(to: userland.appendingPathComponent("Version.plist"), options: .atomic)
         }
         print("[+] \(staged.deviceTree.lastPathComponent) and \(staged.chunks.count) payload chunks staged")
     }

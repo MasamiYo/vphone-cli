@@ -15,9 +15,10 @@ struct VPhoneLaunchpadSlimmingSections: View {
     /// IPSWs, which the list cannot be matched against.
     var templateAvailable: Bool?
     @Binding var slimming: VPhoneLaunchpadSlimming
-    /// An Apple TV is restored on its own and not slimmed: templates and
+    let warnsAboutServiceTrimming: Bool
+    /// Apple TV and HomePod are restored on their own and not slimmed: templates and
     /// slimming drive iOS Setup Assistant and its apps.
-    var forAppleTV = false
+    var requiresStandaloneRestore = false
     /// The `minimal` preset seals the system it restores, which the trim and
     /// setup boot of a template would write.
     var forRestoredSystem = false
@@ -30,10 +31,10 @@ struct VPhoneLaunchpadSlimmingSections: View {
         case .slimming:
             Section {
                 Toggle("Slim System", isOn: $slimming.slim)
-                    .disabled(forAppleTV || forRestoredSystem)
+                    .disabled(requiresStandaloneRestore || forRestoredSystem)
             } footer: {
-                if forAppleTV {
-                    Text("An Apple TV keeps every file, service and app.")
+                if requiresStandaloneRestore {
+                    Text("Apple TV and HomePod keep every file, service and app.")
                         .foregroundStyle(.secondary)
                 } else if forRestoredSystem {
                     Text("The Minimal preset keeps the restored system exactly as sealed.")
@@ -51,13 +52,13 @@ struct VPhoneLaunchpadSlimmingSections: View {
     private var templateSection: some View {
         Section {
             Toggle("Use Template", isOn: $usesTemplate)
-                .disabled(forAppleTV || forRestoredSystem)
+                .disabled(requiresStandaloneRestore || forRestoredSystem)
         } header: {
             Text("Template")
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
-                if forAppleTV {
-                    Text("An Apple TV is restored on its own, with keys of its own. Templates are made for iPhone and iPad.")
+                if requiresStandaloneRestore {
+                    Text("Apple TV and HomePod are restored on their own, with keys of their own. Templates are made for iPhone and iPad.")
                 } else if forRestoredSystem {
                     Text("The Minimal preset restores the machine on its own, with keys of its own: building a template writes the system it seals.")
                 } else {
@@ -100,7 +101,7 @@ struct VPhoneLaunchpadSlimmingSections: View {
                 }
             }
         }
-        .disabled(!slimming.slim)
+        .disabled(requiresStandaloneRestore || forRestoredSystem || !slimming.slim)
     }
 
     private var trimNote: String {
@@ -138,7 +139,10 @@ struct VPhoneLaunchpadSlimmingSections: View {
         } footer: {
             VStack(alignment: .leading, spacing: 4) {
                 Text("About 140 launch daemons a research machine rarely needs, Apple Account's among them.")
-                if slimming.trimsServices {
+                if warnsAboutServiceTrimming {
+                    Text("Service trimming is available only for iOS 26 and iOS 27. This step will be skipped on unsupported versions.")
+                }
+                if !warnsAboutServiceTrimming, slimming.trimsServices {
                     // terminusd and the nano daemons are among them.
                     Text("A phone with these services off cannot pair an Apple Watch.")
                 }
@@ -151,7 +155,7 @@ struct VPhoneLaunchpadSlimmingSections: View {
             }
             .foregroundStyle(.secondary)
         }
-        .disabled(!slimming.slim)
+        .disabled(requiresStandaloneRestore || forRestoredSystem || !slimming.slim)
     }
 
     private var appsPopover: some View {

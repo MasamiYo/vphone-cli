@@ -869,15 +869,14 @@ public final class VPhoneTemplateSetupBoot {
             // Undo a profile only when one is recorded; a fresh guest has none.
             let state = try call("services.profile", [:], deadline: end)
             if state["profile"] as? String ?? "none" != "none" {
-                try requireApplied(call("services.profile.apply", ["profile": "none", "force": true], deadline: end))
+                try requireApplied(applyProfile(["profile": "none", "force": true], deadline: end))
             }
             outcome.serviceProfile = "none"
             outcome.serviceGroups = []
             log("  service profile none")
             return
         }
-        let applied = try call(
-            "services.profile.apply",
+        let applied = try applyProfile(
             ["profile": plan.serviceProfile, "groups": plan.serviceGroups, "force": true],
             deadline: end,
         )
@@ -915,12 +914,43 @@ public final class VPhoneTemplateSetupBoot {
         }
     }
 
-    private func requireApplied(_ result: [String: Any]) throws {
-        let failed = (result["failed"] as? [[String: Any]] ?? []).map { row in
-            "\(row["label"] as? String ?? "?") (\(row["action"] as? String ?? "?"): \(row["error"] as? String ?? "?"))"
+    /// `services.profile.apply`, applied again 5 and 15 s later while launchd
+    /// refuses some of its changes this early in the boot and takes them a
+    /// moment later: "disable requires root (launchd status 1)" for
+    /// com.apple.seserviced on iOS 26.5 and com.apple.fitnesscoachingd on
+    /// iPadOS 27.0.1 (2026-10-23). vphoned records only what an apply changed,
+    /// so another apply redoes just the rest; what each one disabled is added up.
+    private func applyProfile(_ params: [String: Any], deadline end: Date) throws -> [String: Any] {
+        var applied = try call("services.profile.apply", params, deadline: end)
+        var disabled = strings(applied["disabled"])
+        for wait in [5.0, 15.0] where Self.isEarlyBootRefusal(applied) && clock.now().addingTimeInterval(wait) < end {
+            log("  retrying the service profile in \(Int(wait)) s: \(Self.failures(applied).joined(separator: "; "))")
+            clock.sleep(wait)
+            applied = try call("services.profile.apply", params, deadline: end)
+            disabled += strings(applied["disabled"])
         }
+        applied["disabled"] = disabled
+        return applied
+    }
+
+    /// Whether every change an apply could not make was launchd refusing it,
+    /// as icli reports its EPERM and EACCES. Anything else fails at once.
+    static func isEarlyBootRefusal(_ result: [String: Any]) -> Bool {
+        let failed = result["failed"] as? [[String: Any]] ?? []
+        return !failed.isEmpty && failed.allSatisfy { ($0["error"] as? String ?? "").contains("requires root (launchd status") }
+    }
+
+    private func requireApplied(_ result: [String: Any]) throws {
+        let failed = Self.failures(result)
         guard failed.isEmpty else {
             throw StepError("services.profile.apply could not change \(failed.joined(separator: "; "))")
+        }
+    }
+
+    /// The services an apply could not change, as `label (action: error)`.
+    static func failures(_ result: [String: Any]) -> [String] {
+        (result["failed"] as? [[String: Any]] ?? []).map { row in
+            "\(row["label"] as? String ?? "?") (\(row["action"] as? String ?? "?"): \(row["error"] as? String ?? "?"))"
         }
     }
 

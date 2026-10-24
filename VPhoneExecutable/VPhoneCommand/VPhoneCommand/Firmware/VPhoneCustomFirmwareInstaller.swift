@@ -211,12 +211,48 @@ struct VPhoneCustomFirmwareInstaller {
             ? try restoreTree(in: bundleDirectory, path: bundlePath, owner: callerUID)
             : nil
         let device = configuredGuestDevice(in: bundleDirectory) ?? guestDevice(of: restore)
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodTopCap), device.family != .homePod {
+            throw ValidationError("The HomePod top-cap patch is supported only for a HomePod guest.")
+        }
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodSetupBypass), device.family != .homePod {
+            throw ValidationError("The HomePod setup-completion patch is supported only for a HomePod guest.")
+        }
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodAudioProduct), device.family != .homePod {
+            throw ValidationError("The HomePod audio-product patch is supported only for a HomePod guest.")
+        }
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodWelcome), device.family != .homePod {
+            throw ValidationError("The HomePod welcome patch is supported only for a HomePod guest.")
+        }
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodSiriSpeech), device.family != .homePod {
+            throw ValidationError("The HomePod Siri-speech patch is supported only for a HomePod guest.")
+        }
+        if !effectiveEnabled.isDisjoint(with: [FirmwareGuestSystemPatchSet.homePodCryptexStaging, FirmwareGuestSystemPatchSet.homePodCryptexClass, FirmwareGuestSystemPatchSet.homePodAdHocInstall]), device.family != .homePod {
+            throw ValidationError("The HomePod cryptex staging patch is supported only for a HomePod guest.")
+        }
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodSoundGlow), device.family != .homePod {
+            throw ValidationError("The HomePod Sound Glow patch is supported only for a HomePod guest.")
+        }
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodOTAUserland), device.family != .homePod {
+            throw ValidationError("The HomePod OTA userland patch is supported only for a HomePod guest.")
+        }
+        let missingGlowDependencies = FirmwareGuestPatchResolution.missingHomePodSoundGlowDependencies(enabled: effectiveEnabled)
+        guard missingGlowDependencies.isEmpty else {
+            throw ValidationError("The HomePod Sound Glow patch requires these selected guest patches: \(missingGlowDependencies.joined(separator: ", ")).")
+        }
+        let missingSpeechDependencies = FirmwareGuestPatchResolution.missingHomePodSiriSpeechDependencies(enabled: effectiveEnabled)
+        guard missingSpeechDependencies.isEmpty else {
+            throw ValidationError("The HomePod Siri-speech patch requires these selected guest patches: \(missingSpeechDependencies.joined(separator: ", ")).")
+        }
+        let missingWelcomeDependencies = FirmwareGuestPatchResolution.missingHomePodWelcomeDependencies(enabled: effectiveEnabled)
+        guard missingWelcomeDependencies.isEmpty else {
+            throw ValidationError("The HomePod welcome patch requires these selected guest patches: \(missingWelcomeDependencies.joined(separator: ", ")).")
+        }
         // Research: an Apple TV 4K userland staged from its OTA, which
         // `system-tv-exp-ota_userland` puts in place of the restored one.
         let hasOTAUserland = (try? bundleDirectory.isDirectory(VPhoneOTAArchive.userlandDirectoryName)) == true
-        let isOTAUpdate = device.family != .appleTV && mode == .full && hasOTAUserland
+        let isOTAUpdate = device.family != .appleTV && device.family != .homePod && mode == .full && hasOTAUserland
             && effectiveEnabled.contains(FirmwareGuestSystemPatchSet.otaUserland)
-        let otaUserland = (device.family == .appleTV || isOTAUpdate) && hasOTAUserland
+        let otaUserland = (device.family == .appleTV || device.family == .homePod || isOTAUpdate) && hasOTAUserland
             ? try bundleDirectory.directory(VPhoneOTAArchive.userlandDirectoryName)
             : nil
         if isOTAUpdate {
@@ -239,14 +275,16 @@ struct VPhoneCustomFirmwareInstaller {
             }
             guard saved else { throw ValidationError("OTA update needs a stopped disk/SEP/NVRAM snapshot.") }
         }
-        if device.family == .appleTV {
+        if device.usesTVOS {
             guard let plan else {
                 throw ValidationError("tvOS installation needs an explicit patch plan. Resolve a TV selection with `fw set-patches` and `fw patch` first.")
             }
-            let unvalidated = FirmwareGuestPatchResolution.unvalidatedTVGuestPatches(
-                enabled: Set(plan.enabledPatches),
-                arm64eUserland: !device.hasPlainArm64Userland,
-            )
+            let unvalidated = device.family == .homePod
+                ? FirmwareGuestPatchResolution.unvalidatedHomePodGuestPatches(enabled: Set(plan.enabledPatches))
+                : FirmwareGuestPatchResolution.unvalidatedTVGuestPatches(
+                    enabled: Set(plan.enabledPatches),
+                    arm64eUserland: !device.hasPlainArm64Userland,
+                )
             guard unvalidated.isEmpty else {
                 throw ValidationError("These guest patches have not been validated for tvOS. Block them with `fw set-patches` before installation: \(unvalidated.joined(separator: ", "))")
             }
@@ -268,6 +306,25 @@ struct VPhoneCustomFirmwareInstaller {
             }
         }
         try requireFreeSpace(at: [bundlePath, work.url.path])
+        let boardDeviceTree = try stageBoardDeviceTree(in: bundleDirectory, work: work, device: device)
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodAudioProduct) {
+            guard let boardDeviceTree else {
+                throw ValidationError("HomePod audio identity needs the original board device tree in FirmwareOriginals. Recover it from this VM's IPSW before updating the environment.")
+            }
+            // Validate the exact donor model and token before cloning or
+            // writing any guest filesystem, including malformed/placeholder data.
+            _ = try DeviceTreePatcher.homePodAudioProductID(from: Data(contentsOf: boardDeviceTree))
+        }
+        let homePodDisplay: Data?
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodTopCap) {
+            guard let boardDeviceTree else {
+                throw ValidationError("HomePod top-cap emulation needs the original board device tree in FirmwareOriginals. Recover it from this VM's IPSW before updating the environment.")
+            }
+            let properties = try DeviceTreePatcher.homePodDisplayProperties(from: Data(contentsOf: boardDeviceTree))
+            homePodDisplay = try PropertyListSerialization.data(fromPropertyList: properties, format: .binary, options: 0)
+        } else {
+            homePodDisplay = nil
+        }
 
         // Work on an APFS clone of Disk.img in the private folder, then rename
         // it over the original: nothing is attached from the caller's folder,
@@ -277,7 +334,7 @@ struct VPhoneCustomFirmwareInstaller {
         if isOTAUpdate, !cloned {
             throw ValidationError("The OTA update needs a private APFS disk clone; the original disk was left untouched.")
         }
-        if device.family == .appleTV {
+        if device.usesTVOS {
             // A paired dyld edit must never fall back to mutating the live disk.
             // Its errors propagate below, so this clone is committed only after
             // the whole install succeeds.
@@ -390,6 +447,7 @@ struct VPhoneCustomFirmwareInstaller {
         // Resolved once the system volume is mounted (it needs the "was
         // installed" signal there), then used again by the Preboot pass.
         var priorGuest = Set<String>()
+        var installedHomePodUserland: VPhoneRestoreInfo.OSVersion?
         do {
             // Every descriptor on a guest volume lives in this scope, so none
             // is left open to hold the volume busy when it is unmounted.
@@ -401,7 +459,7 @@ struct VPhoneCustomFirmwareInstaller {
             // its prior set is empty whatever a stale plan might say.
             let hasLaunchdBackup = (try? systemRoot.exists("System/Library/xpc/launchd.plist.bak")) ?? false
             // TV installs deliberately omit vphoned and its launchd backup.
-            let wasInstalled = hasLaunchdBackup || (device.family == .appleTV && receiptGuest != nil)
+            let wasInstalled = hasLaunchdBackup || (device.usesTVOS && receiptGuest != nil)
             priorGuest = receiptGuest ?? (wasInstalled ? priorFallback : [])
             if isOTAUpdate {
                 guard wasInstalled, let otaUserland else {
@@ -429,6 +487,7 @@ struct VPhoneCustomFirmwareInstaller {
                     work: work,
                     owner: callerUID,
                     otaUserland: otaUserland,
+                    homePodDisplay: homePodDisplay,
                     plan: plan,
                     priorGuest: priorGuest,
                     kernelPatches: receiptKernel,
@@ -451,11 +510,24 @@ struct VPhoneCustomFirmwareInstaller {
                     work: work,
                     owner: nil,
                     otaUserland: otaUserland,
+                    homePodDisplay: homePodDisplay,
                     plan: plan,
                     priorGuest: priorGuest,
                     kernelPatches: receiptKernel,
                     environmentOnly: true,
                 )
+            }
+            if device.family == .homePod, liveGuest.contains(FirmwareGuestSystemPatchSet.homePodOTAUserland) {
+                // Read the installed bytes while the private System is still
+                // mounted. Preparation/base restore must never promote this
+                // host label before a successful OTA System installation.
+                let data = try systemRoot.readData("System/Library/CoreServices/SystemVersion.plist")
+                guard let version = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                      let product = version["ProductVersion"] as? String,
+                      let build = version["ProductBuildVersion"] as? String else {
+                    throw ValidationError("Installed HomePod userland has no SystemVersion identity.")
+                }
+                installedHomePodUserland = .init(version: product, build: build)
             }
         }
         // The selected Preboot identity can also reach an installed guest through
@@ -465,7 +537,6 @@ struct VPhoneCustomFirmwareInstaller {
         // drops that cache at startup when it is older than the tree; see
         // VPhoneDaemon/Daemon/GuestMobileGestaltCache.swift.
         let buildVersion = plan?.parameters[FirmwareGuestSystemPatchSet.buildVersionParameter] ?? spoofBuild
-        let boardDeviceTree = try stageBoardDeviceTree(in: bundleDirectory, work: work, device: device)
         // An environment update has no restore tree to read the device from;
         // the VM's configuration says which board repair its tree takes.
         try liveGuest.formUnion(patchPreboot(
@@ -493,7 +564,10 @@ struct VPhoneCustomFirmwareInstaller {
         if device.family != .iPhone {
             notApplicableGuest.insert(FirmwareGuestSystemPatchSet.prebootIPhoneProduct)
         }
-        if device.family != .appleTV {
+        if device.family != .homePod {
+            notApplicableGuest.insert(FirmwareGuestSystemPatchSet.homePodAudioProduct)
+        }
+        if !device.usesTVOS {
             notApplicableGuest.insert(FirmwareGuestSystemPatchSet.tvTPRO)
         }
         if buildVersion?.isEmpty ?? true {
@@ -549,6 +623,21 @@ struct VPhoneCustomFirmwareInstaller {
             in: bundleDirectory,
             owner: invokingUser.map { ($0.uid, $0.gid) },
         )
+        if let installedHomePodUserland {
+            let installedBundle = URL(fileURLWithPath: bundlePath, isDirectory: true)
+            let record: () throws -> Void = {
+                let vm = try VPhoneBundle.load(at: installedBundle)
+                let variant = VPhoneRestoreInfo.load(fromBundle: vm)?.variant ?? "jb"
+                _ = try VPhoneRestoreInfo.recordVariant(variant, toBundle: vm,
+                                                        installedUserland: installedHomePodUserland)
+            }
+            do {
+                if let invokingUser { try invokingUser.withUserCredentials(record) }
+                else { try record() }
+            } catch {
+                fputs("warning: could not record installed HomePod userland: \(error)\n", stderr)
+            }
+        }
         switch mode {
         case .full:
             if liveGuest.contains("system-vphoned-boot-install") {
@@ -1154,6 +1243,7 @@ struct VPhoneCustomFirmwareInstaller {
         work: WorkDirectory,
         owner: uid_t?,
         otaUserland: VPhoneConfinedDirectory?,
+        homePodDisplay: Data?,
         plan: VPhoneVirtualMachinePatchPlan?,
         priorGuest: Set<String>,
         kernelPatches: Set<String>?,
@@ -1238,13 +1328,18 @@ struct VPhoneCustomFirmwareInstaller {
         }
 
         // First, so every later step patches the userland that will boot.
-        if guestDevice.family == .appleTV {
-            let identifier = FirmwareGuestSystemPatchSet.tvOTAUserland
+        if guestDevice.family == .appleTV || guestDevice.family == .homePod {
+            let identifier = guestDevice.family == .homePod
+                ? FirmwareGuestSystemPatchSet.homePodOTAUserland : FirmwareGuestSystemPatchSet.tvOTAUserland
             if on(identifier) {
                 guard let otaUserland else {
                     throw ValidationError("\(identifier) is on, but the VM has no OTAUserland folder with the staged payload chunks.")
                 }
-                try replaceTVUserland(system: system, ota: otaUserland, work: work)
+                if guestDevice.family == .homePod {
+                    try replaceHomePodUserland(system: system, ota: otaUserland, work: work, plan: plan, device: guestDevice)
+                } else {
+                    try replaceTVUserland(system: system, ota: otaUserland, work: work)
+                }
                 live.insert(identifier)
             } else if priorGuest.contains(identifier) {
                 print("  [!] \(identifier): off now, but the swapped userland cannot be reverted without a restore")
@@ -1291,7 +1386,7 @@ struct VPhoneCustomFirmwareInstaller {
         //    27.x base.
         // The selected TV donor has a native arm64 cache. Keep its directory
         // intact; cryptex symlinks would point into images it does not ship.
-        let cacheRelative = guestDevice.family == .appleTV
+        let cacheRelative = guestDevice.usesTVOS
             ? "System/Library/Caches/com.apple.dyld"
             : "System/Cryptexes/OS/System/Library/Caches/com.apple.dyld"
         let cacheArchitecture = guestDevice.hasPlainArm64Userland ? "arm64" : "arm64e"
@@ -1341,6 +1436,116 @@ struct VPhoneCustomFirmwareInstaller {
                 try installEnvironment(system: system, environmentOnly: environmentOnly)
                 live.insert("system-launchdaemons-boot-environment")
             }
+        }
+        // HomePod deliberately excludes the iPhone environment. Inject only the
+        // cryptex staging compatibility, directly into its platform executable.
+        let staging = FirmwareGuestSystemPatchSet.homePodCryptexStaging
+        isolate([staging]) {
+            let library = FirmwareGuestSystemPatchSet.homePodCryptexStagingLibrary
+            let libraryPath = String(library.dropFirst())
+            let executable = "usr/libexec/cryptexd"
+            if plan?.isEnabled(staging) == true {
+                guard guestDevice.family == .homePod else {
+                    throw ValidationError("HomePod cryptex staging requires a HomePod guest.")
+                }
+                let payload = try VPhoneGuestBinaries.resolve((library as NSString).lastPathComponent)
+                try system.replaceFile(libraryPath, fromFileAt: payload, mode: 0o755, owner: Self.guestOwner)
+                try patchMachO(system: system, work: work, path: executable,
+                               preserveEntitlements: true, injectedDylibPath: library)
+                live.insert(staging)
+            } else if guestDevice.family == .homePod || priorGuest.contains(staging) {
+                if try revertMachO(system: system, work: work, path: executable) {
+                    print("  [+] \(staging): restored cryptexd from backup")
+                } else if priorGuest.contains(staging) {
+                    // Keep the dependency while a patched daemon still needs it.
+                    live.insert(staging)
+                    throw ValidationError("HomePod cryptex staging has no cryptexd backup; cannot safely remove its library.")
+                }
+                try system.removeItem(libraryPath)
+            }
+        }
+        // Geometry and its SoundBoard-only identity shim belong to one patch:
+        // the daemon still exchanges every LED frame through the native HID.
+        let topCap = FirmwareGuestSystemPatchSet.homePodTopCap
+        let topCapPath = String(FirmwareGuestSystemPatchSet.homePodDisplayPath.dropFirst())
+        if plan?.isEnabled(topCap) == true {
+            guard guestDevice.family == .homePod, let homePodDisplay else {
+                throw ValidationError("Selected HomePod top-cap emulation has no validated donor display geometry.")
+            }
+            _ = try system.directory("usr/share/vphone", create: true, mode: 0o755)
+            try system.writeFile(topCapPath, contents: homePodDisplay, mode: 0o644, owner: Self.guestOwner)
+            try updateHomePodSoundBoard(system: system, work: work, enabled: true)
+            live.insert(topCap)
+        } else {
+            if guestDevice.family == .homePod || priorGuest.contains(topCap) {
+                try updateHomePodSoundBoard(system: system, work: work, enabled: false)
+            }
+            try system.removeItem(topCapPath)
+        }
+        // Data is encrypted on the host. The mobile boot helper applies this
+        // marker through the donor's preferences/sentinel APIs, or restores its
+        // key-level journal when the marker is absent. Its runtime is staged
+        // with vphoned even when off, so deselection has a path back on boot.
+        let setup = FirmwareGuestSystemPatchSet.homePodSetupBypass
+        let setupPath = String(FirmwareGuestSystemPatchSet.homePodSetupPath.dropFirst())
+        if guestDevice.family == .homePod {
+            try installHomePodSetupRuntime(system: system, work: work)
+        }
+        if plan?.isEnabled(setup) == true {
+            guard guestDevice.family == .homePod else {
+                throw ValidationError("HomePod setup completion requires a HomePod guest.")
+            }
+            _ = try system.directory("usr/share/vphone", create: true, mode: 0o755)
+            let policy = try PropertyListSerialization.data(fromPropertyList: ["Enabled": true], format: .binary, options: 0)
+            try system.writeFile(setupPath, contents: policy, mode: 0o644, owner: Self.guestOwner)
+            live.insert(setup)
+        } else {
+            try system.removeItem(setupPath)
+        }
+        let speech = FirmwareGuestSystemPatchSet.homePodSiriSpeech
+        let speechPath = String(FirmwareGuestSystemPatchSet.homePodSiriSpeechPath.dropFirst())
+        if plan?.isEnabled(speech) == true {
+            guard guestDevice.family == .homePod else {
+                throw ValidationError("HomePod Siri speech requires a HomePod guest.")
+            }
+            _ = try system.directory("usr/share/vphone", create: true, mode: 0o755)
+            let policy = try PropertyListSerialization.data(fromPropertyList: ["Enabled": true], format: .binary, options: 0)
+            try system.writeFile(speechPath, contents: policy, mode: 0o644, owner: Self.guestOwner)
+            live.insert(speech)
+        } else {
+            try system.removeItem(speechPath)
+        }
+        let welcome = FirmwareGuestSystemPatchSet.homePodWelcome
+        let welcomePath = String(FirmwareGuestSystemPatchSet.homePodWelcomePath.dropFirst())
+        if plan?.isEnabled(welcome) == true {
+            guard guestDevice.family == .homePod else {
+                throw ValidationError("HomePod welcome requires a HomePod guest.")
+            }
+            _ = try system.directory("usr/share/vphone", create: true, mode: 0o755)
+            let policy = try PropertyListSerialization.data(fromPropertyList: ["Enabled": true], format: .binary, options: 0)
+            try system.writeFile(welcomePath, contents: policy, mode: 0o644, owner: Self.guestOwner)
+            live.insert(welcome)
+        } else {
+            // Once-only state belongs to the guest's writable Data volume and
+            // survives opt-out, re-enabling and bundle/environment updates.
+            try system.removeItem(welcomePath)
+        }
+        let glow = FirmwareGuestSystemPatchSet.homePodSoundGlow
+        let glowPath = String(FirmwareGuestSystemPatchSet.homePodSoundGlowPath.dropFirst())
+        if plan?.isEnabled(glow) == true {
+            guard guestDevice.family == .homePod else {
+                throw ValidationError("HomePod Sound Glow requires a HomePod guest.")
+            }
+            _ = try system.directory("usr/share/vphone", create: true, mode: 0o755)
+            let policy = try PropertyListSerialization.data(fromPropertyList: ["Enabled": true], format: .binary, options: 0)
+            try updateHomePodNowPlaying(system: system, work: work, enabled: true)
+            try system.writeFile(glowPath, contents: policy, mode: 0o644, owner: Self.guestOwner)
+            live.insert(glow)
+        } else {
+            if guestDevice.family == .homePod || priorGuest.contains(glow) {
+                try updateHomePodNowPlaying(system: system, work: work, enabled: false)
+            }
+            try system.removeItem(glowPath)
         }
         for (identifier, library) in [
             (FirmwareGuestSystemPatchSet.gyroscope, "libvphonegyro.dylib"),
@@ -1525,7 +1730,7 @@ struct VPhoneCustomFirmwareInstaller {
             isolate(["system-extensions-boot-gpu_bundle"]) {
                 if let restore {
                     try installGPUBundle(restore: restore, system: system, owner: owner)
-                    if guestDevice.family == .appleTV {
+                    if guestDevice.usesTVOS {
                         try retargetGPUBundleToTVOS(system: system, work: work)
                     }
                     gpuBundleReinstalled = true
@@ -1578,7 +1783,7 @@ struct VPhoneCustomFirmwareInstaller {
 
         if on(FirmwareGuestSystemPatchSet.virtioSoundDriver) {
             isolate([FirmwareGuestSystemPatchSet.virtioSoundDriver]) {
-                try installVirtioSoundDriver(system: system)
+                try installVirtioSoundDriver(system: system, work: work, guestDevice: guestDevice)
                 live.insert(FirmwareGuestSystemPatchSet.virtioSoundDriver)
             }
         } else {
@@ -1658,7 +1863,42 @@ struct VPhoneCustomFirmwareInstaller {
 
         let launchdJetsam = "system-launchd-boot-jetsam_panic_guard_bypass"
         let launchdX1 = FirmwareGuestSystemPatchSet.arm64eX1LaunchdBootstrap
-        isolate([launchdJetsam, launchdX1]) {
+        let personaPatch = FirmwareGuestSystemPatchSet.installCoordinationPersona
+        let personaMarker = String(FirmwareGuestSystemPatchSet.installCoordinationPersonaMarker.dropFirst())
+        let isHomePod = guestDevice.family == .homePod
+        isolate([launchdJetsam, launchdX1] + (isHomePod ? [personaPatch] : [])) {
+            if isHomePod {
+                let library = FirmwareGuestSystemPatchSet.homePodInstallPersonaLibrary
+                let path = String(library.dropFirst())
+                if on(personaPatch) {
+                    let payload = try VPhoneGuestBinaries.resolve((library as NSString).lastPathComponent)
+                    try system.replaceFile(path, fromFileAt: payload, mode: 0o755, owner: Self.guestOwner)
+                    // launchd needs a short load command; this alias is owned
+                    // only by HomePod's isolated installation compatibility.
+                    try installLibraryAlias(system: system, alias: "vp", target: library)
+                    try patchMachO(system: system, work: work, path: "sbin/launchd",
+                                   preserveEntitlements: true, injectedDylibPath: "/vp")
+                    try system.writeFile(personaMarker, contents: Data("1\n".utf8), mode: 0o644, owner: Self.guestOwner)
+                    live.insert(personaPatch)
+                    print("  [+] \(personaPatch): installed scoped HomePod UserManager adapter")
+                } else {
+                    if try revertMachO(system: system, work: work, path: "sbin/launchd") {
+                        print("  [+] \(personaPatch): restored HomePod launchd from backup")
+                    } else if priorGuest.contains(personaPatch) {
+                        live.insert(personaPatch)
+                        throw ValidationError("HomePod persona compatibility has no launchd backup; cannot safely remove its library.")
+                    }
+                    try system.removeItem(personaMarker)
+                    if try system.exists("vp") {
+                        guard try system.readLink("vp") == library else {
+                            throw ValidationError("Another file uses /vp; leaving it intact.")
+                        }
+                        try system.removeItem("vp")
+                    }
+                    try system.removeItem(path)
+                }
+                return
+            }
             let enabled = [launchdJetsam, launchdX1].filter(on)
             if !enabled.isEmpty {
                 var verbs: [String] = []
@@ -1683,7 +1923,44 @@ struct VPhoneCustomFirmwareInstaller {
             }
         }
 
-        isolate([]) { try restoreMISFixTargets(system: system) }
+        if !isHomePod {
+            isolate([]) { try restoreMISFixTargets(system: system) }
+        }
+
+        // HomePod has no misagent/provisioning service. Its research SDK signs
+        // apps ad hoc; load only the existing MIS signature-option adapter in
+        // installd, without iPhone identity, profile or spawn hooks.
+        let adHocInstall = FirmwareGuestSystemPatchSet.homePodAdHocInstall
+        isolate([adHocInstall]) {
+            let library = FirmwareGuestSystemPatchSet.homePodMISFixLibrary
+            let path = String(library.dropFirst())
+            let executable = "usr/libexec/installd"
+            if on(adHocInstall) {
+                guard isHomePod else {
+                    throw ValidationError("HomePod ad-hoc installation requires a HomePod guest.")
+                }
+                let payload = try VPhoneGuestBinaries.resolve((library as NSString).lastPathComponent)
+                try system.replaceFile(path, fromFileAt: payload, mode: 0o755, owner: Self.guestOwner)
+                try installLibraryAlias(system: system, alias: "hm", target: library)
+                try patchMachO(system: system, work: work, path: executable,
+                               preserveEntitlements: true, injectedDylibPath: "/hm")
+                live.insert(adHocInstall)
+            } else if isHomePod || priorGuest.contains(adHocInstall) {
+                if try revertMachO(system: system, work: work, path: executable) {
+                    print("  [+] \(adHocInstall): restored installd from backup")
+                } else if priorGuest.contains(adHocInstall) {
+                    live.insert(adHocInstall)
+                    throw ValidationError("HomePod ad-hoc installation has no installd backup; cannot safely remove its library.")
+                }
+                if try system.exists("hm") {
+                    guard try system.readLink("hm") == library else {
+                        throw ValidationError("Another file uses /hm; leaving it intact.")
+                    }
+                    try system.removeItem("hm")
+                }
+                try system.removeItem(path)
+            }
+        }
 
         isolate(["system-debugserver-cfw-install"]) {
             if on("system-debugserver-cfw-install") {
@@ -1713,9 +1990,7 @@ struct VPhoneCustomFirmwareInstaller {
             }
         }
 
-        let personaPatch = FirmwareGuestSystemPatchSet.installCoordinationPersona
-        let personaMarker = String(FirmwareGuestSystemPatchSet.installCoordinationPersonaMarker.dropFirst())
-        isolate([personaPatch]) {
+        if !isHomePod { isolate([personaPatch]) {
             // Undo the experimental entitlement-only patch if this machine
             // received it. Platform Protobox profiles ignore that exception.
             let proxy = "System/Library/PrivateFrameworks/InstallCoordination.framework/Support/installcoordination_proxy"
@@ -1729,7 +2004,7 @@ struct VPhoneCustomFirmwareInstaller {
             } else {
                 try system.removeItem(personaMarker)
             }
-        }
+        } }
 
         // SystemHook sets FS_CACHE_REUSE_ON_REBOOT while this marker exists.
         let metalCachePatch = FirmwareGuestSystemPatchSet.metalCacheReuse
@@ -2239,7 +2514,7 @@ struct VPhoneCustomFirmwareInstaller {
     ) throws {
         let marker = ".vphone-ota-userland"
         let chunkList = try ota.readData(VPhoneOTAArchive.chunkListName)
-        if identifier == FirmwareGuestSystemPatchSet.tvOTAUserland,
+        if [FirmwareGuestSystemPatchSet.tvOTAUserland, FirmwareGuestSystemPatchSet.homePodOTAUserland].contains(identifier),
            try system.isRegularFile(marker), try system.readData(marker) == chunkList {
             print("  [·] \(identifier): userland already in place")
             return
@@ -2264,7 +2539,7 @@ struct VPhoneCustomFirmwareInstaller {
         } else {
             linkList = nil
         }
-        if identifier == FirmwareGuestSystemPatchSet.otaUserland {
+        if identifier == FirmwareGuestSystemPatchSet.otaUserland || identifier == FirmwareGuestSystemPatchSet.homePodOTAUserland {
             // Root extracts only pinned private copies. Reject traversal and
             // any later member beneath an archive-created symlink first.
             guard let linkList else {
@@ -2288,6 +2563,55 @@ struct VPhoneCustomFirmwareInstaller {
         }
         try system.writeFile(marker, contents: chunkList, mode: 0o644, owner: Self.guestOwner)
         print("  [+] \(identifier): userland extracted")
+    }
+
+    /// The OTA supplies the complete HomePod System; its original 27.0 IPSW
+    /// still supplies the restore identity. Verify the target independently of
+    /// that base manifest, including on an idempotent environment redeploy.
+    private func replaceHomePodUserland(
+        system: VPhoneConfinedDirectory,
+        ota: VPhoneConfinedDirectory,
+        work: WorkDirectory,
+        plan: VPhoneVirtualMachinePatchPlan?,
+        device: VPhoneGuestDevice
+    ) throws {
+        guard let metadata = try PropertyListSerialization.propertyList(from: ota.readData("Version.plist"), format: nil) as? [String: String],
+              metadata["Device"] == device.productType,
+              let version = metadata["Version"], version == plan?.iOSBaseVersion,
+              let parsed = VPhoneVersion(version), parsed >= VPhoneVersion("27.2")!,
+              let build = metadata["Build"], !build.isEmpty else {
+            throw ValidationError("The HomePod OTA device/version does not match the patch plan. Prepare the matching full HomePod OTA before installation.")
+        }
+        // Chunk names alone can be identical across releases. A prior marker
+        // may skip extraction only when the actual System has this identity.
+        let marker = ".vphone-ota-userland"
+        if try system.isRegularFile(marker),
+           let actual = try? PropertyListSerialization.propertyList(from: system.readData("System/Library/CoreServices/SystemVersion.plist"), format: nil) as? [String: Any],
+           actual["ProductVersion"] as? String != version || actual["ProductBuildVersion"] as? String != build {
+            try system.removeItem(marker)
+        }
+        try replaceTVUserland(system: system, ota: ota, work: work,
+                              identifier: FirmwareGuestSystemPatchSet.homePodOTAUserland)
+        guard let actual = try PropertyListSerialization.propertyList(from: system.readData("System/Library/CoreServices/SystemVersion.plist"), format: nil) as? [String: Any],
+              actual["ProductVersion"] as? String == version,
+              actual["ProductBuildVersion"] as? String == build else {
+            throw ValidationError("The extracted HomePod SystemVersion does not match its staged OTA. The private disk clone was discarded.")
+        }
+    }
+
+    private func updateHomePodNowPlaying(system: VPhoneConfinedDirectory, work: WorkDirectory, enabled: Bool) throws {
+        let app = "Applications/NowPlayingCap.app"
+        let executable = "\(app)/NowPlayingCap"
+        if enabled {
+            guard try system.isRegularFile(executable) else {
+                throw ValidationError("HomePod Sound Glow requires the native 27.2 NowPlayingCap app.")
+            }
+            try patchMachO(system: system, work: work, path: executable,
+                           preserveEntitlements: true, injectedDylibPath: "/usr/lib/libvphonehomepoddisplay.dylib")
+            try sealGuestBundle(system: system, bundle: app, preserveEntitlements: true)
+        } else if try revertMachO(system: system, work: work, path: executable) {
+            try sealGuestBundle(system: system, bundle: app, preserveEntitlements: true)
+        }
     }
 
     /// The paravirtual GPU driver and its compiler plugin are built for iOS.
@@ -2314,6 +2638,108 @@ struct VPhoneCustomFirmwareInstaller {
         print("  [+] GPU driver retargeted to tvOS")
     }
 
+    /// IOHIDUserDevice reserves IOClass. The shim supplies MiniDisplay's class
+    /// identity only for our physical ID, inside SoundBoard. Load it through
+    /// SoundBoard's Mach-O: launchd strips DYLD environment variables from this
+    /// platform process. Also remove this patch's earlier environment route.
+    private func updateHomePodSoundBoard(system: VPhoneConfinedDirectory, work: WorkDirectory, enabled: Bool) throws {
+        let daemon = "System/Library/LaunchDaemons/com.apple.SoundBoard.plist"
+        let cache = "System/Library/xpc/launchd.plist"
+        let library = "/usr/lib/libvphonehomepoddisplay.dylib"
+        let libraryPath = String(library.dropFirst())
+        let app = "System/Library/CoreServices/SoundBoard.app"
+        let executable = "\(app)/SoundBoard"
+
+        func read(_ path: String) throws -> (dictionary: [String: Any], format: PropertyListSerialization.PropertyListFormat) {
+            var format = PropertyListSerialization.PropertyListFormat.xml
+            guard let dictionary = try PropertyListSerialization.propertyList(
+                from: system.readData(path), options: [], format: &format,
+            ) as? [String: Any] else {
+                throw ValidationError("HomePod top cap needs a valid \(path).")
+            }
+            return (dictionary, format)
+        }
+
+        func rewrite(_ dictionary: [String: Any]) throws -> [String: Any] {
+            var updated = dictionary
+            guard updated["Label"] as? String == "com.apple.SoundBoard",
+                  (updated["ProgramArguments"] as? [String])?.first
+                    == "/System/Library/CoreServices/SoundBoard.app/SoundBoard"
+            else {
+                throw ValidationError("HomePod top cap refuses a daemon that is not SoundBoard.")
+            }
+            guard updated["EnvironmentVariables"] == nil || updated["EnvironmentVariables"] is [String: Any] else {
+                throw ValidationError("SoundBoard has invalid launchd EnvironmentVariables.")
+            }
+            var environment = updated["EnvironmentVariables"] as? [String: Any] ?? [:]
+            guard environment["DYLD_INSERT_LIBRARIES"] == nil || environment["DYLD_INSERT_LIBRARIES"] is String else {
+                throw ValidationError("SoundBoard has invalid DYLD_INSERT_LIBRARIES.")
+            }
+            let libraries = (environment["DYLD_INSERT_LIBRARIES"] as? String ?? "")
+                .split(separator: ":", omittingEmptySubsequences: true).map(String.init)
+                .filter { $0 != library }
+            if libraries.isEmpty {
+                environment.removeValue(forKey: "DYLD_INSERT_LIBRARIES")
+            } else {
+                environment["DYLD_INSERT_LIBRARIES"] = libraries.joined(separator: ":")
+            }
+            if environment.isEmpty {
+                updated.removeValue(forKey: "EnvironmentVariables")
+            } else {
+                updated["EnvironmentVariables"] = environment
+            }
+            return updated
+        }
+
+        // Validate the complete pair before writing either half. A missing
+        // cache entry is not a reason to silently install an inert shim.
+        guard try system.isRegularFile(daemon), try system.isRegularFile(cache) else {
+            if !enabled {
+                if try revertMachO(system: system, work: work, path: executable) {
+                    try sealGuestBundle(system: system, bundle: app, preserveEntitlements: true)
+                }
+                try system.removeItem(libraryPath)
+                return
+            }
+            throw ValidationError("HomePod top cap needs SoundBoard's launch daemon and launchd cache.")
+        }
+        let original = try read(daemon)
+        var cached = try read(cache)
+        let key = "/" + daemon
+        guard var entries = cached.dictionary["LaunchDaemons"] as? [String: Any],
+              let entry = entries[key] as? [String: Any]
+        else {
+            throw ValidationError("HomePod top cap cannot find SoundBoard in the launchd cache.")
+        }
+        let changedDaemon = try rewrite(original.dictionary)
+        entries[key] = try rewrite(entry)
+        cached.dictionary["LaunchDaemons"] = entries
+
+        if enabled {
+            let shim = try VPhoneGuestBinaries.resolve("libvphonehomepoddisplay.dylib")
+            try system.replaceFile(libraryPath, fromFileAt: shim, mode: 0o755, owner: Self.guestOwner)
+            try patchMachO(
+                system: system, work: work, path: executable,
+                preserveEntitlements: true, injectedDylibPath: library,
+            )
+            try sealGuestBundle(system: system, bundle: app, preserveEntitlements: true)
+        } else {
+            if try revertMachO(system: system, work: work, path: executable) {
+                try sealGuestBundle(system: system, bundle: app, preserveEntitlements: true)
+            }
+            try system.removeItem(libraryPath)
+        }
+        // This is an exact inverse of the prototype's environment insertion,
+        // keeping changes users made to other daemon keys in the meantime.
+        try system.writeFile(daemon, contents: PropertyListSerialization.data(
+            fromPropertyList: changedDaemon, format: original.format, options: 0,
+        ), mode: 0o644, owner: Self.guestOwner)
+        try system.removeItem("\(daemon).bak")
+        try system.writeFile(cache, contents: PropertyListSerialization.data(
+            fromPropertyList: cached.dictionary, format: cached.format, options: 0,
+        ), mode: 0o644, owner: Self.guestOwner)
+    }
+
     private func installVphoned(guestDevice: VPhoneGuestDevice, system: VPhoneConfinedDirectory, work: WorkDirectory) throws {
         // Install the same signed bytes that vm launch uses for auto-update.
         // Re-signing here changes the binary hash and forces an upload and
@@ -2321,6 +2747,14 @@ struct VPhoneCustomFirmwareInstaller {
         let vphoned = try VPhoneGuestBinaries.resolve(VPhoneResources.vphonedName(for: guestDevice.family))
         let staged = work.file("vphoned")
         try fm.copyItem(at: vphoned, to: staged)
+        if guestDevice.family == .iPhone || guestDevice.family == .iPad {
+            // Install on both full and environment-only updates, before the
+            // daemon that needs it. The payload is already signed in the bundle.
+            _ = try system.directory("usr/lib/vphone", create: true)
+            try system.replaceFile("usr/lib/vphone/libswiftCompatibilitySpan.dylib",
+                                   fromFileAt: VPhoneGuestBinaries.resolve("libswiftCompatibilitySpan.dylib"),
+                                   mode: 0o755, owner: Self.guestOwner)
+        }
         try system.replaceFile("usr/bin/vphoned", fromFileAt: staged, mode: 0o755, owner: Self.guestOwner)
         let daemon = resources.guestResources.appendingPathComponent("vphoned.plist")
         try system.replaceFile(
@@ -2338,6 +2772,23 @@ struct VPhoneCustomFirmwareInstaller {
         try system.copyFile(from: backup, to: "launchd.plist", in: work.directory)
         try CustomFirmwareDaemons.injectDaemon(into: temp, name: "vphoned", from: daemon)
         try system.replaceFile(launchd, fromFileAt: temp, mode: 0o644, owner: Self.guestOwner)
+    }
+
+    /// Keep rollback available even when the owner also deselects vphoned.
+    /// This helper is inert when no setup marker or original-key journal exists.
+    private func installHomePodSetupRuntime(system: VPhoneConfinedDirectory, work: WorkDirectory) throws {
+        let helper = try VPhoneGuestBinaries.resolve("vphone-homepod-setup")
+        _ = try system.directory("usr/local/libexec", create: true, mode: 0o755)
+        try system.replaceFile("usr/local/libexec/vphone-homepod-setup", fromFileAt: helper,
+                               mode: 0o755, owner: Self.guestOwner)
+        let daemon = resources.guestResources.appendingPathComponent("com.vphone.homepod-setup.plist")
+        try system.replaceFile("System/Library/LaunchDaemons/com.vphone.homepod-setup.plist", fromFileAt: daemon,
+                               mode: 0o644, owner: Self.guestOwner)
+        let cache = "System/Library/xpc/launchd.plist"
+        let staged = "homepod-setup-launchd.plist"
+        try system.copyFile(from: cache, to: staged, in: work.directory)
+        try CustomFirmwareDaemons.injectDaemon(into: work.file(staged), name: "com.vphone.homepod-setup", from: daemon)
+        try system.replaceFile(cache, fromFileAt: work.file(staged), mode: 0o644, owner: Self.guestOwner)
     }
 
     /// The host copy of the installed vphoned, for launch-time auto-update.
@@ -2386,7 +2837,7 @@ struct VPhoneCustomFirmwareInstaller {
     /// the kernel driver, AppleVirtIOSound, but no plugin for it, so audiomxd
     /// has nothing to play through. The bundle is replaced whole; its
     /// signature seals the binary and Info.plist together.
-    private func installVirtioSoundDriver(system: VPhoneConfinedDirectory) throws {
+    private func installVirtioSoundDriver(system: VPhoneConfinedDirectory, work: WorkDirectory, guestDevice: VPhoneGuestDevice) throws {
         let name = "VPhoneVirtIOSound.driver"
         let source = try VPhoneConfinedDirectory(root: VPhoneGuestBinaries.resolve(name).path)
         let target = "System/Library/Audio/Plug-Ins/HAL/\(name)"
@@ -2398,6 +2849,31 @@ struct VPhoneCustomFirmwareInstaller {
         try system.setMode("\(target)/VPhoneVirtIOSound", 0o755)
         for file in ["\(target)/Info.plist", "\(target)/_CodeSignature/CodeResources"] {
             try system.setMode(file, 0o644)
+        }
+        if guestDevice.family == .homePod {
+            // The shared driver is built for iOS. HomePod's arm64e TVOS ASD
+            // has the same verified interfaces, but dyld requires its platform
+            // and CFBundle metadata to agree with the loading process.
+            let name = "VPhoneVirtIOSound-tvos"
+            try work.directory.removeItem(name)
+            try system.copyFile(from: "\(target)/VPhoneVirtIOSound", to: name, in: work.directory)
+            let staged = work.file(name)
+            var data = try Data(contentsOf: staged)
+            try MachOBuildPlatform.set(MachOBuildPlatform.tvOS, in: &data)
+            try data.write(to: staged)
+            try VPhoneSigner.sign(
+                fileAt: staged,
+                options: .init(identifier: nil, entitlements: nil, mergesExisting: true, style: .appleAdHoc),
+            )
+            try system.replaceFile("\(target)/VPhoneVirtIOSound", fromFileAt: staged, mode: 0o755, owner: Self.guestOwner)
+            let infoPath = "\(target)/Info.plist"
+            guard var info = try PropertyListSerialization.propertyList(from: system.readData(infoPath), format: nil) as? [String: Any] else {
+                throw ValidationError("The virtio sound driver has no valid bundle metadata.")
+            }
+            info["CFBundleSupportedPlatforms"] = ["AppleTVOS"]
+            try system.writeFile(infoPath, contents: PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0), mode: 0o644, owner: Self.guestOwner)
+            try sealGuestBundle(system: system, bundle: target)
+            print("  [+] Virtio sound driver retargeted to tvOS")
         }
         print("  [+] /\(target)")
     }
@@ -2552,6 +3028,18 @@ struct VPhoneCustomFirmwareInstaller {
             if guestDevice.family == .iPhone {
                 repairGroup.append((FirmwareGuestSystemPatchSet.prebootIPhoneProduct, "patch-dt-iphone-product", [boardDeviceTree.path]))
             }
+        }
+        if guestDevice.family == .homePod {
+            // Keep the repair in the inverse composition even with no donor
+            // when it is off: restoring the clean backup needs no source tree.
+            if enabled(FirmwareGuestSystemPatchSet.homePodAudioProduct), boardDeviceTree == nil {
+                throw ValidationError("HomePod audio identity needs its original donor device tree.")
+            }
+            if plan != nil || priorGuest.contains(FirmwareGuestSystemPatchSet.homePodCryptexClass) {
+                repairGroup.append((FirmwareGuestSystemPatchSet.homePodCryptexClass, "patch-dt-homepod-cryptex-class", []))
+            }
+            repairGroup.append((FirmwareGuestSystemPatchSet.homePodAudioProduct, "patch-dt-homepod-audio-product",
+                                boardDeviceTree.map { [$0.path] } ?? []))
         }
         repairGroup.append((FirmwareGuestSystemPatchSet.prebootHaptics, "patch-dt-haptics", []))
         repairGroup.append((FirmwareGuestSystemPatchSet.prebootMicrophoneArray, "patch-dt-microphone-array", []))
@@ -2778,6 +3266,8 @@ struct VPhoneCustomFirmwareInstaller {
     /// which MobileGestalt reads Siri, Camera Control, the Action Button and the
     /// model name as absent; `fw patch` does not keep the iPhone17,3's, so it
     /// always comes from here.
+    /// A HomePod mini also needs its donor's native product-id token for audio
+    /// routing; its selected repair refuses to proceed without a valid donor.
     ///
     /// The IPSW cache and the VM folder are the caller's, so the search and
     /// the write run with the caller's credentials, as `cfw install` records
@@ -2786,8 +3276,9 @@ struct VPhoneCustomFirmwareInstaller {
     /// The write still goes through the pinned VM folder, and the tree is then
     /// staged from there like one `fw patch` kept.
     ///
-    /// Never fails the run: without the tree only the repair is left out, and
-    /// that is said in one `[!]` line naming what is missing and the fix.
+    /// Recovery itself never fails the run: it reports the missing source and
+    /// fix. Selected repairs that require validated donor data check it before
+    /// guest filesystem writes.
     private func recoverBoardDeviceTree(
         in bundleDirectory: VPhoneConfinedDirectory,
         restore: VPhoneConfinedDirectory?,
@@ -2795,11 +3286,15 @@ struct VPhoneCustomFirmwareInstaller {
         invokingUser: VPhoneInvokingUser?,
     ) {
         let device = configuredGuestDevice(in: bundleDirectory) ?? guestDevice(of: restore)
-        let repair = device.presentsBoard ? FirmwareGuestSystemPatchSet.prebootBoardAudio : FirmwareGuestSystemPatchSet.prebootIPhoneProduct
-        guard plan?.isEnabled(repair) ?? true else { return }
+        let repairs = device.family == .homePod
+            ? [FirmwareGuestSystemPatchSet.prebootBoardAudio, FirmwareGuestSystemPatchSet.homePodAudioProduct]
+            : [device.presentsBoard ? FirmwareGuestSystemPatchSet.prebootBoardAudio : FirmwareGuestSystemPatchSet.prebootIPhoneProduct]
+        guard repairs.contains(where: { plan?.isEnabled($0) ?? true }) else { return }
         let tree = (device.boardDeviceTreePath as NSString).lastPathComponent
         let originals = VPhoneBundleOperations.firmwareOriginalsDirectoryName
-        let skipped = device.presentsBoard
+        let skipped = device.family == .homePod
+            ? "[!] HomePod audio identity repair skipped, so native audio routing may not initialize:"
+            : device.presentsBoard
             ? "[!] Board audio repair skipped, so this \(device.productType) guest will have no sound:"
             : "[!] iPhone product repair skipped, so this \(device.productType) guest will have no Siri, Camera Control, Action Button or Model Name:"
         do {
@@ -3132,12 +3627,12 @@ struct VPhoneCustomFirmwareInstaller {
     /// bundle whose seal no longer matches its contents. Ad hoc, like every
     /// other guest binary this pipeline writes; the identifier is kept so the
     /// plugin still answers to the name it always had.
-    private func sealGuestBundle(system: VPhoneConfinedDirectory, bundle: String) throws {
+    private func sealGuestBundle(system: VPhoneConfinedDirectory, bundle: String, preserveEntitlements: Bool = false) throws {
         // No --identifier: codesign keeps the one the bundle already carries.
-        _ = try tool("/usr/bin/codesign", [
-            "-f", "-s", "-", "--timestamp=none",
-            system.directory(bundle).path,
-        ])
+        var arguments = ["-f", "-s", "-", "--timestamp=none"]
+        if preserveEntitlements { arguments.append("--preserve-metadata=entitlements") }
+        arguments.append(try system.directory(bundle).path)
+        _ = try tool("/usr/bin/codesign", arguments)
     }
 
     /// Copy an optional guest binary into the work folder, or nil (with a

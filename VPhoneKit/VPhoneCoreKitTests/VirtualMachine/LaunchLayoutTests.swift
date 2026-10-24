@@ -146,14 +146,16 @@ struct LaunchLayoutTests {
         defer { try? FileManager.default.removeItem(at: root) }
         // A stand-in that lives long enough to be found under the right name.
         let program = root.appendingPathComponent("vphone-vm")
-        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/usr/bin/yes"), to: program)
+        try FileManager.default.copyItem(at: URL(fileURLWithPath: "/bin/cat"), to: program)
         let config = root.appendingPathComponent("config.plist")
         let other = root.appendingPathComponent("other.plist")
         let process = Process()
         process.executableURL = program
-        // yes prints its arguments and blocks once the unread pipe fills.
-        process.arguments = ["--config", config.path]
-        process.standardOutput = Pipe()
+        // cat reads "-" first and blocks on a pipe that is never written to.
+        // Not yes: on macOS 26 it writes a newline over the NUL that ends its
+        // first argument, which runs "--config" into the path.
+        process.arguments = ["-", "--config", config.path]
+        process.standardInput = Pipe()
         try process.run()
         defer { process.terminate() }
         Thread.sleep(forTimeInterval: 0.2)
@@ -187,7 +189,7 @@ struct LaunchLayoutTests {
         #expect(try layout.stageVphoned(into: bundle) == false)
     }
 
-    @Test func `stage vphoned picks the tvOS daemon for an Apple TV guest`() throws {
+    @Test func `stage vphoned picks the tvOS daemon for Apple TV and HomePod guests`() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let guest = root.appendingPathComponent("guest-resources")
         try FileManager.default.createDirectory(at: guest, withIntermediateDirectories: true)
@@ -198,13 +200,14 @@ struct LaunchLayoutTests {
         #expect(resources.vphoned.lastPathComponent == "vphoned")
         #expect(resources.vphoned(for: .iPad).lastPathComponent == "vphoned")
         #expect(resources.vphoned(for: .appleTV).lastPathComponent == "vphoned-tvos")
+        #expect(resources.vphoned(for: .homePod).lastPathComponent == "vphoned-tvos")
 
         let base = VPhoneVirtualMachineManifest(
             cpuCount: 2,
             memorySize: 1024 * 1024,
             romImages: .init(avpBooter: "a", avpSEPBooter: "b"),
         )
-        for (device, expected) in [(VPhoneGuestDevice.appleTV5_3, Data([2])), (.iPhone17_3, Data([1]))] {
+        for (device, expected) in [(VPhoneGuestDevice.appleTV5_3, Data([2])), (.audioAccessory5_1, Data([2])), (.iPhone17_3, Data([1]))] {
             let bundleDir = root.appendingPathComponent(device.productType)
             try FileManager.default.createDirectory(at: bundleDir, withIntermediateDirectories: true)
             let bundle = VPhoneBundle(url: bundleDir, manifest: base.updating(guestDevice: device))

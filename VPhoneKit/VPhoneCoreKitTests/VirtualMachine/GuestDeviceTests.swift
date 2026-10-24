@@ -31,6 +31,39 @@ struct GuestDeviceTests {
     }
 
     @Test
+    func `HomePod mini has its own identity and the tvOS executable platform`() throws {
+        let device = try #require(VPhoneGuestDevice.named("AudioAccessory5,1"))
+        let manifest = ["SupportedProductTypes": ["AudioAccessory5,1"]]
+        #expect(device == .audioAccessory5_1)
+        #expect(device.family == .homePod)
+        #expect(device.productName == "HomePod mini")
+        #expect(device.family.osName == "HomePod Software")
+        #expect(device.usesTVOS && !device.isPad && device.presentsBoard)
+        #expect(!device.hasPlainArm64Userland && device.restoreBase == nil)
+        #expect(device.boardDeviceTreePath == "Firmware/all_flash/DeviceTree.b520ap.im4p")
+        #expect(VPhoneGuestDevice.detect(buildManifest: manifest) == device)
+        #expect(VPhoneGuestDevice.covered(by: manifest) == [device])
+        #expect(VPhoneGuestDevice.detect(buildManifest: ["SupportedProductTypes": ["AudioAccessory1,1"]]) == nil)
+        #expect(device.restoreTreeName(version: "27.0", build: "24J361")
+            == "iPhoneOS_AudioAccessory5,1_27.0_24J361_Restore")
+        #expect(!VPhoneGuestDevice.iPhone17_3.usesTVOS && !VPhoneGuestDevice.iPad16_1.usesTVOS)
+        #expect(VPhoneGuestDevice.appleTV5_3.usesTVOS && VPhoneGuestDevice.appleTV14_1.usesTVOS)
+    }
+
+    @Test
+    func `HomePod mini persists its identity and provisional virtual canvas`() throws {
+        let manifest = VPhoneVirtualMachineManifest.newVM().updating(guestDevice: .audioAccessory5_1)
+        let decoded = try PropertyListDecoder().decode(
+            VPhoneVirtualMachineManifest.self,
+            from: PropertyListEncoder().encode(manifest),
+        )
+        #expect(decoded.guestProductType == "AudioAccessory5,1")
+        #expect(decoded.guestDevice == .audioAccessory5_1)
+        #expect(decoded.screenConfig == .init(width: 320, height: 320, pixelsPerInch: 72, scale: 1.0))
+        #expect(decoded.updating(cpuCount: 4).guestDevice == .audioAccessory5_1)
+    }
+
+    @Test
     func `the Apple TV 4K is an arm64e TV guest at 2x restored over the Apple TV HD`() throws {
         let tv4k = try #require(VPhoneGuestDevice.named("AppleTV14,1"))
         #expect(tv4k == .appleTV14_1 && tv4k.family == .appleTV)
@@ -163,5 +196,20 @@ struct GuestDeviceTests {
         #expect(decoded.guestProductType == "iPhone19,2")
         #expect(decoded.guestDevice == device)
         #expect(decoded.screenConfig == .init(width: 1206, height: 2622, pixelsPerInch: 460, scale: 3.0))
+    }
+
+    @Test
+    func `iPhone Duo preserves its V68 identity and outer display in the VM`() throws {
+        let device = try #require(VPhoneGuestDevice.detect(buildManifest: ["SupportedProductTypes": ["iPhone19,4"]]))
+        #expect(device == .iPhone19_4)
+        #expect(device.boardDeviceTreePath == "Firmware/all_flash/DeviceTree.v68ap.im4p")
+        let manifest = VPhoneVirtualMachineManifest.newVM().updating(guestDevice: device)
+        let decoded = try PropertyListDecoder().decode(
+            VPhoneVirtualMachineManifest.self,
+            from: PropertyListEncoder().encode(manifest),
+        )
+        #expect(decoded.guestProductType == "iPhone19,4")
+        #expect(decoded.guestDevice == device)
+        #expect(decoded.screenConfig == .init(width: 1398, height: 2034, pixelsPerInch: 460, scale: 3.0))
     }
 }

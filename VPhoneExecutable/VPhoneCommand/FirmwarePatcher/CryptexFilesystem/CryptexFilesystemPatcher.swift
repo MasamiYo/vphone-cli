@@ -108,6 +108,9 @@ public final class CryptexFilesystemPatcher: BufferedPatcher {
         let trustcachePath = try createTrustcache(filesystem: unencryptedImage)
 
         print("Creating mtree…")
+        // The restore gets the image as encrypted above, so whatever changes
+        // from here on is what its mtree finds different (see parseEditTime).
+        let editStart = Date()
         let didEdit = try removeSpecificSystemFiles(filesystem: unencryptedImage)
         let mtreePath = try createMtree(filesystem: unencryptedImage)
 
@@ -115,11 +118,12 @@ public final class CryptexFilesystemPatcher: BufferedPatcher {
         // The merged image was shrunk to its minimum size. With a remap,
         // apfs_sealvolume copies the whole fsroot tree first and fails with
         // ENOSPC (exit 65) in the space that is left.
-        try growImage(dmg: unencryptedImage, by: 2 << 30)
+        try growImage(dmg: unencryptedImage, by: Self.sealHeadroom)
         let (digestDbPath, rootHashPath) = try createDigestAndHash(
             filesystem: unencryptedImage,
             mtree: mtreePath,
             remap: didEdit,
+            editedSince: editStart,
         )
         let metadataPath = try compressCanonicalMetadata(mtree: mtreePath, digestDb: digestDbPath)
         let rootHashContainer = try wrapRootHash(rootHashPath)

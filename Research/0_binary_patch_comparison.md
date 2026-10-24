@@ -1,5 +1,300 @@
 # Patch Comparison: Regular / Development / Jailbreak / Experimental
 
+> **HomePod local app installation (2026-10-23).**
+> `system-installd-exp-homepod_adhoc` is selected only by `homepod-mini` on
+> HomePod 27. It loads a dedicated TVOS arm64e build of the existing MIS
+> signature-option and MobileInstallation ad-hoc adapters into installd via
+> `/hm`. Native MIS still validates the signature and produces its metadata;
+> the verifier's `allowAdhocSigning` switch accepts the missing certificate.
+> No embedded-profile bypass, device identity, profile scope or spawn hooks
+> are compiled into this library. Opt-out restores installd's original backup
+> before removing the alias and library. HomePod lacks misagent, so the test
+> app uses the research tvOS SDK and a local signature with no profile.
+> See `Research/Guest/xcode_install_signature_gate.md` for validation.
+> TempPod passes real Xcode installation, headless execution, source breakpoint,
+> stepping, variable inspection and Objective-C expression evaluation. Live
+> opt-out restores installd and launchd byte-identically to their original
+> backups and removes the owned aliases/marker/libraries; the default preset
+> has been restored. Full bundle admission, 77 selected Swift tests and the
+> persona ABI/policy harness pass.
+
+> **HomePod Xcode installation persona (2026-10-23).**
+> The existing `system-installcoordination_proxy-cfw-persona_lookup` now has a
+> HomePod 27 deployment, selected by `homepod-mini`. TempPod reproduced the
+> iPhone's Protobox denial of the installation proxy's UserManager lookup.
+> HomePod loads a dedicated TVOS arm64e `libvphoneinstallpersona.dylib` in
+> launchd via the short `/vp` alias. It reuses the existing root-owned marker,
+> exact service/path/signing-identity and kernel-validated audit-token checks.
+> Other sandbox calls retain their arguments and native result. No spawn,
+> jetsam or iPhone environment hooks are included. Opt-out restores launchd
+> from its original backup before removing the marker, alias and library.
+> Xcode installation, process launch and LLDB stack inspection pass; see
+> `Research/Guest/ios27_xcode_persona_lookup.md`.
+
+> **HomePod cryptex DDI staging (2026-10-23).**
+> `system-cryptexd-exp-homepod_staging` is a selectable HomePod 27 guest patch,
+> enabled by `homepod-mini` and excluded from the iOS/Apple TV presets. It
+> injects the TVOS arm64e `libvphonecryptexstaging.dylib` into cryptexd through
+> a load command, preserving the daemon's entitlements and an original `.bak`.
+> Deselecting restores the daemon before removing the library. Only failed
+> `F_SETPROTECTIONCLASS` calls returning `EPERM` become `ENOTSUP`, the daemon's
+> existing unsupported-filesystem fallback. Other fcntl calls tail-forward
+> their complete ABI arguments. Apple ticket/signature/trust-cache/graft checks
+> remain on the native path. DDI persistence and nonce persistence use Apple's
+> until-reboot mode. The research SEP's digest-storage failure is tolerated only
+> for error 104 in the cryptex POSIX domain and an info plist naming Apple's DDI,
+> `/System/Developer`, and DeveloperModeRequired true; the preceding native
+> signature lock is unchanged. This does not enable the broad iPhone environment or its
+> display hooks. Validation and deployment results are recorded in
+> `Research/Guest/developer_disk_images.md`.
+> TempPod confirmed the staging errno, then exposed an authenticated APFS
+> `clas` mismatch (tvOS ticket `0xf4`, research kernel `0xf2`). The independent
+> `preboot-homepod-exp-cryptex_class` repair sets or adds only the concrete uint32
+> `/product/cryptex1-product-class` to `0xf4`, which the kernel's native Image4
+> runtime reads. It preserves equality verification and global product-id;
+> Preboot backup composition makes it reversible. No kernel instruction is
+> patched. Reveal/validation procedure is in the same research document.
+> TempPod now reports `connected` with a compatible, usable 27B48 tvOS cryptex
+> DDI. Device/process/app/file queries and Xcode Device Hub DDI readiness pass.
+> HomePod has no display, so Device Hub live preview is unsupported as expected;
+> Xcode app installation, launch and LLDB stack inspection now pass. The
+> initial UIKit template asserts when it requests a display-backed window
+> scene; application UI support is separate from DDI readiness.
+> Live opt-out restores cryptexd and the whole personalized DeviceTree to their
+> pre-patch bytes, removing the injected library. Full bundle admission, 76
+> selected Swift tests, and the scoped native adapter harness pass.
+
+> **vphoned on iOS 18 (2026-10-23):** the daemon strongly imports Span types
+> from `@rpath/libswiftCompatibilitySpan.dylib`, but the guest payload omitted
+> the back-deployment library. The bundle now carries the signed iPhoneOS
+> library, and the existing vphoned installation steps (both restore-image
+> injection and full/environment-only CFW install) copy it to
+> `/usr/lib/vphone/libswiftCompatibilitySpan.dylib`. The iOS daemon gains that
+> fallback rpath after `/usr/lib/swift`, preserving the system implementation
+> on iOS 26+. The restore-image trust-cache scan includes the added file.
+> Bundle admission checks its signature/platform and the daemon's search path.
+> No new patch, preset, instruction replacement, or version change is needed;
+> TV/watch daemon payloads are unchanged. This fixes a confirmed missing
+> dependency; an iOS 18 guest boot still needs runtime validation.
+
+> **HomePod integration with upstream main (2026-10-23).**
+> Merged upstream `d14231a4` into the HomePod branch, retaining upstream's
+> 2.12 compatibility contract, Apple Watch, research-board and sealed restore
+> image workflows alongside HomePod's donor inference, OTA userland and audio
+> routing. The `homepod-mini` shipped preset now names the research-board set
+> and blocks the new manual Frida relaxations and iOS Bluetooth-controller
+> patch, matching its built-in definition. HomePod's original global product
+> token, 48 kHz audio-only routing and Sound Glow policies are unchanged.
+> Validation: full VPhone bundle (including admission checks) and Launchpad
+> builds passed; 683 CoreKit, 170 selected patch/pipeline and 105 archive tests
+> passed. The CoreKit throughput threshold needed one isolated retry after
+> failing during the full parallel run. Two research-board firmware comparison
+> tests skipped without their optional fixtures. HomePod display, setup,
+> welcome, Siri and Sound Glow native harnesses and Launchpad machine/cache,
+> compatibility, template and control harnesses passed. No bundle was installed
+> and no live VM behavior was retested for this merge.
+
+> **HomePod 27.2 OTA and native Sound Glow (2026-10-23, live verified).**
+> The 27.0 donor lacks the artwork/color extraction and native media animation
+> cases introduced in 27.2. `system-homepod-exp-ota_userland` stages the full
+> Apple HomePod mini OTA over the same device's 27.0 IPSW, retaining its restore
+> identity and cloudOS boot chain, as the Apple TV OTA pairing does.
+> `system-homepod-exp-sound_glow` injects the existing guest adapter into
+> NowPlayingCap and generates `/usr/share/vphone/HomePodSoundGlow.plist`.
+> Its narrow native `AccessorySettingProvider.mediaUI` getter selects value 1;
+> Apple's artwork service, color extractor and CAPAnimationEffect.media remain
+> responsible for rendering. Opt-out restores the original app and removes the
+> policy. Both declarations are HomePod-only, require 27.2 or later, and are
+> selected by default only by `homepod-mini`. Original product identity and
+> existing audio/Siri behavior are retained. Local validation and native
+> evidence are recorded in [Sound Glow](Firmware/homepod_sound_glow.md).
+> Live 27.2 boot and clear Music/AirPlay audio are verified. Initial playback
+> exposed an unresolved own-device endpoint in the native artwork request.
+> A scoped request adapter selects MediaRemote's local destination only for
+> that own-device UID; native request/response and artwork processing remain
+> intact. Remote requests and opt-out pass through. The routing correction,
+> artwork processing succeed live in 24K120. Purple and yellow album artwork
+> produce distinct native animated colors; pause fades to idle and resume works.
+> A follow-up to the existing Siri speech patch uses a mixable, ducking auxiliary
+> session with notify-on-deactivation after the live interruption test made
+> Music abandon the receiver. The owner confirmed full speech while Music stayed
+> on HomePod; native frames handed off to Siri and returned to colored music.
+> Successful installation now records the actual mounted HomePod SystemVersion
+> after disk commit, preserving cloudOS and variant. Preparing an OTA alone does
+> not promote the host label; full-install command/creator variant recording
+> retains HomePod identity. Restore-info tests cover this merge.
+> Opt-out removes the policy and injected load command and restores white native
+> playback. Re-enable plus cold boot restores audible music and colored native
+> animation, confirmed by the owner and changing valid RGB reports. Final live
+> bundle: `2.11.0-local.8e60e757`; original 27.0 VM and default bundle preserved.
+
+> **HomePod Siri speech policy (2026-10-23, live speech verified).**
+> New optional `system-homepod-exp-siri_speech` generates
+> `/usr/share/vphone/HomePodSiriSpeech.plist` with `Enabled=true`, restricted to
+> 27.x HomePod guests and selected by default only in `homepod-mini`. Installation
+> requires vphoned, the top-cap adapter and virtio sound; welcome additionally
+> requires this speech policy. Opt-out removes only the selected policy.
+> The native branch supports an output-only auxiliary AVAudioSession ID carried
+> on a normal type 13 SVXSystemEvent, allowing SoundBoard's existing Siri lifecycle
+> and completion to handle speech without entering physical recording setup.
+> The candidate repair is scoped to the existing SoundBoard adapter; global
+> product identity, audio route and microphone capability flags remain intact.
+> Live `siriSay:` speaks the full exact welcome sentence. SiriHeadlessService
+> reports synthesis success, sirittsd records playback start/finish, SoundBoard
+> returns to idle and deactivates the auxiliary session. Colorful native frames
+> advance during speech and return to black afterward.
+> See [welcome and speech policy](Firmware/homepod_welcome.md).
+
+> **HomePod welcome policy (2026-10-23, live sequence verified).**
+> New optional `system-homepod-exp-welcome` is restricted to 27.x and admitted
+> only for HomePod guests. Only `homepod-mini` selects it by default. The guest
+> installer checks that vphoned, the HomePod top cap, local setup completion and
+> virtio sound and native Siri speech are selected, then generates
+> `/usr/share/vphone/HomePodWelcome.plist` with `Enabled=true`. Opt-out removes
+> only that policy; once-only Data state remains owned by the guest runtime.
+> The coordinator runs in SoundBoard's existing injected HomePod adapter, using
+> native tone completion, a coordinated Identify activity and Siri finalization
+> after boot readiness. A durable guest-identity claim prevents replay across
+> restarts and updates while allowing each template clone its own welcome.
+> The owner confirms tone, exact speech and both animations on automatic boot.
+> Logs establish TonePlaying, ToneFinished, SpeechRequested and SpeechFinalized.
+> Live inspection caught Identify remaining active: cleanup must call the
+> coordinated `setLocalSessionActive:NO`, which invokes the subclass cleanup;
+> calling `endLocalSessionActivity` alone does not relinquish ownership. The
+> regression mock now preserves that native distinction. Final installed bundle
+> `2.11.0-local.3f1d474e` passes the complete sequence on a fresh-identity clone,
+> returning to an empty activity stack. The original claim/status stay byte
+> identical after update, cold boot and SoundBoard restart with no replay.
+> Direct Siri speech, native animated frames and ordinary tone 1 still pass
+> afterward, including the owner's audible and return-to-idle confirmation.
+> See [welcome policy and native behavior](Firmware/homepod_welcome.md).
+
+> **HomePod welcome pre-live ABI audit (2026-10-23).**
+> Direct 24J361 donor-cache metadata establishes UInt32 tone playback
+> (`SBUITonePlaybackManager play:completion:`, `v28@0:8I16@?20`). The candidate's
+> initial UInt64 mock and guard agreed with each other but would reject the real
+> guest method. Both are corrected, with an independent donor-signature fixture
+> and rejection coverage for the old shape. Native Siri state/selector analysis
+> also confirms a presenting-state activity path separate from microphone audio
+> activation; live animation, metering and audibility remain pending.
+
+> **HomePod audio-only identity correction (2026-10-22, live validation).**
+> An A/B boot of the same installed bundle, changing only the validated donor
+> product token back to its prior virtual value, restores the native red replay;
+> restoring the donor token blacks the same fixture. The donor identity enables
+> HomePodDisplayService's physical gamma path, which requires absent brightness
+> hardware. Audio now selects native B520 route **4** through VirtualAudio's own
+> `ProductIDOverride`, stored by vphoned and set in-process by the HAL plugin.
+> The boot-tree HomePod capability patch retains the original VM product token.
+> `preboot-homepod-exp-audio_product` is now blocked in every preset; its existing
+> inverse restores previously installed guests from the shared Preboot backup.
+> The old repair remains declared for explicit research and reversible migration.
+> No display workaround or new instruction patch. All 88 focused Xcode firmware
+> tests, four audio transport harnesses, the unchanged display adapter harness,
+> the full bundle build and strict signature verification pass. Installed
+> `2.11.0-local.40cd1d45` restores the exact original Preboot tree; MobileGestalt
+> retains the virtual product enum while VirtualAudio uses route 4. The owner
+> confirms clear tones. LED replay and native identify output work across two
+> cold boots; the second playback run has zero starvation/drops in all cycles.
+
+> **HomePod audio port (2026-10-22, live routing validation).**
+> New `preboot-homepod-exp-audio_product` restores the donor's exact 20-byte
+> `/product/product-id` in Preboot through the existing reversible repair
+> composition; new HomePod boot trees receive it too. MobileGestalt then resolves
+> HomePod mini's native VirtualAudio product 4 instead of the VM's unknown 0.
+> `homepod-mini` selects the shared virtio-snd HAL driver, retargeted/resealed
+> for tvOS, publishing its output as the native `PuffinOutput` endpoint. It does
+> not apply the iPhone 8010 override or VirtualAudio instruction/tuning patches.
+> Other presets keep the new identity repair off and TV excludes the driver.
+> First live run proves native product 4, B520 tuning selection and driver load;
+> routing requires the HomePod-only raw UInt32 `mode/glob/0` custom property.
+> The driver advertises this through `cust`, retains the native `defa`/`raww`/
+> `tphn`/`meas` mode and reports changes. Corrected build `61d08ba5` routes to
+> `PuffinOutput`; six playback cycles have zero starvation/drop counters.
+> Final build `b284734a` plays ordinary-session test tones on the Mac's selected
+> Studio Display speakers; the owner confirms clear tones.
+> Live silence traced to B520 speaker DSP buffer overruns at 44.1 kHz.
+> HomePod output now advertises only its 48 kHz wire rate; forcing a 48 kHz
+> session removes the errors and produces nonzero PCM in a scoped host tap.
+> iPhone/iPad retain their alternate-rate support.
+> No new instruction patch. See [native evidence and validation](Guest/homepod_audio.md).
+
+> **HomePod setup completion and controls (2026-10-22, live validation).**
+> New `system-homepod-exp-setup_bypass` is HomePod-only, restricted to 27.x,
+> and selected only by `homepod-mini`. It installs the System marker
+> `/usr/share/vphone/HomePodSetup.plist`. A short-lived mobile helper journals
+> `SetupDone` and `SetupFinishedAllSteps` in `com.apple.purplebuddy`, synchronizes
+> them, and calls the donor's `BYSetupAssistantPrepareLaunchSentinel` before
+> checking the native needs-setup and initial-run APIs. The sentinel is a
+> per-user POSIX semaphore, not a filesystem flag. Removing the marker restores
+> exactly the original two keys, including absent values; the inverse survives
+> until native restoration succeeds. The helper remains installed for rollback
+> even if vphoned is deselected. This completes local setup state; it does not
+> provision an Apple Account or HomeKit home. **Live late-start correction:**
+> an already-running HPSetup retains assistant/voice-trigger assertions even
+> after SoundBoard receives completion and runs post-setup initialization.
+> Native preparation publishes fresh completion; after verification, the helper
+> replays the donor's exported notification only for an existing sentinel and
+> gracefully stops only mobile's exact
+> `/Applications/HPSetup.app/HPSetup`, rechecking identity immediately before
+> SIGTERM. It observes disappearance before reporting success; failures retain
+> the inverse for retry. No SIGKILL, arbitrary process verb or new entitlement.
+> Opt-out does not terminate processes. No new instruction patch.
+> vphoned also exposes all 29 `SBSDebugInterface` methods through a fixed,
+> ABI-checked catalog using `com.apple.debuginfo.soundboard`; the HomePod-only
+> Controls section includes native animation/phase choices and typed button and
+> LED replay adapters. The host top cap now uses runtime-compiled Metal 4 optics
+> with a macOS 15 Metal compatibility path. GPU tests and 35 Xcode catalog and
+> selection tests pass. Final bundle `2.11.0-local.26745ac8` passed live late
+> completion (one native init), fresh/repeated boot, and native Metal display
+> presentation/reconnection. Opt-out restored absent keys and setup behavior.
+> See [implementation, live evidence, and service boundaries](Firmware/homepod_soundboard_controls.md).
+
+> **HomePod top cap (2026-10-22).** `system-homepod-exp-top_cap` installs
+> `/usr/share/vphone/HomePodDisplay.plist`, extracted from the selected board's
+> `/arm-io/dockchannel-rtp/rtp-transport/display` node. It preserves the donor's
+> `MDXCoords`, `MDYCoords`, `MDRingCoords`, `MDBitDepth` and `MDHWVersion` payloads
+> for vphoned's virtual MiniDisplay HID device. Only `homepod-mini` selects it
+> by default; the installer rejects other guest families and missing or invalid
+> donor metadata. Both full installation and environment updates stage it through
+> confined descriptors; deselecting removes this added configuration and its
+> receipt entry. It also installs `libvphonehomepoddisplay.dylib` only into
+> SoundBoard through an `LC_LOAD_WEAK_DYLIB` in its backed-up executable, preserving
+> its entitlements and resealing its app bundle. launchd strips `DYLD_*`
+> environment variables from this platform process, so both the standalone
+> daemon plist and launchd cache are cleaned of the earlier environment route
+> while preserving their other keys and inserted libraries.
+> `IOHIDUserDevice` reserves `IOClass`;
+> the shim adapts MiniDisplay's discovery callback and class-identity query only
+> for the exact virtual display ID. On a failed submission it can replace that
+> virtual handle after vphoned restarts, retrying the same native frame and
+> throttling device enumeration to once per second. Other devices retain their
+> original failure behavior. LED reports still traverse the native HID device. Deselecting
+> restores the original SoundBoard executable from `.bak`, reseals the app,
+> and deletes the library. The VM retains its virtual hardware tree.
+> No instruction patch is added.
+
+> **HomePod mini (2026-10-22).** `AudioAccessory5,1` / B520 uses its own
+> HomePod Software 27.0 (24J361) monolithic arm64e TVOS IPSW with the cloudOS
+> 26.4 boot chain. The dedicated `homepod-mini` preset retains 27 compatibility
+> and vphoned, blocks the Apple TV OTA swap, HD TPRO workaround and iPhone
+> GPU/audio/environment hooks. New `devicetree-cfw-homepod_product` copies
+> concrete `horseman`, `siri-hub` and app architecture capabilities from B520's
+> donor tree only into its installed identity. No new kernel instruction patch.
+> See [HomePod mini support](Firmware/homepod_mini_support.md) for evidence,
+> validation status and limitations.
+> **iPhone Duo bring-up (2026-10-23, first boot fails):**
+> `iPhone19,4` / V68AP, iOS 27.1 (24A94425), is registered with one outer
+> display and paired with cloudOS 26.4 (23E5207q). Its device tree reports
+> `arm64e.x1`. This exercises the existing standard iOS 27 / ARM64E_X1 patch
+> selection on a new userland; it introduces no new instruction patch or
+> preset. Restore and CFW install completed, but setup and a windowed boot
+> panic with PID 1 SIGILL. Installed dyld still uses CSSC instructions that
+> this Mac lacks and current X1 lowering does not cover; exact fault-site
+> attribution remains unverified. Four optional VirtualAudio patches also
+> failed. Neither successful boot nor dual-display/hinge support is established. See
+> [inputs, evidence and boot results](Guest/iphone_duo_bringup.md).
+
 > **Experimental full OTA System update (2026-10-20):**
 > `system-exp-ota_userland` is off in Standard and the TV presets. For a stopped
 > iPhone/iPad guest with a snapshot and prepared target firmware, it replaces
@@ -3492,10 +3787,35 @@ it was not ("Invalid root hash", `apfs_sealvolume` exit 65 in
   restore's own `mtree -m` sets it from the root entry (`.`), not from the
   newest one: run on 2026-10-19, the device took the root's
   `1792405582.069334279` while `/private/var` said `…582.936736187`. The
-  remap takes the root's time now.
+  remap takes the root's time now. Corrected 2026-10-23: `mtree -m` takes
+  the time of the *first entry in walk order whose time differs* (checked
+  with the host's `mtree -m` on a small tree). The restore gets the image as
+  it was encrypted, before `removeSpecificSystemFiles`, so that entry is the
+  first one edited afterwards. The root was that entry only because the
+  browsable mount had created `.fseventsd` and removing it edited the root.
+  Since the mounts are `-nobrowse` (6dcc3f2c) there is no `.fseventsd`, the
+  root keeps the IPSW's time, and sealing with it failed again ("Invalid
+  root hash"; seen on 18.6 22G86 on cloudOS 22G86, where the device took
+  `/private/var`'s time). The remap now takes the first mtree entry edited
+  since `removeSpecificSystemFiles` started.
 - `createDigestAndHash` mounted the image writable only to unmount it again
   for `apfs_sealvolume`, which needs the device; the mount changed the volume
   after the mtree described it. It attaches the image with `-noMount` now.
+
+On macOS 26.6.2 two more steps failed (2026-10-23, Mac mini M4):
+
+- `diskutil image attach -mountPoint` refuses a folder that does not exist
+  ("Mount point … doesn't exist", exit 64), and the merge attached at a fresh
+  `<tmp>/volume` it had not created. Every preset that merges the restore
+  image (watchos, minimal) stopped there. The folder is created first now.
+- The watchOS 26.4 system image has no partition map: its APFS container
+  spans the whole file, and `diskutil image resize` grows it no further than
+  that ("Requested size exceeds maximum size"; min 11.05 GB, max = current =
+  11.26 GB once merged). Left at that size, `apfs_sealvolume` ran out of space
+  remapping the fsroot tree with 541 MB free (ENOSPC, exit 65). `growImage`
+  now extends the file and runs `diskutil apfs resizeContainer <container> 0`,
+  which gave the same image 2.7 GB free. The iOS images, which diskutil can
+  grow, are resized as before.
 
 The binaries the merge patches (`launchd_cache_loader`, `mobileactivationd`)
 are re-signed in Apple's ad-hoc shape (`VPhoneSignOptions.Style.appleAdHoc`),
@@ -3575,7 +3895,7 @@ it finds the recipe in `Contents/Resources/kernelcache_recipes` by SHA-256, then
 
 1. extracts the donor, the vphone600 kernelcache of the 26.4 beta (23E5207q,
    read once from its cloudOS IPSW), and the base into KDKs with
-   `ipsw kernel extract --kdk --symbols`, naming the stripped symbols from the
+   the native `KDKExtraction` pipeline, naming the stripped symbols from the
    recipe's maps;
 2. keeps the recipe's bundle list: the base without its research-board-only
    kexts, plus the donor kexts that link against the base kernel;
@@ -3583,8 +3903,10 @@ it finds the recipe in `Contents/Resources/kernelcache_recipes` by SHA-256, then
    takes the host's own in their place without a word) and links it with
    `kmutil create -a arm64e -n boot -s all -z -x --compress --img4-encode
    --split-ro-rx-tags`;
-4. puts back Apple's CPU subtype if the builder wrote another, and checks that
-   every requested bundle was linked.
+4. puts back Apple's CPU subtype if the builder wrote another, makes calls
+   through the auth stubs the macOS 27 builder keeps direct again
+   (`KernelCollectionStubCalls`, below), and checks that every requested bundle
+   was linked.
 
 The mix replaces both `KernelCache` and `RestoreKernelCache`, so restore boots
 it too. The pipeline keeps kmutil's container (its `PAYP` properties describe
@@ -3593,7 +3915,7 @@ the new layout) and saves the preset's kernel patches into it
 in `FirmwareOriginals`. Mixes are cached in `~/.vphone/kernelcache/mix`, keyed
 by the kernelcaches, the maps and bundle list and the builder layout.
 
-Only the link needs root, and root runs no `ipsw`. `fw kernelcache <vm>` stages
+Only the link needs root; native extraction runs as the invoking user. `fw kernelcache <vm>` stages
 the mix as the user (both extractions and the volume) and links it under sudo:
 root copies the staged volume into a fresh root-only directory, walking it by
 descriptor, refusing every symbolic link but the KDK's pointer to the volume's
@@ -3606,12 +3928,57 @@ Apple linked the base in, read from the base's own prelink info, so a mix no
 longer depends on where it is built. The 26.6 mix then has the segment layout
 of the hand-built research mix that booted.
 
-Requirements: an `ipsw` with `kernel extract --kdk`, named by `VPHONE_IPSW`
-(vphone-cli does not ship it); root; and for every base here (26.4–26.7, all
+Requirements: root for linking; and for every base here (26.4–26.7, all
 `kernel-last`) the kmutil of macOS 26.4 or later. `fw prepare` now pairs a
 cloudOS without vphone600ap and refuses one whose kernelcache no recipe covers.
 `cfw update-kernel` refuses on a mixed kernel, whose originals are the research
 board's.
+
+Native extraction checked on 2026-10-23: all 264 fileset images of the 26.4
+beta vphone600 and vresearch101 collections match the pinned reference in
+recovered references, synthesized symbols and exported bytes. The full KDK
+trees match 313/263 files, with plist values compared semantically. See
+[native KDK extraction](Kernel/native_kdk_export.md). On the 26.6 base
+(23G71), the volume it stages for kmutil matches what the reference extractor
+gives: all 151 executables byte for byte, all 160 Info.plists in value.
+
+**macOS 27's kmutil keeps auth stubs.** The kmutil of macOS 27.0.1 (26A434)
+links the same volume with every kext's `__TEXT_EXEC,__auth_stubs` left in place
+(apfs: 0x2340 bytes), and a call to another image goes `BL stub` → `ADRP/ADD
+x17` (the `__auth_got` slot) → `LDR x16, [x17]` → `BRAA x16, x17`. Apple's own
+iOS 27 kernelcaches keep them as well (iPhone17,3 27.0 apfs: 0x2360 bytes), so
+this is the new toolchain's layout, not a flag: `kmutil create` has none for it.
+Apple's 26.6 `vresearch101` kernelcache has them at size 0, every call direct,
+and the kernel patches look for those direct calls. On the stub-kept mix,
+`kernel-boot-apfs_seal_broken`, `kernel-boot-apfs_mount_upgrade_checks.mov_w0_0`,
+the three `kernel-boot-syscallmask` sites and both `kernel-cfw-debugger` sites
+missed (24 base patches instead of 28), and the guest panicked at its first boot
+after `cfw install` disabled the root snapshot: `"root volume seal is broken"
+@authapfs.c:698`. Trimming is not the cause; `--slim off` panics the same way.
+
+`KernelCollectionStubCalls` runs after the link. For each stub it checks the
+four-instruction shape and reads the target from the `__auth_got` slot, a
+`DYLD_CHAINED_PTR_64_KERNEL_CACHE` pointer into this collection's code (any
+other format, cache level or target is refused). Every `B`/`BL` in a kext's
+code sections that lands on a stub is re-encoded with `ARM64Encoder` to land on
+the target. That is what the macOS 26 builder emits, and the stubs are left
+unreferenced. Rewriting corecrypto's code breaks its FIPS power-on self test
+(`"FIPS Kernel POST Failed (-2074)!" @corecrypto_kext.c:356`, in the restore
+ramdisk), so an image with `__TEXT,__fips_hmacs` is sealed again: HMAC-SHA256,
+keyed with the byte 0, of its `__text`. The existing seal must equal that HMAC
+of the code as linked, or the step refuses. A collection that calls directly
+is left alone. When anything changes, the container is rewritten uncompressed,
+as patched components are.
+
+Checked on 2026-10-23 on macOS 27.0.1: the 26.6 mix has 12,096 stubs and
+131,560 calls retargeted. The seven call-site patches above are found again,
+and none that was found before is lost: 28 kernelcache patches applied. The
+template of iPhone17,3 26.6.2 (23G90) on cloudOS 26.6 (23G71), standard preset,
+restored, took the CFW install and the trim, and its setup boot connected.
+Booted again on its own, it reported Darwin 25.6.0 with iOS 26.6.2, no panic
+in its log, and vphoned answered `device.info`. The setup's first-boot step,
+the template adoption and the clone were not finished: Launchpad restarted at
+that point, which ends a creation in progress.
 
 Checked on 2026-10-19: a `minimal` VM of iOS 26.6 on cloudOS 26.6 (23G71) restores
 and boots, and vphoned answers. Checked on 2026-10-20 with the standard preset:

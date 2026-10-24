@@ -554,7 +554,9 @@ struct VPhoneLaunchpadControlCommands {
 
         var iphone = request.option("iphone-source")
         var cloudOS = request.option("cloudos-source")
-        let device = request.option("device")
+        let device = request.option("device") ?? iphone.flatMap { source in
+            VPhoneLaunchpadIPSW.productType(forSource: source)
+        }
         if iphone == nil || cloudOS == nil {
             let result = try await commandLine.run(["fw", "catalog", "--json"], recordInHistory: false)
             guard result.succeeded, let data = result.jsonData else {
@@ -587,9 +589,9 @@ struct VPhoneLaunchpadControlCommands {
             }
             return value
         }
-        // An Apple TV is restored on its own with the tvOS preset: templates
+        // Apple TV and HomePod restore on their own: templates
         // and slimming drive iOS Setup Assistant and its apps.
-        let isAppleTV = device?.hasPrefix("AppleTV") == true
+        let requiresStandaloneRestore = device?.hasPrefix("AppleTV") == true || device?.hasPrefix("AudioAccessory") == true
         let (patches, guestPatches) = try await Self.patches(
             request,
             commandLine: commandLine,
@@ -599,12 +601,12 @@ struct VPhoneLaunchpadControlCommands {
         // The Minimal preset seals the system it restores, which a template's
         // trim and setup boot would write.
         let restoredSystem = patches.customisesRestoredSystem
-        let usesTemplate = !request.flag("no-template") && !isAppleTV && !restoredSystem
+        let usesTemplate = !request.flag("no-template") && !requiresStandaloneRestore && !restoredSystem
         let slimming: VPhoneLaunchpadSlimming
-        if isAppleTV || restoredSystem {
+        if requiresStandaloneRestore || restoredSystem {
             if !Self.slimmingSwitches(request).isEmpty {
-                throw VPhoneLaunchpadError(isAppleTV
-                    ? "An Apple TV is created without a template; the slimming switches do not apply."
+                throw VPhoneLaunchpadError(requiresStandaloneRestore
+                    ? "Apple TV and HomePod are created without a template; the slimming switches do not apply."
                     : "The \(patches.preset) preset creates a machine without a template; the slimming switches do not apply.")
             }
             var off = VPhoneLaunchpadSlimming()
@@ -884,6 +886,23 @@ struct VPhoneLaunchpadControlCommands {
         }
     }
 
+    /// A maintenance command for a client: it shows in the app as a run of
+    /// Launchpad's own would, without opening its sheet, and its output
+    /// streams to the client too.
+    private func maintenance(
+        _ kind: VPhoneLaunchpadMaintenanceRun.Kind,
+        on machine: VPhoneLaunchpadMachinePath,
+        emit: @escaping Emit,
+        _ command: (@escaping @Sendable (String) -> Void) async throws -> Int32,
+    ) async throws -> Int32 {
+        try await library.runMaintenance(
+            VPhoneLaunchpadMaintenanceRun(kind: kind, machine: machine),
+            presents: false,
+            forward: emit,
+            command,
+        )
+    }
+
     private func installCustomFirmware(_ request: VPhoneLaunchpadControlRequest, emit: @escaping Emit) async throws -> Any {
         let machine = try await machine(request)
         let version = try bundleVersion(of: machine)
@@ -891,13 +910,16 @@ struct VPhoneLaunchpadControlCommands {
             throw VPhoneLaunchpadError("Stop \(machine.name) before installing CFW.")
         }
         try await requireDiskUnheld(machine)
-        let status = try await model.helper.installCustomFirmware(
-            bundleVersion: version,
-            machineName: machine.name,
-            libraryRoot: machine.libraryRoot,
-            keepArtifacts: request.flag("keep-artifacts"),
-            onLine: emit,
-        )
+        let keepArtifacts = request.flag("keep-artifacts")
+        let status = try await maintenance(.installCustomFirmware, on: machine, emit: emit) { [helper = model.helper] onLine in
+            try await helper.installCustomFirmware(
+                bundleVersion: version,
+                machineName: machine.name,
+                libraryRoot: machine.libraryRoot,
+                keepArtifacts: keepArtifacts,
+                onLine: onLine,
+            )
+        }
         guard status == 0 else {
             throw VPhoneLaunchpadError("Unable to install custom firmware. Check the log for details.")
         }
@@ -912,12 +934,14 @@ struct VPhoneLaunchpadControlCommands {
             throw VPhoneLaunchpadError("Stop \(machine.name) before updating its guest environment.")
         }
         try await requireDiskUnheld(machine)
-        let status = try await model.helper.updateGuestEnvironment(
-            bundleVersion: version,
-            machineName: machine.name,
-            libraryRoot: machine.libraryRoot,
-            onLine: emit,
-        )
+        let status = try await maintenance(.updateGuestEnvironment, on: machine, emit: emit) { [helper = model.helper] onLine in
+            try await helper.updateGuestEnvironment(
+                bundleVersion: version,
+                machineName: machine.name,
+                libraryRoot: machine.libraryRoot,
+                onLine: onLine,
+            )
+        }
         guard status == 0 else {
             throw VPhoneLaunchpadError("Unable to update the guest environment. Check the log for details.")
         }
@@ -932,12 +956,14 @@ struct VPhoneLaunchpadControlCommands {
             throw VPhoneLaunchpadError("Stop \(machine.name) before updating its kernel.")
         }
         try await requireDiskUnheld(machine)
-        let status = try await model.helper.updateKernel(
-            bundleVersion: version,
-            machineName: machine.name,
-            libraryRoot: machine.libraryRoot,
-            onLine: emit,
-        )
+        let status = try await maintenance(.updateKernel, on: machine, emit: emit) { [helper = model.helper] onLine in
+            try await helper.updateKernel(
+                bundleVersion: version,
+                machineName: machine.name,
+                libraryRoot: machine.libraryRoot,
+                onLine: onLine,
+            )
+        }
         guard status == 0 else {
             throw VPhoneLaunchpadError("Unable to update the kernel. Check the log for details.")
         }
