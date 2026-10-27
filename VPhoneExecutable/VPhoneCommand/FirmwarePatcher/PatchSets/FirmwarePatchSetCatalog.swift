@@ -69,7 +69,7 @@ public enum FirmwarePatchSetCatalog {
             .union(hypervisorConcealmentPatches)
             .union(experimentalIdentityPatches)
             .union([FirmwareGuestSystemPatchSet.otaUserland, FirmwareGuestSystemPatchSet.homePodTopCap, FirmwareGuestSystemPatchSet.homePodSetupBypass, FirmwareGuestSystemPatchSet.homePodAudioProduct, FirmwareGuestSystemPatchSet.homePodWelcome, FirmwareGuestSystemPatchSet.homePodSiriSpeech, FirmwareGuestSystemPatchSet.homePodOTAUserland, FirmwareGuestSystemPatchSet.homePodSoundGlow, FirmwareGuestSystemPatchSet.homePodCryptexStaging, FirmwareGuestSystemPatchSet.homePodCryptexClass, FirmwareGuestSystemPatchSet.homePodAdHocInstall])
-            .union([FirmwareKernelCustomFirmwarePatchSet.tvTPROPagers, misTrustAuthPatch, FirmwareGuestSystemPatchSet.settingsRootRows, FirmwareGuestSystemPatchSet.settingsSoftwareUpdate, FirmwareGuestSystemPatchSet.tvTPRO, FirmwareGuestSystemPatchSet.tvOTAUserland])
+            .union([FirmwareKernelCustomFirmwarePatchSet.tvTPROPagers, misTrustAuthPatch, FirmwareGuestSystemPatchSet.settingsRootRows, FirmwareGuestSystemPatchSet.settingsSoftwareUpdate, FirmwareGuestSystemPatchSet.tvTPRO, FirmwareGuestSystemPatchSet.tvOTAUserland, FirmwareGuestSystemPatchSet.tvSetupDisplayLookup, FirmwareGuestSystemPatchSet.tvSetupFocus, FirmwareGuestSystemPatchSet.tvLocalActivation, FirmwareGuestSystemPatchSet.tvLegacySetup])
 
     /// ProMotion: the 120 Hz timing for the paravirtual display.
     ///
@@ -226,7 +226,7 @@ public enum FirmwarePatchSetCatalog {
         freshly restored 26.4 guest does not survive. The HomePod-only top cap is off.
         """,
         patchSets: bundledReferences,
-        selection: .block([FirmwareGuestSystemPatchSet.homePodTopCap, FirmwareGuestSystemPatchSet.homePodSetupBypass, FirmwareGuestSystemPatchSet.homePodAudioProduct, FirmwareGuestSystemPatchSet.homePodWelcome, FirmwareGuestSystemPatchSet.homePodSiriSpeech, FirmwareGuestSystemPatchSet.homePodOTAUserland, FirmwareGuestSystemPatchSet.homePodSoundGlow, FirmwareGuestSystemPatchSet.homePodCryptexStaging, FirmwareGuestSystemPatchSet.homePodCryptexClass, FirmwareGuestSystemPatchSet.homePodAdHocInstall]),
+        selection: .block([FirmwareGuestSystemPatchSet.tvLegacySetup, FirmwareGuestSystemPatchSet.tvSetupDisplayLookup, FirmwareGuestSystemPatchSet.tvSetupFocus, FirmwareGuestSystemPatchSet.tvLocalActivation, FirmwareGuestSystemPatchSet.homePodTopCap, FirmwareGuestSystemPatchSet.homePodSetupBypass, FirmwareGuestSystemPatchSet.homePodAudioProduct, FirmwareGuestSystemPatchSet.homePodWelcome, FirmwareGuestSystemPatchSet.homePodSiriSpeech, FirmwareGuestSystemPatchSet.homePodOTAUserland, FirmwareGuestSystemPatchSet.homePodSoundGlow, FirmwareGuestSystemPatchSet.homePodCryptexStaging, FirmwareGuestSystemPatchSet.homePodCryptexClass, FirmwareGuestSystemPatchSet.homePodAdHocInstall]),
     )
 
     /// The iOS payloads, hooks and shared-cache patches an Apple TV guest has no
@@ -236,7 +236,6 @@ public enum FirmwarePatchSetCatalog {
     public static let tvOSBlockedPatches: Set<String> = [
         paravirtTask3Patch,
         FirmwareGuestSystemPatchSet.arm64eX1CacheBootstrap,
-        FirmwareGuestSystemPatchSet.virtualBluetooth,
         "dyld-boot-iomfb_force_kern",
         "dyld-boot-iomfb_swapend",
         "dyld-boot-lockdown_mode",
@@ -245,12 +244,15 @@ public enum FirmwarePatchSetCatalog {
         "dyld-boot-xpc_lwcr",
         "dyld-cfw-camera",
         "kernel-boot-arm64e_x1",
+        FirmwareKernelCustomFirmwarePatchSet.cssc,
         "preboot-cfw-devicetree_board_audio",
         "preboot-cfw-devicetree_haptics",
         "preboot-cfw-devicetree_iphone_product",
         "preboot-cfw-devicetree_microphone_array",
         RestoreRamDiskSealPatcher.patchIdentifier,
         "system-apps-cfw-attitude",
+        FirmwareGuestSystemPatchSet.signInSheets,
+        FirmwareGuestSystemPatchSet.followUpGroups,
         "system-backboardd-cfw-gyroscope",
         "system-backboardd-cfw-accelerometer",
         "system-campo-cfw-entitlements",
@@ -318,7 +320,7 @@ public enum FirmwarePatchSetCatalog {
         patchSets: bundledReferences,
         selection: .block(
             manualOnlyPatches
-                .subtracting([FirmwareGuestSystemPatchSet.tvOTAUserland])
+                .subtracting([FirmwareGuestSystemPatchSet.tvOTAUserland, FirmwareGuestSystemPatchSet.tvSetupDisplayLookup, FirmwareGuestSystemPatchSet.tvSetupFocus, FirmwareGuestSystemPatchSet.tvLocalActivation])
                 .union(tvOSBlockedPatches.subtracting(["system-extensions-boot-gpu_bundle"]).subtracting(tvOS27UserlandPatches)),
         ),
     )

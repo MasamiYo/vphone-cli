@@ -16,6 +16,7 @@ public enum FirmwareKernelCustomFirmwarePatchSet {
     public static let identifier = "com.vphone.patchset.kernel.cfw"
 
     public static let tvTPROPagers = "kernel-exp-tv_tpro_pagers"
+    public static let cssc = "kernel-boot-cssc_emulation"
 
     /// Only applies to an iOS 27 userland.
     private static let ios27 = VPhonePatchApplicability(iOSBase: .major(27))
@@ -241,6 +242,15 @@ public enum FirmwareKernelCustomFirmwarePatchSet {
             // MARK: iOS 27 Userland
 
             VPhonePatchDeclaration(
+                identifier: cssc,
+                title: "CSSC instruction compatibility",
+                summary: "Emulates scalar CSSC instructions in user-mode exception handling, including before launchd starts, on hosts without native CSSC.",
+                target: .firmware(.kernelcache),
+                applicability: VPhonePatchApplicability(iOSBase: .major(27), cloudOS: .release(major: 26, minor: 4)),
+                bootEssential: true,
+            ),
+
+            VPhonePatchDeclaration(
                 identifier: "kernel-boot-arm64e_x1",
                 title: "ARM64E_X1 admission",
                 summary: "Admits subtype-12 binaries, enables exec PAC and selects the ARM64E authenticated shared region required by the iOS 27 userland.",
@@ -288,6 +298,17 @@ public enum FirmwareKernelCustomFirmwarePatchSet {
                 target: .firmware(.kernelcache),
                 applicability: ios27,
                 bootEssential: true,
+            ),
+            VPhonePatchDeclaration(
+                identifier: "kernel-cfw-aks_unlock_bag",
+                title: "Keybag unlock arguments",
+                summary: "Accepts the five-argument keybag unlock an iOS 26.6-or-newer userland sends, so escrow unlock and encrypted backups work on the 26.4 kernel.",
+                target: .firmware(.kernelcache),
+                // iOS 26.6 is where Apple's keybag-unlock external method began
+                // sending inputScalarCount == 5 (26.5 and earlier send 4); the
+                // anchor self-guards on a kernel that already accepts 5, so no
+                // cloudOS bound is needed.
+                applicability: VPhonePatchApplicability(iOSBase: .atLeast(major: 26, minor: 6)),
             ),
 
             VPhonePatchDeclaration(

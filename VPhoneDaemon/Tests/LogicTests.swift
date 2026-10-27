@@ -1,12 +1,13 @@
 import Foundation
+import MachO
 
 // MARK: - Harness
 
 /// Checks the guest-independent parts of vphoned on the Mac: the service
 /// profile lists and bookkeeping, the first-boot settle verdict (data
-/// migration included), the device name rule and the pointer scroll
-/// parameters. `run-logic-tests.sh` builds
-/// this file with those sources.
+/// migration included), the device name rule, the pointer scroll
+/// parameters and the Irisin package a guest takes. `run-logic-tests.sh`
+/// builds this file with those sources.
 nonisolated(unsafe) var failures = 0
 nonisolated(unsafe) var checks = 0
 
@@ -36,8 +37,36 @@ enum LogicTests {
         dataMigrationRecord()
         deviceNameRule()
         pointerScroll()
+        bootstrapPlatform()
+        setupAssistantState()
         print("\(checks) checks, \(failures) failures")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    // MARK: - Setup Assistant
+
+    static func setupAssistantState() {
+        for machine in ["AppleTV5,3", "AppleTV18,1"] {
+            expect(GuestSetupAssistantState.usesTVPolicy(machine: machine), "TV policy for \(machine)")
+        }
+        for machine in ["iPhone17,3", "iPad16,1", "AudioAccessory5,1", ""] {
+            expect(!GuestSetupAssistantState.usesTVPolicy(machine: machine), "existing policy for \(machine)")
+        }
+        func state(_ done: Bool, _ version: Int?, _ current: Int?, tv: Bool = true, completed: Bool = true) -> GuestSetupAssistantState {
+            GuestSetupAssistantState(setupDone: done, version: version, currentVersion: current, requiresTVCompletion: tv, tvCompleted: completed)
+        }
+        expect(!state(true, 15, 15).pending, "native TV completion with its current version")
+        expect(!state(true, 16, 15).pending, "newer recorded TV version")
+        expect(state(false, 15, 15).pending, "TV SetupDone remains required")
+        expect(state(true, 14, 15).pending, "TV update setup remains pending")
+        expect(state(true, nil, 15).pending, "missing TV version is pending")
+        expect(state(true, 15, 15, completed: false).pending, "native TV success flag remains required")
+        expect(state(true, 15, nil).pending, "unknown TV current version cannot prove completion")
+        expect(!state(true, 11, 11, tv: false, completed: false).pending, "iPhone ignores the TV flag")
+        expect(state(false, 11, 11, tv: false).pending, "iPhone SetupDone remains required")
+        expect(state(true, 10, 11, tv: false).pending, "iPhone update version remains required")
+        expect(!state(true, nil, nil, tv: false).pending, "existing unknown-version fallback")
+        expect(state(true, nil, 11, tv: false).pending, "HomePod keeps its existing version policy")
     }
 
     // MARK: - Service Profile
@@ -396,5 +425,21 @@ enum LogicTests {
         for bad: Any in [-1, 8, 1.5, true, "1"] {
             expect((try? GuestPointerScroll.buttons(["buttons": bad])) == nil, "buttons \(bad) is refused")
         }
+    }
+
+    // MARK: - Bootstrap Platform
+
+    static func bootstrapPlatform() {
+        let architecture = GuestBootstrapPlatform.packageArchitecture
+        expectEqual(architecture("roothide", false), "iphoneos-arm64e")
+        expectEqual(architecture("rootless", false), "iphoneos-arm64")
+        expectEqual(architecture("roothide", true), "appletvos-arm64e", "an Apple TV takes Irisin's Apple TV package")
+        expectEqual(architecture("rootless", true), nil, "Irisin serves no rootless Apple TV")
+        expectEqual(architecture("rootful", false), nil)
+        expect(GuestBootstrapPlatform.packageRequiresApp(architecture: "iphoneos-arm64e"), "the iOS packages carry the app")
+        expect(GuestBootstrapPlatform.packageRequiresApp(architecture: "iphoneos-arm64"), "the iOS packages carry the app")
+        expect(!GuestBootstrapPlatform.packageRequiresApp(architecture: "appletvos-arm64e"), "the Apple TV package has none")
+        expectEqual(GuestBootstrapPlatform.mainExecutablePlatform(), UInt32(PLATFORM_MACOS), "this test runs as macOS")
+        expect(!GuestBootstrapPlatform.isTVOS, "the Mac is not tvOS")
     }
 }

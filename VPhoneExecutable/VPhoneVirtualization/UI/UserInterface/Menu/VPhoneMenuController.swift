@@ -23,10 +23,16 @@ class VPhoneMenuController {
 
     var hardwareKeyboardItem: NSMenuItem?
     var tvControlCenterItem: NSMenuItem?
+    var tvRemoteItem: NSMenuItem?
+    lazy var tvRemoteWindowController = VPhoneTVRemoteWindowController(control: control)
 
     /// An Apple TV guest has a TV button that opens Control Center when held.
     var showsTVControls = false {
-        didSet { tvControlCenterItem?.isHidden = !showsTVControls }
+        didSet {
+            tvControlCenterItem?.isHidden = !showsTVControls
+            tvRemoteItem?.isHidden = !showsTVControls
+            if oldValue && !showsTVControls { tvRemoteWindowController.close() }
+        }
     }
     var watchSideButtonItem: NSMenuItem?
 
@@ -42,10 +48,12 @@ class VPhoneMenuController {
     /// Saves the Sync Host Location setting to this machine's config.plist.
     var onHostLocationSyncChange: ((Bool) throws -> Void)?
 
+    var onSessionPressed: (() -> Void)?
     var onFilesPressed: (() -> Void)?
     var onKeychainPressed: (() -> Void)?
     var onFindPressed: (() -> Void)?
     var onAppsPressed: (() -> Void)?
+    var connectSessionItem: NSMenuItem?
     var connectFileBrowserItem: NSMenuItem?
     var connectKeychainBrowserItem: NSMenuItem?
     var connectDevModeStatusItem: NSMenuItem?

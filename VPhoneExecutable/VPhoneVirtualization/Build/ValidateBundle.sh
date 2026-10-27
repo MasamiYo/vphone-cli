@@ -42,6 +42,17 @@ for name in vphone-vm vphone-cli vphone-escalator libswiftCompatibilitySpan.vpho
     require_signed_macho "$macos/$name"
 done
 require_signed_macho "$frameworks/VPhonePatchKit.framework/Versions/A/VPhonePatchKit"
+# The terminal reads these through Bundle.module, which searches
+# VPhone.bundle's Contents/Resources and root, never Contents/MacOS, and traps
+# when it finds nothing. A missing or misplaced resource bundle is therefore
+# not a degraded terminal but a crash on opening one, and it carries no
+# Mach-O, so no other check here would notice it had gone.
+for name in Ghostty terminfo; do
+    [[ -d "$resources/GhosttyKit_GhosttyTerminal.bundle/Contents/Resources/$name" ]] || {
+        print -u2 "The Ghostty resource bundle in Contents/Resources has no $name directory"
+        exit 1
+    }
+done
 require_signed_macho "$location_helper"
 /usr/bin/codesign --verify --strict "$location_app"
 # One requirement for every build, so locationd keeps one grant for all of
@@ -148,7 +159,7 @@ if /usr/bin/grep -q 'AVPSEPBooter-' "$resources/OpenSEP/OpenSEP.bin"; then
     exit 1
 fi
 
-for name in vphoned vphoned-tvos vphoned-watchos libswiftCompatibilitySpan.dylib launchdhook-vphone.dylib SystemHook-vphone.dylib libcamfix.dylib \
+for name in vphoned vphoned-tvos vphoned-watchos libvphonetvsetupfocus.dylib libswiftCompatibilitySpan.dylib launchdhook-vphone.dylib SystemHook-vphone.dylib libcamfix.dylib \
     libvcamcaptured.dylib libmisfix.dylib libhapticsfix.dylib libbatteryhealthfix.dylib libdevicehubfix.dylib libdevicename.dylib \
     libprefsfix.dylib libsigninfix.dylib libvphonegyro.dylib libvphoneaccelerometer.dylib libvphoneattitude.dylib libvphonehomepoddisplay.dylib libvphonecryptexstaging.dylib libvphoneinstallpersona.dylib libvphonehomepodmisfix.dylib vphone-homepod-setup libAppleParavirtCompilerPluginIOGPUFamily.dylib; do
     require_signed_macho "$guest/$name"
@@ -169,6 +180,19 @@ daemon_rpaths="$(/usr/bin/otool -l "$guest/vphoned" | /usr/bin/awk '
         print -u2 "vphoned does not use the bundled Span compatibility library"
         exit 1
     }
+# The scripting session runs on JavaScriptCore, which watchOS does not ship.
+# IcliKit's probe opens it at run time, so the daemon names no JavaScriptCore
+# symbol; a reference would leave the watch guest without a daemon at all.
+for daemon in vphoned vphoned-tvos vphoned-watchos; do
+    javascriptcore_loads="$(/usr/bin/otool -l "$guest/$daemon" | /usr/bin/awk '
+        $1 == "cmd" { command = $2 }
+        $1 == "name" && $2 ~ /JavaScriptCore/ { print command }
+    ' | /usr/bin/sort -u)"
+    [[ -z "$javascriptcore_loads" ]] || {
+        print -u2 "$daemon must not link JavaScriptCore, which the probe opens at run time: $javascriptcore_loads"
+        exit 1
+    }
+done
 for name in vphoned.plist libcamfix.plist libvcamcaptured.plist libmisfix.plist com.vphone.homepod-setup.plist; do
     [[ -f "$guest/$name" ]] || { print -u2 "Missing guest configuration: $name"; exit 1; }
 done
@@ -220,7 +244,7 @@ while IFS= read -r file; do
         "$frameworks/"*)
             [[ "$platform" != IOS ]] || { print -u2 "iOS binary in Contents/Frameworks: ${file#$bundle/}"; exit 1; }
             ;;
-        "$guest/vphoned-tvos"|"$guest/libvphonehomepoddisplay.dylib"|"$guest/libvphonecryptexstaging.dylib"|"$guest/libvphoneinstallpersona.dylib"|"$guest/libvphonehomepodmisfix.dylib"|"$guest/vphone-homepod-setup")
+        "$guest/vphoned-tvos"|"$guest/libvphonetvsetupfocus.dylib"|"$guest/libvphonehomepoddisplay.dylib"|"$guest/libvphonecryptexstaging.dylib"|"$guest/libvphoneinstallpersona.dylib"|"$guest/libvphonehomepodmisfix.dylib"|"$guest/vphone-homepod-setup")
             # tvOS dyld refuses an iOS-platform daemon on an Apple TV guest.
             [[ "$platform" == TVOS ]] || { print -u2 "Non-tvOS binary: ${file#$bundle/}"; exit 1; }
             ;;

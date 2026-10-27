@@ -545,6 +545,10 @@ final class VPhoneGuestControl {
 
     /// Calls one vphoned operation after the input events already queued, so a
     /// key or text request cannot overtake a tap sent before it.
+    /// A cancellable input producer must drain first, then check that its
+    /// interaction is still current immediately before submitting a new RPC.
+    func waitForQueuedInput() async { await orderedInput?.value }
+
     func callAfterQueuedInput(_ method: String, params: [String: Any] = [:]) async throws -> [String: Any] {
         await orderedInput?.value
         return try await call(method, params: params)
@@ -1001,6 +1005,20 @@ final class VPhoneGuestControl {
             components.queryItems?.append(URLQueryItem(name: "mode", value: mode))
         }
         return components.string ?? ""
+    }
+
+    /// A VSOCK connection of its own for a route that streams for as long as
+    /// it is open, rather than answering once. The caller owns it from here:
+    /// every other request sets a read timeout and closes when its reply is
+    /// complete, neither of which suits a terminal that is idle most of the
+    /// time. `VPhoneGuestShellChannel` is the only caller.
+    func openGuestStream() async throws -> VPhoneGuestStream {
+        guard let device else { throw ControlError.notConnected }
+        let socket = await withCheckedContinuation {
+            (continuation: CheckedContinuation<VPhoneSocketResult, Never>) in
+            device.connect(toPort: 1339) { continuation.resume(returning: VPhoneSocketResult($0)) }
+        }
+        return VPhoneGuestStream(connection: try socket.result.get())
     }
 
     private func httpError(_ response: VPhoneHTTPResponse) throws -> ControlError {

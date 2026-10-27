@@ -211,6 +211,18 @@ struct VPhoneCustomFirmwareInstaller {
             ? try restoreTree(in: bundleDirectory, path: bundlePath, owner: callerUID)
             : nil
         let device = configuredGuestDevice(in: bundleDirectory) ?? guestDevice(of: restore)
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.tvLegacySetup), device.family != .appleTV {
+            throw ValidationError("The TV setup compatibility patch is supported only for an Apple TV guest.")
+        }
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.tvSetupDisplayLookup), device.family != .appleTV {
+            throw ValidationError("The TV setup display-connection patch is supported only for an Apple TV guest.")
+        }
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.tvLocalActivation), device.family != .appleTV {
+            throw ValidationError("The TV local-activation patch is supported only for an Apple TV guest.")
+        }
+        if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.tvSetupFocus), device.family != .appleTV {
+            throw ValidationError("The TV setup focus adapter is supported only for an Apple TV guest.")
+        }
         if effectiveEnabled.contains(FirmwareGuestSystemPatchSet.homePodTopCap), device.family != .homePod {
             throw ValidationError("The HomePod top-cap patch is supported only for a HomePod guest.")
         }
@@ -447,7 +459,7 @@ struct VPhoneCustomFirmwareInstaller {
         // Resolved once the system volume is mounted (it needs the "was
         // installed" signal there), then used again by the Preboot pass.
         var priorGuest = Set<String>()
-        var installedHomePodUserland: VPhoneRestoreInfo.OSVersion?
+        var installedOTAUserland: VPhoneRestoreInfo.OSVersion?
         do {
             // Every descriptor on a guest volume lives in this scope, so none
             // is left open to hold the volume busy when it is unmounted.
@@ -517,7 +529,8 @@ struct VPhoneCustomFirmwareInstaller {
                     environmentOnly: true,
                 )
             }
-            if device.family == .homePod, liveGuest.contains(FirmwareGuestSystemPatchSet.homePodOTAUserland) {
+            if liveGuest.contains(FirmwareGuestSystemPatchSet.homePodOTAUserland)
+                || liveGuest.contains(FirmwareGuestSystemPatchSet.tvOTAUserland) {
                 // Read the installed bytes while the private System is still
                 // mounted. Preparation/base restore must never promote this
                 // host label before a successful OTA System installation.
@@ -525,9 +538,9 @@ struct VPhoneCustomFirmwareInstaller {
                 guard let version = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
                       let product = version["ProductVersion"] as? String,
                       let build = version["ProductBuildVersion"] as? String else {
-                    throw ValidationError("Installed HomePod userland has no SystemVersion identity.")
+                    throw ValidationError("Installed OTA userland has no SystemVersion identity.")
                 }
-                installedHomePodUserland = .init(version: product, build: build)
+                installedOTAUserland = .init(version: product, build: build)
             }
         }
         // The selected Preboot identity can also reach an installed guest through
@@ -553,7 +566,7 @@ struct VPhoneCustomFirmwareInstaller {
         ))
         // Selected patches this guest has nothing for, so the receipt does not
         // report them as missing forever: the board audio repair on an
-        // iPhone17,3, which has no board of its own to present, the iPhone
+        // iPhone XS Max, which is not presented as its own board, the iPhone
         // product repair on a non-iPhone, and the build spoof with no value set. A
         // guest whose board tree could not be recovered is not among them: its
         // repair is missing, and drift should keep saying so.
@@ -623,19 +636,19 @@ struct VPhoneCustomFirmwareInstaller {
             in: bundleDirectory,
             owner: invokingUser.map { ($0.uid, $0.gid) },
         )
-        if let installedHomePodUserland {
+        if let installedOTAUserland {
             let installedBundle = URL(fileURLWithPath: bundlePath, isDirectory: true)
             let record: () throws -> Void = {
                 let vm = try VPhoneBundle.load(at: installedBundle)
                 let variant = VPhoneRestoreInfo.load(fromBundle: vm)?.variant ?? "jb"
                 _ = try VPhoneRestoreInfo.recordVariant(variant, toBundle: vm,
-                                                        installedUserland: installedHomePodUserland)
+                                                        installedUserland: installedOTAUserland)
             }
             do {
                 if let invokingUser { try invokingUser.withUserCredentials(record) }
                 else { try record() }
             } catch {
-                fputs("warning: could not record installed HomePod userland: \(error)\n", stderr)
+                fputs("warning: could not record installed OTA userland: \(error)\n", stderr)
             }
         }
         switch mode {
@@ -1145,7 +1158,23 @@ struct VPhoneCustomFirmwareInstaller {
         throw ValidationError("No prepared iPhone restore tree was found in \(path). Run fw prepare, then install CFW again.")
     }
 
+    /// The free space a run needs before it touches the disk. A full install
+    /// unpacks cryptexes and the GPU bundle from a prepared restore tree into
+    /// an APFS clone of Disk.img, which takes tens of GiB. An environment or
+    /// kernel update writes only this bundle's guest files or one kernelcache
+    /// into that clone, so asking it for the same 50 GiB refused the update on
+    /// any Mac with a few VMs on it, while the update itself needed a small
+    /// fraction of that. 10 GiB still stops it on a volume that is close to
+    /// full.
+    static func requiredFreeSpaceGiB(for mode: Mode) -> Int64 {
+        switch mode {
+        case .full: 50
+        case .environmentOnly, .kernelUpdate: 10
+        }
+    }
+
     private func requireFreeSpace(at paths: [String]) throws {
+        let requiredGiB = Self.requiredFreeSpaceGiB(for: mode)
         var seen = Set<dev_t>()
         for path in paths {
             var metadata = stat()
@@ -1162,8 +1191,8 @@ struct VPhoneCustomFirmwareInstaller {
                     fputs("warning: Volume at \(path) reported 0 available space via resource keys, using statfs fallback: \(capacity / (1024 * 1024 * 1024)) GiB\n", stderr)
                 }
             }
-            guard capacity > 50 * 1024 * 1024 * 1024 else {
-                throw ValidationError("Less than 50 GiB of disk space is available on the volume holding \(path). Free up space, then install CFW again.")
+            guard capacity > requiredGiB * 1024 * 1024 * 1024 else {
+                throw ValidationError("Less than \(requiredGiB) GiB of disk space is available on the volume holding \(path). Free up space, then run the \(mode.summary) again.")
             }
         }
     }
@@ -1228,7 +1257,9 @@ struct VPhoneCustomFirmwareInstaller {
     /// no restore-tree step runs.
     ///
     /// Paired TV dyld updates abort on failure and discard the private disk
-    /// clone, preserving the original disk and receipt. Other patches run in isolation: one patch failing — a verb rejecting an
+    /// clone, preserving the original disk and receipt. Selected X1 bootstrap
+    /// patches also abort on failure: continuing would boot an incompatible
+    /// cache or executable. Other patches run in isolation: one patch failing — a verb rejecting an
     /// unexpected prologue on an older VM, say — is reported and the patch is
     /// left in its prior state, but the run continues and the vphoned redeploy,
     /// done first, is never blocked. Non-patch failures (a volume that will not
@@ -1360,17 +1391,36 @@ struct VPhoneCustomFirmwareInstaller {
         }
         let version = try productVersion(system: system)
 
+        func requireX1Bootstrap() throws {
+            let required: Set<String> = [
+                FirmwareGuestSystemPatchSet.arm64eX1DyldBootstrap,
+                FirmwareGuestSystemPatchSet.arm64eX1CacheBootstrap,
+                FirmwareGuestSystemPatchSet.arm64eX1LaunchdBootstrap,
+                FirmwareGuestSystemPatchSet.arm64eX1FsckBootstrap,
+                FirmwareGuestSystemPatchSet.arm64eX1MountBootstrap,
+            ]
+            let failed = Set(failures).intersection(required).filter {
+                plan?.isEnabled($0) ?? version.hasPrefix("27.")
+            }.sorted()
+            guard failed.isEmpty else {
+                throw ValidationError("Required X1 boot patches failed; installation stopped before setup boot: \(failed.joined(separator: ", ")). See the patch error above.")
+            }
+        }
+
         if version.hasPrefix("27.") || priorGuest.contains(FirmwareGuestSystemPatchSet.arm64eX1DyldBootstrap) {
             machO(FirmwareGuestSystemPatchSet.arm64eX1DyldBootstrap, path: "usr/lib/dyld",
                   verbs: ["patch-arm64e-x1"], preserveEntitlements: true)
+            try requireX1Bootstrap()
         }
         if version.hasPrefix("27.") || priorGuest.contains(FirmwareGuestSystemPatchSet.arm64eX1FsckBootstrap) {
             machO(FirmwareGuestSystemPatchSet.arm64eX1FsckBootstrap, path: "sbin/fsck",
                   verbs: ["patch-arm64e-x1"], preserveEntitlements: true)
+            try requireX1Bootstrap()
         }
         if version.hasPrefix("27.") || priorGuest.contains(FirmwareGuestSystemPatchSet.arm64eX1MountBootstrap) {
             machO(FirmwareGuestSystemPatchSet.arm64eX1MountBootstrap, path: "sbin/mount",
                   verbs: ["patch-arm64e-x1"], preserveEntitlements: true)
+            try requireX1Bootstrap()
         }
 
         // 0. A cache whose span alone overruns the guest kernel's shared region
@@ -1433,8 +1483,12 @@ struct VPhoneCustomFirmwareInstaller {
         }
         isolate(["system-launchdaemons-boot-environment"]) {
             if on("system-launchdaemons-boot-environment") {
-                try installEnvironment(system: system, environmentOnly: environmentOnly)
+                try installEnvironment(system: system, work: work, guestDevice: guestDevice,
+                                       environmentOnly: environmentOnly)
                 live.insert("system-launchdaemons-boot-environment")
+            } else if guestDevice.family == .appleTV {
+                // Optional on TV, unlike on iOS: take it out again.
+                try removeTVEnvironment(system: system)
             }
         }
         // HomePod deliberately excludes the iPhone environment. Inject only the
@@ -1548,6 +1602,8 @@ struct VPhoneCustomFirmwareInstaller {
             try system.removeItem(glowPath)
         }
         for (identifier, library) in [
+            (FirmwareGuestSystemPatchSet.followUpGroups, "libprefsfix.dylib"),
+            (FirmwareGuestSystemPatchSet.signInSheets, "libsigninfix.dylib"),
             (FirmwareGuestSystemPatchSet.gyroscope, "libvphonegyro.dylib"),
             (FirmwareGuestSystemPatchSet.accelerometer, "libvphoneaccelerometer.dylib"),
             (FirmwareGuestSystemPatchSet.attitude, "libvphoneattitude.dylib"),
@@ -1587,10 +1643,11 @@ struct VPhoneCustomFirmwareInstaller {
             ("dyld-exp-hv_vmm", "patch-hv-vmm-dsc", [dsc]),
             ("dyld-cfw-camera", "patch-camera-dsc", [dsc, DyldSharedCacheChunkSet.mainCacheURL(in: URL(fileURLWithPath: dsc)).path]),
         ]
-        applyDyldPatches(
+        try applyDyldPatches(
             dyld, dsc: dsc, cacheRelative: cacheRelative, system: system, plan: plan, priorGuest: priorGuest,
             live: &live, failures: &failures,
         )
+        try requireX1Bootstrap()
 
         // The feature plist exists from iOS 26. Turning the patch off restores
         // the original.
@@ -1767,7 +1824,11 @@ struct VPhoneCustomFirmwareInstaller {
         }
 
         machO("system-launchd_cache_loader-boot-unsecure_cache_gate", path: "usr/libexec/launchd_cache_loader", verbs: ["patch-launchd-cache-loader"], codeIdentifier: "com.apple.launchd_cache_loader")
-        machO("system-mobileactivationd-boot-should_hactivate", path: "usr/libexec/mobileactivationd", verbs: ["patch-mobileactivationd"])
+        // The TV declaration has its own 27.2 gate and preset selection; the
+        // implementation and reversible backup are shared with iPhone.
+        let activation = guestDevice.family == .appleTV
+            ? FirmwareGuestSystemPatchSet.tvLocalActivation : "system-mobileactivationd-boot-should_hactivate"
+        machO(activation, path: "usr/libexec/mobileactivationd", verbs: ["patch-mobileactivationd"])
 
         isolate(["system-watchdogd-exp-hv_vmm_cache"]) {
             if on("system-watchdogd-exp-hv_vmm_cache") {
@@ -1923,6 +1984,7 @@ struct VPhoneCustomFirmwareInstaller {
             }
         }
 
+        try requireX1Bootstrap()
         if !isHomePod {
             isolate([]) { try restoreMISFixTargets(system: system) }
         }
@@ -1990,6 +2052,69 @@ struct VPhoneCustomFirmwareInstaller {
             }
         }
 
+        let tvLegacySetup = FirmwareGuestSystemPatchSet.tvLegacySetup
+        let tvSetupFlags = CustomFirmwareTVSetup.relativePath
+        isolate([tvLegacySetup]) {
+            if (version == "27.2" || version.hasPrefix("27.2.")), on(tvLegacySetup), guestDevice.family == .appleTV {
+                try patchCopy(
+                    of: tvSetupFlags, in: system, work: work,
+                    verb: "patch-tv-setup", backupSafe: backupSafe(tvLegacySetup),
+                )
+                live.insert(tvLegacySetup)
+            } else if try revertCopy(of: tvSetupFlags, in: system) {
+                print("  [+] \(tvLegacySetup): restored CompanionServices feature flags")
+            } else if priorGuest.contains(tvLegacySetup) {
+                print("  [!] \(tvLegacySetup): no backup to revert (not revertible)")
+                live.insert(tvLegacySetup)
+            }
+        }
+
+        let tvSetupFocus = FirmwareGuestSystemPatchSet.tvSetupFocus
+        isolate([tvSetupFocus]) {
+            let executable = "Applications/Setup.app/Setup"
+            let library = FirmwareGuestSystemPatchSet.tvSetupFocusLibrary
+            let path = String(library.dropFirst())
+            if on(tvSetupFocus), guestDevice.family == .appleTV,
+               version == "27.2" || version.hasPrefix("27.2.") {
+                let payload = try VPhoneGuestBinaries.resolve((library as NSString).lastPathComponent)
+                try system.replaceFile(path, fromFileAt: payload, mode: 0o755, owner: Self.guestOwner)
+                try installLibraryAlias(system: system, alias: "tf", target: library)
+                try patchMachO(system: system, work: work, path: executable,
+                               preserveEntitlements: true, injectedDylibPath: "/tf")
+                try sealGuestBundle(system: system, bundle: "Applications/Setup.app", preserveEntitlements: true)
+                live.insert(tvSetupFocus)
+            } else {
+                if try revertMachO(system: system, work: work, path: executable, bundle: "Applications/Setup.app", preserveEntitlements: true) {
+                    print("  [+] \(tvSetupFocus): restored Setup from backup")
+                } else if priorGuest.contains(tvSetupFocus) {
+                    live.insert(tvSetupFocus)
+                    throw ValidationError("TV setup focus adapter has no Setup backup; cannot safely remove its library.")
+                }
+                if try system.exists("tf") {
+                    guard try system.readLink("tf") == library else {
+                        throw ValidationError("Another file uses /tf; leaving it intact.")
+                    }
+                    try system.removeItem("tf")
+                }
+                try system.removeItem(path)
+            }
+        }
+
+        let tvSetupLookup = FirmwareGuestSystemPatchSet.tvSetupDisplayLookup
+        let tvSetupBackground = "Applications/SetupBackground.app/SetupBackground"
+        isolate([tvSetupLookup]) {
+            if on(tvSetupLookup), guestDevice.family == .appleTV {
+                if try patchTVSetupDisplayLookup(system: system, work: work, backupSafe: backupSafe(tvSetupLookup)) {
+                    live.insert(tvSetupLookup)
+                }
+            } else if try revertMachO(system: system, work: work, path: tvSetupBackground) {
+                print("  [+] \(tvSetupLookup): restored SetupBackground from backup")
+            } else if priorGuest.contains(tvSetupLookup) {
+                print("  [!] \(tvSetupLookup): off now but no backup to revert (not revertible)")
+                live.insert(tvSetupLookup)
+            }
+        }
+
         if !isHomePod { isolate([personaPatch]) {
             // Undo the experimental entitlement-only patch if this machine
             // received it. Platform Protobox profiles ignore that exception.
@@ -2039,7 +2164,8 @@ struct VPhoneCustomFirmwareInstaller {
     /// multi-gigabyte scan when nothing changed. A disabled patch with no undo
     /// record was either never applied (nothing to do) or applied before the
     /// undo log existed; the latter is told apart by the prior-live set and
-    /// reported as not revertible, staying live. Each verb runs in isolation.
+    /// reported as not revertible, staying live. The selected X1 bootstrap
+    /// patch must succeed; optional cache patches still run in isolation.
     private func applyDyldPatches(
         _ dyld: [(id: String, verb: String, args: [String])],
         dsc: String,
@@ -2049,9 +2175,14 @@ struct VPhoneCustomFirmwareInstaller {
         priorGuest: Set<String>,
         live: inout Set<String>,
         failures: inout [String],
-    ) {
+    ) throws {
         func enabled(_ id: String) -> Bool {
             plan?.isEnabled(id) ?? !FirmwareGuestSystemPatchSet.settingsRowPatches.contains(id)
+        }
+        func requireBootstrap(_ id: String, error: any Error) throws {
+            if id == FirmwareGuestSystemPatchSet.arm64eX1CacheBootstrap {
+                throw ValidationError("Required X1 boot patch \(id) failed; installation stopped before setup boot: \(error)")
+            }
         }
         let undoAbsolute = (dsc as NSString).appendingPathComponent(Self.dscUndoLogLeaf)
         let undoRelative = "\(cacheRelative)/\(Self.dscUndoLogLeaf)"
@@ -2073,6 +2204,7 @@ struct VPhoneCustomFirmwareInstaller {
                     } catch {
                         failures.append(entry.id)
                         print("  [!] \(entry.id): re-running the applied patch failed, left as it was: \(error)")
+                        try requireBootstrap(entry.id, error: error)
                     }
                 } else if let undoLog, undoLog.hasOutdatedImplementation(of: entry.id) {
                     print("  [*] \(entry.id): an earlier implementation is applied; reverting it and applying the current one")
@@ -2082,6 +2214,7 @@ struct VPhoneCustomFirmwareInstaller {
                         failures.append(entry.id)
                         live.insert(entry.id)
                         print("  [!] \(entry.id): reverting the earlier implementation failed, left as it was: \(error)")
+                        try requireBootstrap(entry.id, error: error)
                         continue
                     }
                     do {
@@ -2089,6 +2222,7 @@ struct VPhoneCustomFirmwareInstaller {
                     } catch {
                         failures.append(entry.id)
                         print("  [!] \(entry.id): the earlier implementation was reverted but the current one failed; the cache is unpatched for it: \(error)")
+                        try requireBootstrap(entry.id, error: error)
                         continue
                     }
                 }
@@ -2100,6 +2234,7 @@ struct VPhoneCustomFirmwareInstaller {
                 } catch {
                     failures.append(entry.id)
                     print("  [!] \(entry.id): dyld patch failed, left in its prior state: \(error)")
+                    try requireBootstrap(entry.id, error: error)
                 }
             case (false, true):
                 if recorded.contains(entry.id) {
@@ -2134,6 +2269,7 @@ struct VPhoneCustomFirmwareInstaller {
         work: WorkDirectory,
         path: String,
         bundle: String? = nil,
+        preserveEntitlements: Bool = false,
     ) throws -> Bool {
         let backup = "\(path).bak"
         guard try system.exists(backup) else { return false }
@@ -2143,7 +2279,7 @@ struct VPhoneCustomFirmwareInstaller {
         try system.replaceFile(path, fromFileAt: work.file(name), mode: 0o755, owner: Self.guestOwner)
         try system.removeItem(backup)
         if let bundle {
-            try sealGuestBundle(system: system, bundle: bundle)
+            try sealGuestBundle(system: system, bundle: bundle, preserveEntitlements: preserveEntitlements)
         }
         return true
     }
@@ -2812,25 +2948,75 @@ struct VPhoneCustomFirmwareInstaller {
     /// selected it), and the `/vh` alias is not created — an installed VM
     /// already has it, and an environment update does not add load-command
     /// infrastructure. A full install writes every library and creates `/vh`.
-    private func installEnvironment(system: VPhoneConfinedDirectory, environmentOnly: Bool = false) throws {
-        for name in VPhoneGuestEnvironment.libraries {
+    ///
+    /// An Apple TV takes `VPhoneGuestEnvironment.tvLibraries` alone, marked
+    /// tvOS. No TV guest had an environment before, so the narrow rule does
+    /// not apply there: both libraries and `/vh` are always written.
+    private func installEnvironment(
+        system: VPhoneConfinedDirectory,
+        work: WorkDirectory,
+        guestDevice: VPhoneGuestDevice,
+        environmentOnly: Bool = false,
+    ) throws {
+        let tvOS = guestDevice.family == .appleTV
+        let narrow = environmentOnly && !tvOS
+        for name in tvOS ? VPhoneGuestEnvironment.tvLibraries : VPhoneGuestEnvironment.libraries {
             if VPhoneGuestEnvironment.selectedLibraries.contains(name) {
                 continue
             }
             let path = "usr/lib/\(name)"
-            if environmentOnly, try !system.exists(path) {
+            if narrow, try !system.exists(path) {
                 print("  [·] \(path): not on this VM, left out")
                 continue
             }
-            let source = try VPhoneGuestBinaries.resolve(name)
+            let shipped = try VPhoneGuestBinaries.resolve(name)
+            let source = tvOS ? try tvOSCopy(of: shipped, work: work) : shipped
             try system.replaceFile(path, fromFileAt: source, mode: 0o755, owner: Self.guestOwner)
         }
-        if !environmentOnly {
+        if !narrow {
             // launchd has little free header space for another load command.
             // /vh fits the same 32-byte command as the old /b without reusing it.
             try installLibraryAlias(system: system, alias: "vh", target: "/usr/lib/launchdhook-vphone.dylib")
         }
-        try installMISFixDefaults(system: system)
+        if tvOS {
+            print("  [+] Environment hooks retargeted to tvOS: \(VPhoneGuestEnvironment.tvLibraries.joined(separator: ", "))")
+        } else {
+            try installMISFixDefaults(system: system)
+        }
+    }
+
+    /// A bundle-shipped iOS library, marked tvOS and signed again in the work
+    /// directory. dyld refuses to load a library of another platform, and an
+    /// Apple TV guest's processes, launchd among them, are tvOS.
+    private func tvOSCopy(of source: URL, work: WorkDirectory) throws -> URL {
+        let name = "tvos-\(source.lastPathComponent)"
+        try work.directory.removeItem(name)
+        let staged = work.file(name)
+        var data = try Data(contentsOf: source)
+        try MachOBuildPlatform.set(MachOBuildPlatform.tvOS, in: &data)
+        try data.write(to: staged)
+        try VPhoneSigner.sign(
+            fileAt: staged,
+            options: .init(identifier: nil, entitlements: nil, mergesExisting: true, style: .appleAdHoc),
+        )
+        return staged
+    }
+
+    /// The TV environment's libraries and `/vh`, when the environment is off.
+    /// A launchd still patched to load `/vh` loads nothing: the command is weak.
+    private func removeTVEnvironment(system: VPhoneConfinedDirectory) throws {
+        var removed = false
+        for name in VPhoneGuestEnvironment.tvLibraries where try system.exists("usr/lib/\(name)") {
+            try system.removeItem("usr/lib/\(name)")
+            removed = true
+        }
+        if try system.isSymlink("vh"), try system.readLink("vh") == "/usr/lib/launchdhook-vphone.dylib" {
+            try system.removeItem("vh")
+            removed = true
+        }
+        if removed {
+            print("  [+] system-launchdaemons-boot-environment: removed the TV environment hooks")
+        }
     }
 
     /// The CoreAudio HAL plugin for the VM's virtio sound device. iOS ships
@@ -3262,9 +3448,9 @@ struct VPhoneCustomFirmwareInstaller {
     /// made from when it has none. A board-presenting VM patched before `fw
     /// patch` kept it needs it for the board audio repair, without which
     /// VirtualAudio looks for the iPhone's tunings and the guest has no sound.
-    /// An iPhone17,3 VM needs it for the product description repair, without
+    /// An iPhone XS Max VM needs it for the product description repair, without
     /// which MobileGestalt reads Siri, Camera Control, the Action Button and the
-    /// model name as absent; `fw patch` does not keep the iPhone17,3's, so it
+    /// model name as absent; `fw patch` does not keep its board tree, so it
     /// always comes from here.
     /// A HomePod mini also needs its donor's native product-id token for audio
     /// routing; its selected repair refuses to proceed without a valid donor.
@@ -3721,6 +3907,27 @@ struct VPhoneCustomFirmwareInstaller {
                 mergesExisting: true,
                 style: .appleAdHoc,
             ),
+        )
+        try system.replaceFile(target, fromFileAt: staged, mode: 0o755, owner: Self.guestOwner)
+        return true
+    }
+
+    /// The cloudOS application sandbox does not include the TV service name.
+    /// SetupBackground's only other entitlements are its identity, container
+    /// requirement and platform bit; keep them and add just this lookup.
+    private func patchTVSetupDisplayLookup(system: VPhoneConfinedDirectory, work: WorkDirectory, backupSafe: Bool) throws -> Bool {
+        let target = "Applications/SetupBackground.app/SetupBackground"
+        guard let staged = try stageOptional(target, from: system, work: work, label: "SetupBackground") else { return false }
+        guard let source = try VPhoneSigner.entitlements(ofFileAt: staged).first(where: { !$0.isEmpty }) else {
+            throw ValidationError("SetupBackground has no readable entitlements")
+        }
+        let ent = work.file("SetupBackground.entitlements")
+        try source.write(to: ent)
+        try CustomFirmwareMachLookupExceptions.merge(at: ent, services: ["com.apple.PineBoardServices"])
+        try backupEntitlementTarget(target, in: system, backupSafe: backupSafe)
+        try VPhoneSigner.sign(
+            fileAt: staged,
+            options: .init(entitlements: Data(contentsOf: ent), style: .appleAdHoc),
         )
         try system.replaceFile(target, fromFileAt: staged, mode: 0o755, owner: Self.guestOwner)
         return true

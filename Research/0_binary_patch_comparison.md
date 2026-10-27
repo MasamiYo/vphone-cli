@@ -1,5 +1,122 @@
 # Patch Comparison: Regular / Development / Jailbreak / Experimental
 
+> **Apple TV RootHide bootstrap and environment hooks (2026-10-26).** No new
+> declaration or instruction patch. An arm64e Apple TV now admits
+> `system-launchdaemons-boot-environment` and
+> `system-launchd-boot-jetsam_panic_guard_bypass`
+> (`FirmwareGuestPatchResolution.tvArm64eGuestPatches`); both stay blocked in
+> `tvos` and `tvos-4k` and on the plain-arm64 HD. On TV the environment is
+> `launchdhook-vphone.dylib` and `SystemHook-vphone.dylib` alone, their
+> `LC_BUILD_VERSION` rewritten to tvOS (`MachOBuildPlatform`) and re-signed at
+> install, with `/vh`; turning it off removes them. The launchd patch is
+> unchanged: on `tv4k`'s tvOS 26.6 arm64e launchd it rewrote `tbnz w0, #0,
+> 0xdac4` at `0xDA68` to `b 0xdac4` (anchor `jetsam property category`) and
+> `/vh` went in as `LC_LOAD_WEAK_DYLIB`. With both on, `tv4k` booted to the
+> home screen with SystemHook in every process and the vphoned RootHide root
+> as `VPHONE_JB_ROOT`; with both off again launchd came back from its backup
+> and the libraries and `/vh` were removed. vphoned installs Irisin's
+> `appletvos-arm64e` package as the RootHide bootstrap on any tvOS guest and
+> refuses rootless there; both were validated live on `tv4k`. See
+> [tvOS support](Firmware/tvos_support.md#roothide-bootstrap).
+
+> **Apple TV remote and native Setup (2026-10-24).** The current
+> `tvos-4k` preset selects `system-setupbackground-exp-pineboard_lookup` on
+> 27.2 and blocks `system-tv-exp-legacy_setup`. The environment update
+> restores the original CompanionServices flags from their backup, returning
+> to the new Setup app. Live debugger inspection localized Select's failure:
+> Hello's native focus target exists but is deferred; a directional press
+> commits it, after which Select executes the ordinary Hello callback and
+> opens Language. `system-setup-exp-deferred_focus` installs a tvOS dylib into
+> Setup via `/tf`, preserving its original entitlements and a reversible backup.
+> Its adapter uses native TV button-focus policy (`0`) only for an active key
+> Setup window whose WaffleIron system has default deferral (`3`) and no explicit
+> override. It observes scene/key/focus updates, preserves other overrides, and
+> uses UIKit's own preferred-focus machinery and eligibility checks. Earlier
+> focus-initialization prototypes expired after the native 60-second idle timer.
+> A live policy-0 test retained focus past 80 seconds and Select entered the
+> native country picker. The adapter changes no
+> pairing, drawing, ScenePhase, window suppression or setup-completion state.
+> This patch is selected only by `tvos-4k` on 27.2; legacy setup remains off.
+> Installed cold-boot testing passes the first Select after more than 65 seconds
+> idle at Hello, without directional priming or a debugger. Completed
+> AX/button taps now survive panel focus loss; pending holds are cancelled and
+> neither may cross a guest reconnection. The actual AX-button/queue harness
+> covers this live-discovered delivery failure. See the
+> [input investigation](Firmware/tvos_27_setup_input.md). Remote clicks, holds,
+> Home/Settings navigation and Control Center have passed live testing.
+>
+> Native Setup then reached manual activation and failed with -71136. The
+> matching tvOS mobileactivationd retains the existing `should_hactivate`
+> local-state path, but the TV preset had excluded it. The new declaration
+> `system-mobileactivationd-exp-tv_activation` reuses that unchanged patcher
+> with an exact 27.2 applicability gate, selected only by `tvos-4k` and admitted
+> only for arm64e Apple TV. The installer uses one activation declaration per
+> device, retaining the existing backup/revert path. Installed native Manual
+> setup now advances past activation to room choice and Terms & Conditions.
+> Cold boot of `a4b9ffc4` exposed a packaging failure: the final Setup bundle
+> seal discarded the entitlements preserved by `patchMachO`, causing native
+> TCC Bluetooth usage-description crashes. Both applying the focus adapter
+> and restoring its backup now preserve original entitlements through bundle
+> sealing. Corrected bundle `da14d7a4` retains the full pristine entitlement set
+> byte-identically and passes the idle/AX input test. After user-confirmed Terms,
+> native Setup completes to Home with its own SetupDone/TVBuddy completion
+> flags true and TVSetupVersion=15. The original VM is also updated, with its
+> prior setup and data preserved. Navigation, Control Center, Siri search,
+> Power sleep and TV wake pass; audio effects without active media remain
+> unverified. A final read-only daemon correction uses TV version/completion
+> policy instead of the iOS setup version; 376 logic checks pass. Its bundle
+> `9ffd2d6e` is installed on both machines. Final cold boots report TV setup
+> and current versions 15, pending=false, and no Setup process. The clone
+> returns directly to Home; the original remains running with its data intact.
+> Both receipts have zero pending changes and legacy setup off.
+
+> **The iPhone17,3 presents its board (2026-10-25).**
+> `VPhoneGuestDevice.presentsBoard` no longer excludes the iPhone17,3; only the
+> XS Max keeps the shared tree. An iPhone17,3 guest now gets the separate
+> installed tree and the `devicetree-cfw-ipad_*` presentation from
+> `DeviceTree.d47ap.im4p`, as every other iPhone does, and skips
+> `preboot-exp-devicetree_identity`. No patch is new. `ipad_identity` is on in
+> `standard`, so a `standard` iPhone17,3 guest now reports `iPhone17,3` instead
+> of `iPhone99,11`. The catalog's release list keeps its iPhone17,3 check
+> explicit (`VPhoneFirmwareCatalog.pairings`), so its pairings do not change. Checked on
+> a new `iPhone17,3 27.0.1 (24A446)` guest, cloudOS 26.4 (23E5207q), plain
+> `standard`: the restore tree split off `DeviceTree.vphone600ap.guest.im4p`;
+> the receipt records the `ipad_*` patches and
+> `preboot-cfw-devicetree_board_audio`; `device.info` reports `iPhone17,3` at
+> 430x932 @3x; Settings > About shows Model Name iPhone 16 and an Action
+> Button row; the Camera app shows the .5/1x/2 lenses and the test pattern;
+> with Location Services on, `location.set` reads back a fresh simulated fix
+> and `bluetoothd`/`locationd` keep their boot PIDs (no #438). Crash reports
+> held only the documented restore-reboot panic and `duetexpertd` datavault
+> crashes, plus one `NANDTaskScheduler` PAC kill in its Core Data failure
+> logging (no ANS NAND on a VM), not on a device tree path.
+
+> **Account prompt hooks are selectable (2026-10-25).**
+> `system-preferences-cfw-followup_groups` (`libprefsfix.dylib`, Settings'
+> CoreFollowUp groups) and `system-apps-cfw-signin_sheets`
+> (`libsigninfix.dylib`, in-app sign-in sheets) were installed with the guest
+> environment and could not be turned off. Both are now declarations, on in
+> `standard` and `experimental`, blocked in the TV and HomePod presets, which
+> already block the environment. `cfw install` and `cfw update-environment`
+> install or remove each library per the plan, a VM with no plan keeps both,
+> and the live environment sync no longer reinstalls one that was turned off.
+> SystemHook skips a missing library, so removal takes effect on the next
+> launch of Settings or the app. No binary or loader changes. Account daemons
+> stay running either way; update and account daemons are disabled only by
+> vphoned's service profile ([service trimming](Guest/service_trimming.md)).
+
+> **CSSC kernel compatibility experiment (2026-10-25).**
+> `kernel-boot-cssc_emulation` targets iOS 27 with cloudOS 26.4. It reuses the
+> kernel's undefined-instruction copyin, PAC-safe interrupt helpers and
+> signed-state check/sign ABI. Only known EL0 scalar CSSC words are evaluated;
+> unknown faults retain native triage. The single baseline-A64 payload occupies
+> persistent kernel text; no userland/cache CSSC trampolines or writable code
+> pages are introduced. Existing X1 PAuth/CPA lowering remains unchanged.
+> Selected X1 boot patch failures abort installation, and an unresolved CSSC
+> kernel handler aborts kernel preparation. TV and HomePod presets exclude
+> this operation. See `Research/Guest/iphone_duo_bringup.md` for the reveal
+> procedure and signed-state handling.
+
 > **HomePod local app installation (2026-10-23).**
 > `system-installd-exp-homepod_adhoc` is selected only by `homepod-mini` on
 > HomePod 27. It loads a dedicated TVOS arm64e build of the existing MIS
@@ -306,6 +423,12 @@
 > patch failure. This is host-driven payload installation; Apple's UpdateBrain
 > protocol and application migration are not implied. See
 > [the implementation and validation record](Restore/data_preserving_full_ota.md).
+
+> **OTA removed-app state (2026-10-25):** capture preserves the guest's removed
+> system-app IDs, and complete/commit/verify include LaunchServices placeholders
+> in their absence checks. Reconciliation retains the original removal backups
+> and independent app data. No instruction patch or preset changes; see the
+> [removed-app regression](Restore/data_preserving_full_ota.md#preserve-removed-system-apps-2026-10-25).
 > **2026-10-21 correction:** full updates also stage, validate and install
 > `payloadv2/links.txt`. The 24A446 iPad OTA omits 24,835 duplicate paths from
 > its numbered chunks. Missing J410 media resources made audiomxd trap in
@@ -448,6 +571,50 @@
 > `tvos` with the GPU bundle and the userland swap on and both TV TPRO patches
 > off. See
 > [tvOS support](Firmware/tvos_support.md#apple-tv-4k-from-its-ota).
+
+> **Apple TV 4K, 4th generation (2026-10-23).** `AppleTV18,1` / `J265AP`
+> reuses `tvos-4k`, the Apple TV HD 26.6 restore base, and cloudOS 26.4 beta
+> (`23E5207q`). Its only catalog release is the supplied Pallas tvOS 27.2 beta
+> OTA (`24K120`; asset alias `24K6120` shares the archive). OTA manifest
+> validation refuses other OS versions for this board. Patch discovery preserves
+> the recorded J265 identity over the HD manifest, and Launchpad selects the 4K
+> preset. The real OTA staged its
+> J265 tree and all 42 chunks; `fw patch` processed all 11 components with 239
+> patches, and the selected cache patchers passed dry runs against its userland.
+> Launchpad and the bundle move to series 2.13 so earlier Launchpad builds cannot
+> choose the HD preset for the new device. Restore and full CFW installation
+> completed on 2026-10-24. The guest daemon reports AppleTV18,1 / 27.2.0;
+> rendering initially stalled in SetupBackground and then reached the animated
+> 4K Hello screen after repairing its service lookup. Select did not advance
+> the new Setup scene; no Hello-handler entry appeared in a live log capture.
+> Live validation exposed a missing sandbox lookup in the new SetupBackground
+> app: a native probe with its original three entitlements took 15.049 seconds
+> to initialize PBSDisplayManager; adding only
+> `com.apple.security.exception.mach-lookup.global-name = [com.apple.PineBoardServices]`
+> reduced that to 0.005 seconds. The 10-second scene watchdog kills the original
+> before initialization returns. New declaration
+> `system-setupbackground-exp-pineboard_lookup` targets that app's entitlements,
+> applies only to 27.2, and remains opt-in; the installer also
+> requires an Apple TV identity. It preserves all existing entitlements and
+> backs up the executable for reversal through `cfw update-environment`.
+> The supported `tvos-4k` preset instead selects `system-tv-exp-legacy_setup`
+> for 27.2: `TVSetupV2.Enabled = false` and `TVSetupV2HW.Enabled = false` in
+> `System/Library/FeatureFlags/Domain/CompanionServices.plist`. PineBoard then
+> selects the native TVSetup retained in this OTA. A cold-boot experiment
+> reached its 4K Language screen; consumer HID and native keyboard Down/Up
+> moved focus to Simplified Chinese and restored English. This does not
+> complete setup or select a language. Both feature dictionaries are required;
+> metadata, unrelated flags and encoding are preserved, and a `.bak` supports
+> reversal through the normal guest patch selection. All 59 focused tests
+> passed. The installed final bundle `2.13.0-local.aaf2152c` cold-boots to
+> Language on two cold boots (vphoned in six and five seconds) with the
+> temporary override removed and no crash reports. Its System `.bak` matches the
+> original plist and SetupBackground is restored byte-identically. Native
+> Return advances to Region; Escape returns to Language, without completing
+> setup. No instruction patch or new preset is introduced. The installer promotes the
+> installed TV OTA's SystemVersion after committing its private disk clone,
+> fixing the host's stale 26.6 restore-base label. See
+> [bring-up notes](Firmware/tvos_support.md#apple-tv-4k-4th-generation).
 
 > **tvOS 27 on the Apple TV 4K (2026-10-16).** No new patch. The 4K's tvOS 27.0
 > (24J361) OTA goes over the HD's 26.6 IPSW, and the plan resolves for the OTA's
@@ -1141,6 +1308,7 @@ Apple's ROM and this patch. See `Firmware/openavb_boot_rom.md`.
 | JB-32 | B/C | `patchParavirtTask3Version` (`kernel-cfw-paravirt_gpu_task3.request`, `.features`, `.features_code`, `.identity_hook`, `.identity_code`) | `setupVersion`; task initializer's `Failed to create Page Table Lock`; superclass task retain/store; XNU flow-divert CDHASH log and proc/task inverse getter | **Persistent per-executable host shader caches through Task3, enabled in Standard.** Phase 1 (2026-10-19) requests binary version 252 while computing guest features from the lower of the granted version and the original 245 (`.features` branches to `.features_code`, a five-instruction clamp after the identity trampoline in the same cave; a refusal passes through). Phase 2 (2026-10-20) writes the owning executable's 20-byte code-signing cdhash at TaskRoot+0x28 before descriptor preparation and task registration. The host uses `task-<40 hex>` and retains that directory. A missing proc/hash leaves twenty zero bytes and preserves the ephemeral fallback. The owning task field is recovered from the superclass initializer, not guessed or taken from current_proc. Kernel helpers are found through source-backed semantic call flow (`cs_get_cdhash`) and the dynamically recovered proc_struct_size global (`get_bsdtask_info`); no task/proc layout offsets or kernel VAs are hardcoded. The trampoline preserves x0–x18, LR and SP, copies exactly 20 bytes and replays the displaced descriptor load. All four sites must resolve before any is emitted; failure aborts a selected install. Replacements use ARM64Encoder; new encoders have Keystone 0.9.2 parity tests. Gated by applyParavirtTask3 and declared for cloudOS 26.4 only; Standard enables it there and tvOS presets block it. Static fixture, missing-anchor and register-clobber execution tests pass. Lychee on macOS 27.0.1 / cloudOS 26.4 / iOS 27.0.1 negotiated 252 across three full boots, retained the same nine executable keys, and passed Camera with zero GPU resets. Host GPU compilation events fell 631 → 17 → 12; the Settings windows fell 121 → 5 → 0. Frame-counter gaps do not establish visible animation stutter; the user reports smooth warmed animations. Measurements, cdhash checks and crash analysis are in `Research/Guest/gpu_acceleration.md`. Older hosts remain untested. | Y |
 | JB-33 | B     | `patchTproOff` (record `kernel-exp-frida_tpro_off`) | `_xprr_tpro_enabled` (`__DATA_CONST`), found via the `if (xprr_tpro_enabled)` guard of the VM_REGION_FLAG_TPRO_ENABLED store | **Frida spawn support (opt-in, Frida set; port of mowisec/frida_patches_srd `tpro-off`).** libdyld asserts on every API entry that TPRO pages are read-only and aborts (`TPRO regions should not be writable on entry to dyld`); Frida's spawn handshake re-enters libdyld inside dyld's own TPRO window, so `frida -f` and spawn-gated apps abort. Clearing the flag takes the kernel's existing no-TPRO path for every process (global). Anchor: unique `adrp/ldr/cbz/ldr/cmp/b.lo/ldrh/orr #2/strh` window, decoded with Capstone; the flag must resolve into `__DATA_CONST` and hold 1, else fail closed. 26.4 `c0ecdb4b`: flag at file-off `0x7526D4` (1 → 0). See `Research/KernelCustomFirmwarePatches/patch_tpro_off.md`. | Frida set |
 | JB-34 | B     | `patchSyscallFilterOff` (record `kernel-exp-frida_syscall_filter_off`) | `_task_get_mach_trap_filter_mask`, `_task_get_mach_kobj_filter_mask`, `_mac_proc_check_syscall_unix` | **Frida in syscall-filtered processes (opt-in, Frida set; port of mowisec/frida_patches_srd `syscall-filter-off`).** Sandbox syscall filters (`syscall-unix/-mach/-mig`) deny the agent's own calls inside the target: attaching to trustd, apsd, cfprefsd, backboardd or runningboardd kills them, and in locationd `thread_get_state` returns `KERN_DENIED` (no threads for Stalker). The two mask accessors return NULL ("no filter", XNU `bsd_arm64.c:249`, `ipc_kobject.c:563`) and the MACF BSD check returns 0 (`systemcalls.c:162`); the rest of the sandbox is untouched. JB-07 (`kernel-boot-syscallmask`, which rewrites the masks as they are installed) does not reach these processes; this is the NULL-mask alternative that row mentions. Anchors: the inlined `bitstr_test` of each check (kobject one behind `cmn #1 ; b.eq`), and `and w1,#0xffff ; mov x0 ; bl ; mov ; cbnz w0` in unix_syscall; each must match once and the three functions must open `pacibsp ; stp`, else fail closed. 26.4 `c0ecdb4b`: file-off `0x1D43090`, `0x1D43120`, `0x24CCAE8` (2 words each). See `Research/KernelCustomFirmwarePatches/patch_syscall_filter_off.md`. | Frida set |
+| JB-35 | C     | `patchAksUnlockBagCount5` (records `kernel-cfw-aks_unlock_bag.redirect` / `.cave`) | AppleSEPKeyStore keybag-unlock external-method handler (the one whose `IOExternalMethodArguments` count check is `cmp w8,#3 ; b.eq ; cmp w8,#4 ; b.ne BadArg`) | **Escrow-bag unlock / encrypted backups for an iOS 26.6-or-newer userland on the 26.4 kernel (`iOSBase: .atLeast(26, 6)`; pipeline `applyAksUnlockBag5`, not `applyIOS27`).** From iOS 26.6 on, the userland keybag unlock sends `inputScalarCount == 5` (scalars[3]=flags&1, scalars[4]=flags); the 26.4 AppleSEPKeyStore handler accepts only 3 or 4 and rejects 5 with `kIOReturnBadArgument`, so every escrow-bag unlock fails and `backup2 encryption` returns EscrowFailure. The count-4 path reads only scalars[3] (the same flag bit), so a count-5 call is handled correctly by it unchanged. Redirect the `cmp w8,#4` into a 6-word cave that accepts 4 or 5 (both → the original count-4 path) else takes the handler's own BadArgument branch. Anchor (structural): the 13-word count-dispatch block matched by its fixed words with the four branch words masked (opcode+condition kept, imm19/imm26 wildcarded); BadArgument/count-4 targets decoded from the anchor's own branches, no absolute offset. The `cset w25,ne` word is part of the fixed match and is what makes the block unique among the five keystore handlers that share this 3/4-count preamble — see caveat (2). **Self-guarding:** the anchor requires `cmp w8,#4 ; b.ne` (the 3/4-only reject shape), so on a kernel that already accepts 5 (Apple-native 26.6+, or this patch's own output) it finds no match and no-ops — hence no cloudOS bound is needed. Replacement bytes from the keystone-verified `ARM64Encoder.encodeCmpWImmediate`/`encodeBCond`/`encodeB`. Kernelcache is SPTM-content-measured, so apply at create time (not hot-swappable). **Version floor empirically pinned (2026-10-26)** by scanning native iPhone17,3 kernelcaches: the keybag handler is `cmp#3;b.eq ; cmp#4;b.ne` (3/4 only) on 18.6.2 / 26.1 / 26.4 / **26.5 (23F77)**, and becomes `cmp#3;b.eq ; cmp#4;b.eq ; cmp#5;b.ne` (accepts 5) on **26.6 (23G71)** / 26.6.1 / 27.0.1 — Apple's own 26.6+ handler is byte-identical to the shape this patch synthesizes. **Review caveats (not yet on-device validated):** (1) the dispatch-table index of the patched handler is 13, not the "selector 12" the introducing commit's comment states — cosmetic (the block, not the label, is patched), but the comment should be corrected; (2) uniqueness rests on the arbitrary `cset w25` register allocation, so a kernel rebuild that reallocates it would drop the match (fail-closed) — the robust key would be the IOExternalMethod dispatch-table entry for the real keybag-unlock selector, needing on-device confirmation of that selector number before retargeting. See `KernelCustomFirmwarePatchAksUnlockBag.swift`. | `26.6+` |
 
 ### EXP-Only Kernel Methods (Reference List)
 
@@ -3817,6 +3985,18 @@ On macOS 26.6.2 two more steps failed (2026-10-23, Mac mini M4):
   which gave the same image 2.7 GB free. The iOS images, which diskutil can
   grow, are resized as before.
 
+Corrected 2026-10-24 (macOS 26.5.1, Minimal preset): the iOS OS images have
+no partition map either. iPhone17,3 26.5 23F77's `094-54920-099` converts to a
+9.31 GB RAW image with 537 MB free, and `diskutil image resize -plist` reports
+max = current for it, so `convertToRawImage`'s resize to max left it as it
+was. Merging the System OS cryptex (5.2 GB) then ran out of space in the image
+("dyld_shared_cache_arm64e.09: No space left on device"), for iOS 18.6 22G86
+as well; a 2.12.0 bundle that had built both a day earlier failed the same
+way on the same host. `convertToRawImage` keeps the resize to max where it
+grows the image and otherwise grows it as `growImage` does, by 16 GiB
+(`mergeHeadroom`): the room is sparse, and `shrinkImage` gives it back after
+the merge.
+
 The binaries the merge patches (`launchd_cache_loader`, `mobileactivationd`)
 are re-signed in Apple's ad-hoc shape (`VPhoneSignOptions.Style.appleAdHoc`),
 like the stock binaries around them. The guest's TXM is stock here: it takes
@@ -4074,8 +4254,19 @@ the universal binary), and three patches are new:
 | Patch | Target | Change |
 | --- | --- | --- |
 | `devicetree-cfw-watch_companion` | an iPhone guest's tree | `/product/watch-companion = 1`, added where the board copy removed a placeholder. vphone600's `syscfg/waco` has no syscfg value on a VM, so iBoot drops it and the phone pairs with no watch. |
-| `system-bluetoothd-cfw-btvc_le_connection` | `/System/Library/FeatureFlags/Domain/BluetoothFeatures.plist`, `cfw install`, iOS 26+ | `EnableBTVCLeConnection.Enabled = true`: bluetoothd's virtual LE controller may connect. Reverted from the `.bak` when turned off; blocked for tvOS. |
+| `system-bluetoothd-cfw-btvc_le_connection` | `/System/Library/FeatureFlags/Domain/BluetoothFeatures.plist`, `cfw install` / `cfw update-environment`, guest OS 26+ | `EnableBTVCLeConnection.Enabled = true`: bluetoothd's virtual LE controller may connect. Reverted from the `.bak` when turned off; enabled for iPhone, Apple TV HD, Apple TV 4K and HomePod guests. |
 | `filesystem-exp-btvc_le_connection` | the same file in the restore image (`minimal`, `watchos`) | The same flag, written before the seal. |
+
+On 2026-10-26 the Apple TV and HomePod presets also enable the guest BTVC
+patch, and their installer admission includes it for both plain-arm64 and
+arm64e userlands. The existing OS 26+ applicability and opt-out restoration
+remain in place. HomePod mini 27.0 (24J361) and tvOS 27.2 (24K120) ship the
+BTVC Bonjour, advertisement and LE connection implementation; the HomePod
+connection manager still queries `EnableBTVCLeConnection`. Their original
+feature plists omit the entry, which the existing plist patcher can add.
+This enables transport testing; HomePod onboarding, Apple TV companion setup
+and Home/AirPlay pairing have not been validated. Existing machines need the
+updated Core Bundle and `cfw update-environment` while stopped, then a boot.
 
 ## iOS 18 guests on the research board (2026-10-21)
 

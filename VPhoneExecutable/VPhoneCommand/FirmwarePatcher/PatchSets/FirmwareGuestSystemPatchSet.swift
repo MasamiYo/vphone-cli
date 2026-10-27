@@ -29,6 +29,8 @@ public enum FirmwareGuestSystemPatchSet {
     public static let gyroscope = "system-backboardd-cfw-gyroscope"
     public static let accelerometer = "system-backboardd-cfw-accelerometer"
     public static let attitude = "system-apps-cfw-attitude"
+    public static let followUpGroups = "system-preferences-cfw-followup_groups"
+    public static let signInSheets = "system-apps-cfw-signin_sheets"
     public static let arm64eX1DyldBootstrap = "system-dyld-boot-arm64e_x1_bootstrap"
     public static let arm64eX1CacheBootstrap = "dyld-boot-arm64e_x1_bootstrap"
     public static let arm64eX1LaunchdBootstrap = "system-launchd-boot-arm64e_x1_bootstrap"
@@ -43,6 +45,11 @@ public enum FirmwareGuestSystemPatchSet {
     public static let virtualBluetooth = "system-bluetoothd-cfw-btvc_le_connection"
     public static let jetsamDisableAllowed = "system-jetsamproperties-cfw-disable_allowed"
     public static let tvTPRO = "system-dyld-exp-tv_tpro"
+    public static let tvSetupDisplayLookup = "system-setupbackground-exp-pineboard_lookup"
+    public static let tvLegacySetup = "system-tv-exp-legacy_setup"
+    public static let tvSetupFocus = "system-setup-exp-deferred_focus"
+    public static let tvSetupFocusLibrary = "/usr/lib/libvphonetvsetupfocus.dylib"
+    public static let tvLocalActivation = "system-mobileactivationd-exp-tv_activation"
     /// Replaces the restored System volume with an Apple TV 4K userland
     /// staged from its OTA. Research only: no IPSW exists for that device.
     public static let tvOTAUserland = "system-tv-exp-ota_userland"
@@ -127,6 +134,34 @@ public enum FirmwareGuestSystemPatchSet {
                 applicability: VPhonePatchApplicability(iOSBase: .major(26)),
             ),
             VPhonePatchDeclaration(
+                identifier: tvLegacySetup,
+                title: "Legacy TV setup (research)",
+                summary: "Research fallback: selects the legacy TVSetup app in tvOS 27.2 by disabling TVSetupV2 and TVSetupV2HW. Off in every preset; disabling restores the original flags and the new Setup flow.",
+                target: .guestFile(path: "/" + CustomFirmwareTVSetup.relativePath),
+                applicability: VPhonePatchApplicability(iOSBase: .release(major: 27, minor: 2)),
+            ),
+            VPhonePatchDeclaration(
+                identifier: tvLocalActivation,
+                title: "TV local activation",
+                summary: "Uses mobileactivationd’s existing local activation path for the tvOS 27.2 research guest, allowing the native Setup assistant to proceed without an Apple activation record.",
+                target: .guestExecutable(path: "/usr/libexec/mobileactivationd"),
+                applicability: VPhonePatchApplicability(iOSBase: .release(major: 27, minor: 2)),
+            ),
+            VPhonePatchDeclaration(
+                identifier: tvSetupFocus,
+                title: "TV setup button focus",
+                summary: "Uses native TV button-focus policy in the new tvOS 27.2 Setup window, so Consumer Select works without indirect-touch activity, including after idle. Preserves explicit focus overrides, eligibility and all Setup readiness checks.",
+                target: .guestExecutable(path: "/Applications/Setup.app/Setup"),
+                applicability: VPhonePatchApplicability(iOSBase: .release(major: 27, minor: 2)),
+            ),
+            VPhonePatchDeclaration(
+                identifier: tvSetupDisplayLookup,
+                title: "TV setup display connection",
+                summary: "Lets tvOS 27.2 SetupBackground look up PineBoardServices on the cloudOS kernel. Without this one sandbox exception, its display-state request times out and setup stays black.",
+                target: .guestEntitlements(path: "/Applications/SetupBackground.app/SetupBackground"),
+                applicability: VPhonePatchApplicability(iOSBase: .release(major: 27, minor: 2)),
+            ),
+            VPhonePatchDeclaration(
                 identifier: tvOTAUserland,
                 title: "Apple TV 4K userland from OTA",
                 summary: "Research: replaces the System volume with the arm64e tvOS userland staged in the VM's OTAUserland folder, extracted with aa so ownership, modes, flags and compression survive.",
@@ -136,7 +171,7 @@ public enum FirmwareGuestSystemPatchSet {
             VPhonePatchDeclaration(
                 identifier: virtualBluetooth,
                 title: "Virtual Bluetooth",
-                summary: "Turns on the feature flag that lets bluetoothd connect over its virtual controller, which a paired watch and phone talk over.",
+                summary: "Turns on the feature flag that lets bluetoothd establish LE connections between guests over its Bonjour virtual controller.",
                 target: .guestFile(path: "/" + CustomFirmwareBluetoothVirtualController.relativePath),
                 applicability: VPhonePatchApplicability(iOSBase: .atLeast(major: 26, minor: 0)),
             ),
@@ -421,6 +456,22 @@ public enum FirmwareGuestSystemPatchSet {
                 """,
                 target: .guestFile(path: "/Library/LaunchDaemons"),
                 bootEssential: true,
+            ),
+
+            // MARK: Account prompts
+
+            VPhonePatchDeclaration(
+                identifier: followUpGroups,
+                title: "Hide Settings follow-up groups",
+                summary: "Installs libprefsfix.dylib, loaded by SystemHook into Settings. Hides the CoreFollowUp groups: Apple Account suggestions, services included with purchase, AppleCare, More for Your iPhone and Screen Time updates. Removing the library shows them again on the next Settings launch.",
+                target: .guestFile(path: "/usr/lib/libprefsfix.dylib"),
+            ),
+
+            VPhonePatchDeclaration(
+                identifier: signInSheets,
+                title: "Suppress sign-in sheets",
+                summary: "Installs libsigninfix.dylib, loaded by SystemHook into every app. Drops Apple Account, iCloud, Game Center and Media & Purchases sign-in sheets; account daemons are untouched. Removing the library restores the sheets on the next app launch.",
+                target: .guestFile(path: "/usr/lib/libsigninfix.dylib"),
             ),
 
             // MARK: Motion

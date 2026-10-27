@@ -1,5 +1,287 @@
 # tvOS support
 
+## Apple TV 4K (4th generation)
+
+Added on 2026-10-23: `AppleTV18,1`, board `J265AP` (`j265ap`), with **tvOS
+27.2 only**. The supplied Pallas SoftwareUpdate response lists beta assets
+`24K120` and `24K6120` pointing to the same AEA archive and key. Its actual
+BuildManifest and SystemVersion both identify `27.2` / `24K120`, so the catalog
+uses that build and offers one pairing. The archive is 5,234,491,392 bytes,
+SHA-256 `a98cff4d0006b4c047c4eff163c5c1cb17fe0d1f67005ea575050523c7b858f7`.
+The URL and public symmetric key are recorded in `VPhoneFirmwareCatalog`.
+
+This board reuses the 3rd generation's OTA path: Apple TV HD 26.6 (`23L773`)
+provides the restore base, cloudOS 26.4 beta (`23E5207q`) provides the boot
+chain/kernel, and the OTA supplies J265's tree and System userland. The virtual
+canvas is 3840×2160 at 2x. Its payload chunks use `pbzm` / LZRAVEN, so creation
+requires macOS 27. On an older host there is no catalog pairing for this model;
+it cannot fall back to tvOS 26.6. OTA identity checks reject OS versions other
+than 27.2, including renamed local archives.
+
+Both `vm create` and Launchpad New Machine use the existing `tvos-4k` preset
+and a standalone restore without template slimming:
+
+```zsh
+vphone-cli vm create tv4k4 --device AppleTV18,1 --cpu 4 --memory 4096 --disk-size 48
+```
+
+Use Launchpad and VPhone.bundle **2.13** together. Earlier Launchpad versions
+would choose the HD preset for this new product type. The CLI/catalog schema
+is unchanged; the new series keeps that preset decision paired with the new
+device catalog. Firmware patch discovery now preserves any recorded OTA board
+with a restore base, so the HD manifest cannot replace J265's guest identity.
+The current `tvos-4k` preset retains the new 27.2 Setup app and selects its
+SetupBackground display lookup repair. The legacy TVSetup fallback used in
+the earlier validation below is now off in every preset. The new setup's
+input issue remains under investigation; see [native Setup and remote
+panel](#native-setup-and-remote-panel). There is no new instruction patch or preset.
+
+Validation completed without admin privileges:
+
+- Xcode builds of `VPhone.bundle` and Launchpad; core identity/catalog tests,
+  all 113 archive tests, 116 selected firmware/device-tree tests, and 32 patch
+  model tests passed. Two TCP timing tests failed in the full core run and
+  passed when rerun individually. Launchpad product/catalog and bundle-version
+  tests passed.
+- `fw prepare` against the real OTA and cached base/cloudOS IPSWs decrypted
+  the archive, verified `27.2` / `24K120`, staged `DeviceTree.j265ap.im4p` and
+  all **42** payload chunks, reused the cached GPU driver, and recorded
+  `AppleTV18,1` in `config.plist`.
+- `fw patch` with `tvos-4k` processed all **11** components and applied **239**
+  patches. The patched device tree reports model `AppleTV18,1`, target `J265`,
+  and subtype `J265AP`. No undeclared-patch warnings appeared.
+- Selective, unprivileged extraction confirmed dyld and launchd are arm64e
+  `USR00`, and SystemVersion reports `27.2` / `24K120`. Dry runs of the five
+  enabled tvOS 27 cache patchers succeeded: IOMFB found 10 trampolines, lsd and
+  libxpc found their gates, maxSlide needed no change because the cache fits,
+  and lockdown mode had no target. The cache-loader gate patch also succeeded
+  on a separate extracted copy.
+
+Live validation on 2026-10-24 used the persistent machine
+`~/.vphone/machines/tv4k4`, cloned from the prepared scratch machine. Launchpad
+2.13 and its helper installed and admitted the local bundle. The native restore
+completed for ECID `0xF853D2724C37EC35`; full `cfw install --keep-artifacts`
+then applied 109 patches and installed all 42 OTA chunks. The machine is bound
+to local bundle `2.13.0-local.aaf2152c`. Other machines were left stopped.
+
+The installer now promotes the installed OTA's SystemVersion for TV as well
+as HomePod, after the private disk clone is committed. Without this, the host
+kept showing the HD restore base's 26.6 even though the guest ran 27.2.
+`RestoreInfoTests` passed all 21 cases after the change, including both 4K
+identities, and the finished bundle rebuilt successfully.
+
+Both normal boots reached vphoned in about five seconds. `device.info` reports
+`AppleTV18,1`, `27.2.0`, four CPUs, 4 GB, and a 1920×1080-point screen at 2x.
+Graphical startup initially stalled: the native window retained the boot logo,
+and guest screenshots were black. SetupBackground's scene-create watchdog
+found its main thread in `PBSDisplayManager._init`, waiting on a semaphore for
+`fetchCurrentDisplayStateWithReply:`. Static analysis confirms a 15-second
+client wait against the scene's 10-second watchdog; the server implementation
+dispatches to the main queue and replies with its serialized state without a
+display-mode readiness gate. A missing client proxy can also produce that
+wait, so this stack alone did not establish the failure's cause.
+
+One controlled restart of `com.apple.PineBoard` allowed SetupBackground's
+scene to become ready, and the new Setup app rendered its animated Hello
+screen at 3840×2160. A third cold boot stalled again; restarting Setup alone
+did not recover it, and a second PineBoard restart did not reliably help.
+Keyboard Return through vphoned, the host API and the native window did not
+advance the recovered Hello screen.
+
+A temporary native probe then isolated the sandbox lookup. As `mobile`, the
+display service returned real 3840×2160 display state immediately, and
+`PBSDisplayManager.sharedInstance` initialized on the main thread in 0.006 s.
+Signing the same probe with SetupBackground's original three entitlements
+(application identifier, platform bit and container requirement) changed that
+to 15.049 s. Adding only
+`com.apple.security.exception.mach-lookup.global-name = [com.apple.PineBoardServices]`
+reduced it to 0.005 s. The container requirement remained on. This reproduces
+the scene watchdog without involving video playback or the GPU.
+
+`system-setupbackground-exp-pineboard_lookup` adds that single exception,
+preserving the app's other entitlements. The declaration applies only to
+27.2, is opt-in, and the installer rejects a non-TV identity.
+It saves the original executable as `.bak`, allowing the normal guest patch
+selection and `cfw update-environment` to reverse it. All 55 focused patch
+catalog, guest resolution and entitlement tests passed, as did the 32 patch
+model tests; the finished bundle rebuilt successfully. After administrator
+authorization, Launchpad installed `2.13.0-local.ea3237b6`, and
+`vm set-bundle tv4k4 2.13.0-local.ea3237b6 --update-environment` applied the
+patch. The guest receipt records it live. The installed executable has exactly
+the original three keys plus the single lookup array; its `.bak` is byte
+identical to the original pulled before the update.
+
+The first patched cold boot reached vphoned in five seconds and the animated
+4K Hello screen without a PineBoard restart. PineBoard, backboardd, Setup and
+SetupBackground retain their startup PIDs; no crash report was present after
+the boot. Consumer-page Select (`0x0C/0x41`) still did not advance Hello. A
+12-second Setup log capture around a press contained 144 normal rendering
+entries but no `Remote pressed.` handler entry. Static analysis and Swift
+field metadata show this handler checks `_hasDrawingStarted` and
+`ScenePhase.active`, not a mandatory paired-Bluetooth-remote condition. The
+unresolved cause is event delivery or these local scene gates.
+
+PineBoard retains a native fallback: `CompanionServices/TVSetupV2`, or
+`TVSetupV2HW` plus its product-type gate, selects `com.apple.Setup`; with both
+flags disabled it selects `com.apple.purplebuddy` (TVSetup). This TVSetup is
+from the 27.2 OTA (its SDK and minimum OS version are 27.2), not the HD restore
+base. A temporary Data-volume override of both flags followed by a cold boot
+opened its 4K Language screen. Consumer Down/Up and native-window keyboard
+Down/Up moved English to Simplified Chinese and back without selecting a
+language. REA evidence: `ev_e11258e9f22e339e9c8e1eedd8108024a7a9859b12a8c4cb966954461712f258`
+and `ev_be3a9edd8bf4e9ede9361aaa789b4cc9a4e282387021eb2ed7ca9f9fec6dd74a`.
+
+The supported preset therefore uses `system-tv-exp-legacy_setup`, gated to
+27.2 and selected only by `tvos-4k`. It sets `TVSetupV2.Enabled` and
+`TVSetupV2HW.Enabled` to false in the System CompanionServices feature plist,
+preserving other flags, metadata and encoding. The installer requires a TV
+identity and backs up the original plist for reversal. It does not mark setup
+complete or choose any setup options. The SetupBackground lookup repair now
+remains opt-in for investigation of the new setup flow. The 59 focused
+feature-plist, guest-resolution, catalogue and entitlement tests passed.
+
+Launchpad installed final bundle `2.13.0-local.aaf2152c` and updated the guest
+environment. Its receipt records the legacy setup patch and no display-lookup
+patch. The System feature plist matches the offline patch output; its `.bak`
+is byte-identical to the original. SetupBackground reverted byte-identically
+to the original executable. The temporary Data override was removed before
+boot and its absence confirmed from the guest.
+
+The final bundle's first cold boot reached vphoned in six seconds and the 4K
+Language screen. Consumer Down/Up moved English to Simplified Chinese and
+back. Native keyboard Return opened Region, and Escape returned to Language.
+No region, permissions, agreements, accounts or setup completion were chosen.
+The initial host window, tested after clearing only this machine's saved frame,
+has exactly 3840×2160 content plus the 104-pixel toolbar and correctly labels
+tvOS 27.2.0. Window fitting now follows toolbar installation and showing the
+window so AppKit's initial screen constraint cannot distort the wide panel.
+PineBoard (38), backboardd (74) and TVSetup (214) retained their PIDs over the
+first minute; the crash list remained empty. A second final cold boot reached
+vphoned in five seconds and rendered the 4K Language screen again, with no
+crash reports. The VM is left running there. `ui.tree` cannot verify the frontmost app on TV, so input
+verification uses direct screenshots and the native VM window.
+Logs, the watchdog report, a guest spindump and screenshots are retained under
+`/private/tmp/vphone-appletv18-*` and `.build/appletv18-validation/`.
+
+## Native Setup and remote panel
+
+Current source, 2026-10-24: `tvos-4k` blocks
+`system-tv-exp-legacy_setup` and enables the existing 27.2
+`system-setupbackground-exp-pineboard_lookup` and
+`system-setup-exp-deferred_focus`. An environment update restores
+the original CompanionServices feature flags from their `.bak`, then applies
+the single display-service lookup entitlement repair and the native button-
+focus policy adapter in Setup. This returns an earlier
+test VM to `com.apple.Setup`, without changing setup completion or choices.
+The current bundle is `2.13.0-local.9ffd2d6e`. Its installed focus adapter
+passes cold-boot input testing, and native manual setup advances past activation.
+
+The new panel is available only for Apple TV guests under **Device > Apple TV
+Remote** (Option-Command-R). Its silver remote face has a directional clickpad
+and Select, Back, TV/Control Center, Play/Pause, Mute, volume rocker, side Siri
+and Power buttons. Native buttons expose accessibility labels and keyboard
+focus. Click/hold sends distinct consumer HID down/up events, so the guest can
+interpret taps, multiple clicks and holds. Closing, minimizing, losing focus
+or disconnecting releases held controls; a failed release is retried before
+new input on reconnection. A cancelled queued press cannot reach a later
+connection. Remote controls are disabled while the agent is unavailable.
+
+Arrow keys, Return and Escape in the panel send the remote's directional,
+Select and Menu events. Space activates a focused button, or Play/Pause when
+the remote face has focus. H, M, +/-, S and P map to TV, Mute, Volume, Siri and
+Power. The HID consumer MenuEscape usage (`0x46`) is Back; ACBack (`0x224`)
+is a different UIKit press type. These mappings are verified against the
+matching tvOS 27.2 UIKitCore, rather than inferred from keyboard behavior.
+The control layout and hold semantics follow Apple's
+[Siri Remote guide](https://support.apple.com/en-us/102337).
+
+Offline validation uses `Tests/run-tv-remote-tests.sh`, a host-only AppKit
+harness with no guest connection. It exercises all 13 accessible buttons,
+directional hit areas, pointer holds, overlapping keyboard/pointer sources,
+modifier-safe releases, cancellation while the shared queue is suspended,
+and release recovery after disconnection. Completed AX/button taps survive
+panel key loss, unfinished holds are cancelled before releasing the view, and
+a connection epoch keeps old taps out of a later guest. The harness exercises
+the actual AX button through that cancellation sequence. It renders the native
+view to a PNG for visual review. The focused patch suites pass 63 tests and
+the patch model suites pass 32. The finished bundle builds and passes bundle
+admission. Live remote tests passed Home/Settings navigation, Select, Back and
+a held TV button opening Control Center. The new focus/preset checks passed
+54 focused tests; the activation declaration's version/preset matrix then passed
+49 selected tests. Installed cold-boot focus and completed-tap delivery pass:
+Hello appeared at 21:23:00 UTC, and the first actual remote AX Select after
+more than 65 seconds idle advanced to Quick Start at 21:24:19. No directional
+input, RPC priming, or debugger was used. Siri/audio integration remains outside
+that validation.
+
+Live inspection localized Hello's failure to native deferred focus. Select
+reaches the active key window as UIPress type 4 with window suppression off,
+but no item is focused. UIKit already holds Hello's preferred item as a
+deferred target. A normal Up commits it and the next Select enters Language;
+the native deferred-focus method also commits it without an arrow. Initial
+focus-operation prototypes expired after the native 60-second idle timeout.
+The final adapter instead uses native TV button-focus policy (`0`) only for
+an active key Setup window with WaffleIron/default-3/nil-override state;
+explicit unrelated overrides are preserved. Native preferred focus and
+eligibility still choose the item. Scene/key/focus notifications recheck
+asynchronously, with no swizzles or polling. A manual policy-0 trial retained
+focus beyond 80 seconds, and ordinary Select advanced English to the country
+picker, then United States to Quick Start. [The investigation](tvos_27_setup_input.md)
+records the exact boundaries and installed test. No pairing,
+drawing, scene-phase or setup-completion state is fabricated, and no Hello
+command or readiness check is bypassed.
+
+The exact built focus adapter was then loaded into a fresh native Setup
+process without a manual policy call. It initialized native focus and ordinary
+remote input advanced Quick Start to Set Up Manually. Activation failed with
+`NSOSStatusErrorDomain` -71136. The matching tvOS mobileactivationd retains
+the same local-activation path as the existing iPhone patch; its getter was
+unpatched because TV excluded it. `system-mobileactivationd-exp-tv_activation`
+now reuses that patch under an exact 27.2 gate, selected only by `tvos-4k` and
+admitted only for arm64e Apple TV. Older TV releases and HomePod keep their
+existing selection. The complete bundle builds and 49 focused tests pass.
+After administrator authorization, cold boot of `a4b9ffc4` exposed a sealing
+bug: final bundle signing dropped Setup's original entitlements and caused
+TCC Bluetooth usage-description crashes before Hello. `da14d7a4` preserves
+those entitlements during both application and reversal of the focus adapter.
+The actual installed executable's full entitlements compare byte-identically
+to pristine Setup. Its signature verifies with the pulled Info.plist and
+CodeResources (resource contents excluded from that host check). Both new
+patches are recorded applied, with zero pending patches and legacy setup off.
+The corrected cold boot reaches Hello; the actual remote's Manual selection
+advances through activation to room choice, Data & Privacy, and Terms &
+Conditions. After the user's action-time confirmation, Terms were accepted,
+account sign-in was skipped, and optional Siri, location, and analytics were
+declined. Native Welcome then advanced to the Home Screen. Native preferences
+now contain SetupDone=true, TVBuddyCompletedSuccessfully=true, and
+TVSetupVersion=15; Setup itself wrote these completion values and exited.
+English/United States and America/Sao_Paulo were preserved; Office was chosen
+only on the diagnostic clone. The original VM was also updated to `da14d7a4`,
+cold-booted in five seconds, and retained its prior completed setup and data.
+
+Final original-VM remote tests pass navigation, Select/Back, Control Center,
+Siri search/dictation UI, Power hold to sleep and TV to wake. Volume Up/Down,
+Mute (twice), and Play/Pause were exercised without active media; audible
+effects remain unverified. All inputs were released and Home restored. The
+two unused builds with the sealing defect (`8e456731`, `a4b9ffc4`) were removed.
+
+Completion exposed an additional read-only reporting bug: vphoned compared the
+absent iOS SetupVersion against BYBuddyIOSCurrentVersion even on Apple TV.
+`9ffd2d6e` uses TVSetupVersion, dynamic BYBuddyTVOSCurrentVersion, SetupDone,
+and TVBuddyCompletedSuccessfully for runtime Apple TV models. iPhone/HomePod
+and the existing skip operation retain their previous behavior. No completion
+state is written. The full bundle builds and its 376-check logic harness passes.
+After administrator installation, both machines' guest environments match
+`9ffd2d6e`. Each cold boot answers vphoned in five seconds and reports native
+setup/current version 15, SetupDone=true, pending=false, and no Setup process.
+The clone returns directly to Home without running Setup again and is then
+stopped. The original VM remains running with its data and completed setup
+preserved. Both patch receipts have zero pending changes and legacy setup off.
+The final original-VM Home capture and actual remote Back/Right test also pass;
+all 13 controls are enabled and the VM is left at Home with input released.
+
+## Earlier Apple TV validation
+
 Validated on 2026-10-15: AppleTV5,3 tvOS 26.4 beta 1 (23L5208m) on the
 cloudOS 26.4 beta (23E5207q) vphone600ap platform boots to TVSetup and Settings.
 The same VM booted normally with four CPUs after installing the persistent
@@ -21,8 +303,8 @@ lists tvOS 26.6 for the Apple TV HD, and New Machine and `vm create --device
 AppleTV5,3` build it with the `tvos` preset.
 
 tvOS 27 dropped the Apple TV HD, and Apple publishes no IPSW for any Apple TV
-4K: AppleDB lists only OTA packages for AppleTV11,1 and AppleTV14,1, and
-AppleTV18,1 is not released. An Apple TV 4K (AppleTV14,1) guest is the HD's
+4K. The 3rd generation (AppleTV14,1) and 4th generation (AppleTV18,1) use
+full OTAs. An Apple TV 4K guest is the HD's
 26.6 restore with the 4K's identity and arm64e userland taken from its OTA;
 `fw prepare` reads the OTA itself. See
 [Apple TV 4K from its OTA](#apple-tv-4k-from-its-ota).
@@ -243,12 +525,116 @@ Its launchd job goes into `/System/Library/xpc/launchd.plist` as on iOS. The
 plain-arm64 loader (`0xB00` in 23L5208m), and the console then shows `Using
 unsecure cache: /System/Library/xpc/launchd.plist`. Both are now admitted for
 TV (`FirmwareGuestPatchResolution.tvSupportedGuestPatches`). The environment
-hooks (`system-launchdaemons-boot-environment`) stay blocked; they have no TV
-port.
+hooks (`system-launchdaemons-boot-environment`) stay blocked on the plain-arm64
+HD; an arm64e TV admits a two-library port of them, see "RootHide bootstrap"
+below.
 
 Verified on 23L5208m and 23L773: `vm wait` returns, `device.info` reports
 `own_name` "Apple TV", screenshots and `apps.launch` work, and consumer-page
 HID input moves the TVSetup focus.
+
+A TV guest has no shell, no package manager, and the `tvos` preset admits
+neither debugserver nor any Frida patch, so the scripting session is the
+debugging environment there: `script.eval` and the `/v1/shell` WebSocket run
+JavaScript with vphoned's identity inside the guest. JavaScriptCore is a
+public tvOS framework and the tvOS SDK ships its stub, so nothing has to be
+installed. See "Scripting sessions" in `Research/vphoned_http_api.md`.
+
+Nothing about the session needed a tvOS build: the tvOS SDK marks
+`posix_spawn`, `execv` and the rest of the process API `__TVOS_PROHIBITED`,
+but `vphoned-tvos` is the iOS build with its platform retagged, so those
+declarations are never consulted, and the proxy has been spawning its worker
+that way on TV guests all along. Compiling the daemon against the tvOS SDK
+would fail on them; do not try to, and do not guard the session's code for
+tvOS availability.
+
+## RootHide bootstrap
+
+Irisin 5.0.1 ships a third package, `appletvos-arm64e`, beside iOS's two:
+`irisind`, `irisin-install` and the daemon's plist, tvOS 17 binaries (plain
+arm64, platform TVOS), and no app. Irisin serves an Apple TV only as RootHide
+and refuses any other root (its `Documentation/AppleTV.md`). OwnGoal's
+repository carries no tvOS bootstrap package yet, so on TV the bootstrap is
+the RootHide root, vphoned's base in it, and Irisin's privileged layer.
+
+`bootstrap.install` decides the package by the platform dyld runs vphoned as
+(`GuestBootstrapPlatform`: the main image's `LC_BUILD_VERSION`, TVOS for
+`vphoned-tvos`), not by product type, so the HD and the 4K take the same
+package. On tvOS `rootless` is refused before a root is created. The
+package's missing app is allowed only for `appletvos-*`; vphoned then creates
+no data directory, registers nothing and loads the daemon, which is what the
+package's own postinst does. Every root also gets an empty `Applications`,
+which icli's refresh needs to exist. The Apps menu offers only roothide on
+an Apple TV.
+
+Validation, 2026-10-26, `tv4k` on jp-01 (AppleTV14,1, tvOS 26.6 arm64e OTA
+userland: `/sbin/launchd` cpusubtype `0x80000002`, `dyld_shared_cache_arm64e`),
+the new `vphoned-tvos` delivered by the host's update path:
+
+- `{"layout":"rootless"}` answers `Irisin serves only a roothide bootstrap on
+  tvOS`; no `/var/jb` appears.
+- `{"layout":"roothide"}` downloads `wiki.qaq.irisin_5.0.1_appletvos-arm64e.deb`
+  (digest checked) and returns `architecture` `appletvos-arm64e`,
+  `registration` null, `firmware_version` 26.6.0, `irisind` loaded, started and
+  running. The base created `/tmp`, `/var`, `/var/root`, `/etc`, `/var/tmp`,
+  `/dev`, `/rootfs` and the three account files from tvOS's own; `pwd.db`
+  waits for a `pwd_mkdb` no tvOS package provides yet. The `.jbroot` loader
+  links are in the root, `usr/lib` and `usr/libexec`.
+- Irisin's tvOS test client (`irisin-external-probe`, root-owned in the
+  root's `usr/libexec`, from Irisin's Apple TV test kit) gets `serviceInfo`
+  with `installRoot` the vphoned root, installs and removes an `all` package
+  (dpkg status lists it beside `firmware`, then only `firmware`), and is
+  refused an `iphoneos-arm64e` package.
+- After `system.reboot`, `bootstrap.inspect` reports the roothide root,
+  vphoned's startup reloads `wiki.qaq.irisind`, and the daemon starts on demand
+  for the client.
+
+### Environment hooks
+
+The iOS environment inserts SystemHook into every process and five more
+libraries into named iOS processes (SpringBoard, Settings, installd,
+lockdownd, cryptexd, configd). An Apple TV takes
+`VPhoneGuestEnvironment.tvLibraries` alone, `launchdhook-vphone.dylib` and
+`SystemHook-vphone.dylib`: the RootHide loader links and `VPHONE_JB_ROOT` at
+each spawn, jetsam limits for bootstrap programs, and ElleKit's TweakLoader
+when a bootstrap provides one. The spawn hooks insert a library only when it
+is installed, so the others are simply absent. Both libraries are built for
+iOS; `cfw install` and `cfw update-environment` mark them tvOS with
+`MachOBuildPlatform` and sign them again, as the HomePod virtio sound driver
+is. They are always written with `/vh` on TV, and removed with `/vh` when the
+patch is off. The hook is loaded by `/vh`, the load command
+`system-launchd-boot-jetsam_panic_guard_bypass` adds to launchd, so both
+patches are admitted together, for an arm64e TV only: both libraries are
+arm64e. Neither is on in `tvos-4k`; turn them on with `fw set-patches <vm>
+--allow system-launchdaemons-boot-environment --allow
+system-launchd-boot-jetsam_panic_guard_bypass`, then `cfw update-environment`.
+
+Offline, on a copy of `tv4k`'s `/sbin/launchd` (586496 bytes): the jetsam
+patcher found `jetsam property category`, function at `0xDA34`, and rewrote
+`tbnz w0, #0, 0xdac4` at `0xDA68` to `b 0xdac4`; `inject-dylib` added
+`LC_LOAD_WEAK_DYLIB /vh`.
+
+Live, the same day on `tv4k`, with the RootHide bootstrap above installed:
+`fw set-patches tv4k --allow …` for both, then `cfw update-environment`
+logged `Environment hooks retargeted to tvOS`, the jetsam patch at `0xDA68`
+and `/vh`. The guest booted to vphoned in 20 seconds and to the home screen.
+The launchd hook inserted SystemHook into xpcproxy (203 spawns by then),
+PineBoard, PosterBoard and the TV apps; SystemHook's log names
+`root=/private/var/containers/Bundle/Application/.jbroot-000114514191980C` in
+every process, so the hook found the vphoned root. The test client's request
+started `irisind` through xpcproxy (`label=wiki.qaq.irisind`); the hook
+checked its loader link (`loader_link_errno=0`) and, its plist setting
+`DISABLE_TWEAKS`, logged `inserted-tweaks-disabled`. `serviceInfo` answered as
+before; PineBoard kept its boot pid; the only reports were `bug_type` 313
+SiriSearchFeedback entries, which the guest also wrote before the hooks.
+There is no `bootstrap-root` line in the hook's log: its first spawns come
+before the data volume where the log lives is mounted.
+
+Turning both off (`fw set-patches tv4k`, `cfw update-environment`) logged
+`removed the TV environment hooks` and `restored sbin/launchd from backup`;
+the guest booted in 20 seconds with neither library nor `/vh`, the bootstrap
+still installed. Turning them on again restored the hooked boot. Snapshots
+`before-tvroothide` (no bootstrap) and `bootstrap-no-hooks` are on the VM.
 
 ## TV button, Home and Control Center
 

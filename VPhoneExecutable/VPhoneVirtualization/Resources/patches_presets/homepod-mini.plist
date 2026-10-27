@@ -98,6 +98,7 @@
 			<string>dyld-boot-iomfb_swapend</string>
 			<string>dyld-cfw-camera</string>
 			<string>kernel-boot-arm64e_x1</string>
+			<string>kernel-boot-cssc_emulation</string>
 			<string>preboot-cfw-devicetree_board_audio</string>
 			<string>preboot-cfw-devicetree_haptics</string>
 			<string>preboot-cfw-devicetree_iphone_product</string>
@@ -105,15 +106,20 @@
 			<string>preboot-homepod-exp-audio_product</string>
 			<string>restoreramdisk-boot-apfs_sha3_hash</string>
 			<string>system-apps-cfw-attitude</string>
+			<string>system-apps-cfw-signin_sheets</string>
+			<string>system-preferences-cfw-followup_groups</string>
 			<string>system-backboardd-cfw-gyroscope</string>
 			<string>system-backboardd-cfw-accelerometer</string>
 			<string>system-campo-cfw-entitlements</string>
-			<string>system-bluetoothd-cfw-btvc_le_connection</string>
 			<string>system-debugserver-cfw-install</string>
 			<string>system-dyld-boot-arm64e_x1_bootstrap</string>
 			<string>system-diskimagesiod-cfw-is_mount_complete</string>
 			<string>system-extensions-boot-gpu_bundle</string>
 			<string>system-tv-exp-ota_userland</string>
+			<string>system-setupbackground-exp-pineboard_lookup</string>
+			<string>system-setup-exp-deferred_focus</string>
+			<string>system-mobileactivationd-exp-tv_activation</string>
+			<string>system-tv-exp-legacy_setup</string>
 			<string>system-fsck-boot-arm64e_x1_bootstrap</string>
 			<string>system-jetsamproperties-cfw-disable_allowed</string>
 			<string>system-launchd-boot-arm64e_x1_bootstrap</string>
