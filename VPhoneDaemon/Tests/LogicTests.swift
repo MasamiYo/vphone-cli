@@ -40,8 +40,24 @@ enum LogicTests {
         processSpawnPolicy()
         bootstrapPlatform()
         setupAssistantState()
+        homeViewDistancePolicy()
         print("\(checks) checks, \(failures) failures")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    static func homeViewDistancePolicy() {
+        expect(GuestHomeViewDistancePolicy.rejection(mode: "automatic", resetEnvironment: false) != nil,
+            "environment-wide reset requires explicit acknowledgement before native transport")
+        expect(GuestHomeViewDistancePolicy.rejection(mode: "automatic", resetEnvironment: true) == nil,
+            "acknowledged environment-wide reset is admitted")
+        for mode in ["near", "standard", "far"] {
+            expect(GuestHomeViewDistancePolicy.rejection(mode: mode, resetEnvironment: false) == nil,
+                "detail-only override preserves unrelated fields without a reset acknowledgement")
+        }
+        for mode in ["", "Near", "middle", "3", "automatic "] {
+            expect(GuestHomeViewDistancePolicy.rejection(mode: mode, resetEnvironment: true) != nil,
+                "strict native enum mapping rejects unsupported mode \(mode)")
+        }
     }
 
     static func processSpawnPolicy() {
@@ -63,6 +79,16 @@ enum LogicTests {
         }
         for machine in ["iPhone17,3", "iPad16,1", "AudioAccessory5,1", ""] {
             expect(!GuestSetupAssistantState.usesTVPolicy(machine: machine), "existing policy for \(machine)")
+        }
+        expect(GuestSetupAssistantState.usesHomeViewPolicy(machine: "HomeAccessory17,1"), "HomeView native setup policy")
+        expect(!GuestSetupAssistantState.usesHomeViewPolicy(machine: "AudioAccessory5,1"), "HomePod keeps its policy")
+        for done in [false, true] {
+            for bypass in [false, true] {
+                let home = GuestSetupAssistantState(setupDone: done, version: nil, currentVersion: nil,
+                    requiresTVCompletion: false, tvCompleted: false,
+                    requiresHomeViewCompletion: true, forceNoBuddy: bypass)
+                expect(home.pending == (!done && !bypass), "HomeView reads native completion or ForceNoBuddy without an iOS version")
+            }
         }
         func state(_ done: Bool, _ version: Int?, _ current: Int?, tv: Bool = true, completed: Bool = true) -> GuestSetupAssistantState {
             GuestSetupAssistantState(setupDone: done, version: version, currentVersion: current, requiresTVCompletion: tv, tvCompleted: completed)
@@ -87,8 +113,8 @@ enum LogicTests {
 
     static func profileCatalog() {
         let groups = GuestServiceProfile.groups27
-        expectEqual(GuestServiceProfile.base27.count, 134, "appendix A less siriactionsd, passd and financed")
-        expectEqual(Set(GuestServiceProfile.base27).count, 134, "appendix A has no duplicates")
+        expectEqual(GuestServiceProfile.base27.count, 133, "appendix A less siriactionsd, passd, financed and generativeexperiencesd")
+        expectEqual(Set(GuestServiceProfile.base27).count, 133, "appendix A has no duplicates")
         let all = groups.flatMap(\.labels)
         expectEqual(Set(all).count, all.count, "no label is in two groups")
         for label in all + GuestServiceProfile.neverDisable {
@@ -106,7 +132,7 @@ enum LogicTests {
 
     static func profileCatalog26() {
         let base26 = GuestServiceProfile.base26
-        expectEqual(base26.count, 128, "134 minus six 26.6.2 does not load")
+        expectEqual(base26.count, 127, "133 minus six 26.6.2 does not load")
         expectEqual(Set(base26).count, base26.count, "no duplicates")
         expect(Set(base26).isSubset(of: GuestServiceProfile.base27), "26 adds no label of its own")
         expect(GuestServiceProfile.notLoadedOn26.isSubset(of: GuestServiceProfile.base27), "only 27 labels are left out")
@@ -128,33 +154,42 @@ enum LogicTests {
 
     static func profileSelection() {
         let trimmed = try? GuestServiceProfile.select(profile: "trimmed", iosMajor: 27)
-        expectEqual(trimmed?.labels.count, 138, "default trimmed = 134 + 2 store + 2 follow-up")
+        expectEqual(trimmed?.labels.count, 137, "default trimmed = 133 + 2 store + 2 follow-up")
         expectEqual(trimmed?.groups, ["base", "app_store", "signin_followup"])
         expect(trimmed?.labels.contains("com.apple.followupd") == true, "followupd is in trimmed")
         expect(trimmed?.labels.contains("com.apple.akd") == false, "akd is not in trimmed by default")
         expect(trimmed?.labels.contains("com.apple.siriactionsd") == false, "siriactionsd serves App Intents controls")
         expect(GuestServiceProfile.neverDisable.contains("com.apple.siriactionsd"), "siriactionsd is never disabled")
         expect(trimmed?.labels.contains("com.apple.passd") == false && trimmed?.labels.contains("com.apple.financed") == false, "Wallet's daemons stay")
+        expect(trimmed?.labels.contains("com.apple.generativeexperiencesd") == false, "BackgroundShortcutRunner spins without it")
+        if let labels = trimmed?.labels {
+            // A guest trimmed by list version 3 owns it; applying again turns it back on.
+            let v3 = labels + ["com.apple.generativeexperiencesd"]
+            let change = GuestServiceProfile.reconcile(
+                target: labels, owned: v3, overrides: Dictionary(uniqueKeysWithValues: v3.map { ($0, true) }),
+            )
+            expectEqual(change.enable, ["com.apple.generativeexperiencesd"], "list version 3 guests get it back")
+        }
         expectEqual(trimmed?.labels, trimmed?.labels.sorted(), "labels sorted")
 
         let accounts = try? GuestServiceProfile.select(profile: "trimmed", iosMajor: 27, extraGroups: ["accounts"])
-        expectEqual(accounts?.labels.count, 141, "accounts adds three")
+        expectEqual(accounts?.labels.count, 140, "accounts adds three")
         expect(accounts?.labels.contains("com.apple.amsaccountsd") == true, "amsaccountsd with accounts")
 
         let allowed = try? GuestServiceProfile.select(
             profile: "trimmed", iosMajor: 27, allow: ["com.apple.weatherd", "com.example.not-listed"],
         )
-        expectEqual(allowed?.labels.count, 137, "allow removes one")
+        expectEqual(allowed?.labels.count, 136, "allow removes one")
         expectEqual(allowed?.allowed, ["com.apple.weatherd"], "only catalog labels are reported as allowed")
         expect(allowed?.labels.contains("com.apple.weatherd") == false, "weatherd kept")
 
         let trimmed26 = try? GuestServiceProfile.select(profile: "trimmed", iosMajor: 26)
-        expectEqual(trimmed26?.labels.count, 132, "26 trimmed = 128 + 2 store + 2 follow-up")
+        expectEqual(trimmed26?.labels.count, 131, "26 trimmed = 127 + 2 store + 2 follow-up")
         expectEqual(trimmed26?.groups, ["base", "app_store", "signin_followup"])
         expect(trimmed26?.refused.isEmpty == true, "the 26 list names nothing never disabled")
         expectEqual(
             (try? GuestServiceProfile.select(profile: "trimmed", iosMajor: 26, extraGroups: ["accounts"]))?.labels.count,
-            135, "accounts adds three on 26",
+            134, "accounts adds three on 26",
         )
 
         expectEqual(try? GuestServiceProfile.select(profile: "none", iosMajor: 25), GuestServiceProfile.Selection())
@@ -186,8 +221,8 @@ enum LogicTests {
             expect(overlap.isEmpty, "\(group.name) names never-disabled \(overlap.sorted())")
         }
         for trap in [
-            "com.apple.sleepd", "com.apple.CommCenter", "com.apple.CommCenterMobileHelper",
-            "com.apple.CommCenterRootHelper", "com.apple.cloudd", "com.apple.nanoregistryd",
+            "com.apple.sleepd", "com.apple.generativeexperiencesd", "com.apple.CommCenter",
+            "com.apple.CommCenterMobileHelper", "com.apple.CommCenterRootHelper", "com.apple.cloudd", "com.apple.nanoregistryd",
             "com.apple.nanoregistrylaunchd", "com.apple.mobileassetd", "com.apple.storekitd",
             "com.apple.cfprefsd.xpc.daemon", "com.apple.SpringBoard", "com.apple.backboardd",
             "com.apple.mobile.installd", "com.apple.lsd", "com.apple.mobileactivationd",
@@ -249,7 +284,7 @@ enum LogicTests {
         var overrides = Dictionary(uniqueKeysWithValues: ota.map { ($0, true) })
         overrides["com.apple.user-choice"] = true
         let apply = GuestServiceProfile.reconcile(target: trimmed.labels, owned: [], overrides: overrides)
-        expectEqual(apply.disable.count, 135, "138 minus the three already disabled")
+        expectEqual(apply.disable.count, 134, "137 minus the three already disabled")
         expectEqual(apply.skipped.map(\.label), ota.sorted())
         let owned = GuestServiceProfile.owned(after: apply, failedDisable: [], failedEnable: [])
         for label in apply.disable {
@@ -454,5 +489,17 @@ enum LogicTests {
         expect(!GuestBootstrapPlatform.packageRequiresApp(architecture: "appletvos-arm64e"), "the Apple TV package has none")
         expectEqual(GuestBootstrapPlatform.mainExecutablePlatform(), UInt32(PLATFORM_MACOS), "this test runs as macOS")
         expect(!GuestBootstrapPlatform.isTVOS, "the Mac is not tvOS")
+
+        // Irisin 5.1.4's roothide list
+        let roothide: [[String: Any]] = [
+            ["source": "deb https://roothide.github.io/procursus iphoneos-arm64e/1800 main", "maximumSystemVersion": 15],
+            ["source": "deb https://stripe.owngoal.dev 1900 main", "minimumSystemVersion": 16],
+            ["source": "https://apt.owngoal.dev"],
+        ]
+        let sources = GuestBootstrapPlatform.recommendedSources
+        expectEqual(sources([], roothide, 27), ["deb https://stripe.owngoal.dev 1900 main", "https://apt.owngoal.dev"])
+        expectEqual(sources(nil, roothide, 15), ["deb https://roothide.github.io/procursus iphoneos-arm64e/1800 main", "https://apt.owngoal.dev"])
+        expectEqual(sources([["source": "https://repo.example"]], roothide, 27), ["https://repo.example"], "a managed list with entries wins")
+        expectEqual(sources(nil, nil, 27), [], "no list recommends nothing")
     }
 }

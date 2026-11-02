@@ -83,6 +83,11 @@ struct VPhoneVirtualMachineCreateCommand: ParsableCommand {
     var noTemplate = false
     @Flag(help: "Do not boot the new VM to check that vphoned answers")
     var skipFirstBoot = false
+    @Option(help: ArgumentHelp(
+        "During the first boot, install the Irisin bootstrap in this layout, then owngoal-bootstrap-vphone through irisin-cli: roothide | rootless (deprecated; not on tvOS)",
+        valueName: "layout",
+    ))
+    var bootstrap: String?
     @OptionGroup(title: "Template slimming") var slimming: VPhoneTemplateSlimmingOptions
     @Flag(
         name: .customLong("keep-artifacts"),
@@ -134,6 +139,8 @@ struct VPhoneVirtualMachineCreateCommand: ParsableCommand {
         switch selectedGuest {
         case let guest? where guest.family == .appleTV:
             guest.restoreBase == nil ? VPhonePatchPreset.tvOSIdentifier : VPhonePatchPreset.tvOS4KIdentifier
+        case let guest? where guest.family == .homeView:
+            VPhonePatchPreset.homeViewIdentifier
         case let guest? where guest.family == .homePod:
             VPhonePatchPreset.homePodMiniIdentifier
         case let guest? where guest.family == .watch:
@@ -157,6 +164,17 @@ struct VPhoneVirtualMachineCreateCommand: ParsableCommand {
 
         if iphoneSource != nil, iphoneVersion != nil || iphoneBuild != nil {
             throw ValidationError("Use either --iphone-source or --iphone-version/--iphone-build.")
+        }
+        if let bootstrap {
+            guard bootstrap == "roothide" || bootstrap == "rootless" else {
+                throw ValidationError("--bootstrap takes roothide or rootless, not \(bootstrap).")
+            }
+            if skipFirstBoot {
+                throw ValidationError("--bootstrap installs during the first boot; --skip-first-boot leaves it out.")
+            }
+            if bootstrap == "rootless", usesTVOS {
+                throw ValidationError("Irisin serves only a roothide bootstrap on tvOS.")
+            }
         }
         if template != nil, noTemplate {
             throw ValidationError("--template and --no-template exclude each other.")
@@ -306,6 +324,7 @@ struct VPhoneVirtualMachineCreateCommand: ParsableCommand {
                 slimming: slimming.request.isEmpty ? nil : slimming.resolve(),
             ),
             skipsFirstBoot: skipFirstBoot,
+            bootstrapLayout: bootstrap,
             slimming: slimming.resolve(),
         ))
     }

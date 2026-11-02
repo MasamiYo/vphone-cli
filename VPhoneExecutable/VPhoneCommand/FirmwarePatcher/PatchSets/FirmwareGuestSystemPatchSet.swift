@@ -24,6 +24,7 @@ public enum FirmwareGuestSystemPatchSet {
     public static let homePodInstallPersonaLibrary = "/usr/lib/libvphoneinstallpersona.dylib"
     public static let homePodAdHocInstall = "system-installd-exp-homepod_adhoc"
     public static let homePodMISFixLibrary = "/usr/lib/libvphonehomepodmisfix.dylib"
+    public static let ios17Desktop = "system-springboard-exp-ios17_desktop"
     public static let metalCacheReuse = "system-systemhook-cfw-metal_cache_reuse"
     public static let metalCacheReuseMarker = "/usr/lib/vphone-metal-cache-reuse"
     public static let gyroscope = "system-backboardd-cfw-gyroscope"
@@ -45,12 +46,18 @@ public enum FirmwareGuestSystemPatchSet {
     public static let ciBarcodeExecutablePath = ciBarcodeBundlePath + "/CIBarcode"
 
     public static let paravirtGPUIndexOffset = "system-paravirt_gpu-cfw-heap_index_offset"
+    public static let paravirtGPUPrimitiveRestart = "system-paravirt_gpu-cfw-primitive_restart"
     public static let paravirtGPUDriverPath =
         "System/Library/Extensions/AppleParavirtGPUMetalIOGPUFamily.bundle/AppleParavirtGPUMetalIOGPUFamily"
 
     public static let locationdCohorting = "system-locationd-cfw-disable_auto_cohort"
     public static let virtualBluetooth = "system-bluetoothd-cfw-btvc_le_connection"
     public static let jetsamDisableAllowed = "system-jetsamproperties-cfw-disable_allowed"
+    public static let homeViewProfileLookup = "system-userprofilesd-exp-keybag_lookup"
+    public static let homeViewDisplayLookups = "system-breadboard-exp-mach_lookup"
+    public static let homeViewSetupBypass = "system-homeview-exp-setup_bypass"
+    public static let homeViewEnvironmentService = "dyld-exp-homeview_environment_service"
+    public static let homeViewSetupPath = "/usr/share/vphone/HomeViewSetup.plist"
     public static let tvTPRO = "system-dyld-exp-tv_tpro"
     public static let tvSetupDisplayLookup = "system-setupbackground-exp-pineboard_lookup"
     public static let tvLegacySetup = "system-tv-exp-legacy_setup"
@@ -92,10 +99,45 @@ public enum FirmwareGuestSystemPatchSet {
         summary: "Shared-cache policy gates, patched system daemons and the vphone guest payload",
         patches: [
             VPhonePatchDeclaration(
+                identifier: ios17Desktop,
+                title: "iOS 17 desktop bring-up",
+                summary: "Skips unavailable flashlight construction and synchronous widget discovery that stall SpringBoard on iOS 17 research guests. Widgets and flashlight are unavailable while selected. Experimental, off by default.",
+                target: .guestExecutable(path: "/System/Library/CoreServices/SpringBoard.app/SpringBoard"),
+                applicability: VPhonePatchApplicability(iOSBase: .major(17)),
+            ),
+            VPhonePatchDeclaration(
+                identifier: homeViewEnvironmentService,
+                title: "HomeView distance simulation service",
+                summary: "Enables BreadBoard's native environment simulation service on retail HomeView 27.2 by opening only its internal-install gate. Preserves the service's client entitlement check and global build identity. Experimental, off by default; native near/far runtime validation is pending.",
+                target: .dyldSharedCache,
+                applicability: VPhonePatchApplicability(iOSBase: .release(major: 27, minor: 2)),
+            ),
+            VPhonePatchDeclaration(
                 identifier: homePodCryptexClass,
                 title: "HomePod Cryptex product class",
                 summary: "Sets the research kernel's Cryptex product class to the native tvOS/HomePod value so signed tvOS developer images pass Image4 equality validation. Changes only /product/cryptex1-product-class; preserves the global product token.",
                 target: .prebootDeviceTree,
+                applicability: ios27,
+            ),
+            VPhonePatchDeclaration(
+                identifier: homeViewProfileLookup,
+                title: "HomeView guest profile keybag access",
+                summary: "Adds only the native Keybag/UserManager Mach service lookup to userprofilesd's temporary sandbox so its guest-profile request can reach the service on the older research kernel. Preserves authorization checks and original entitlements; reversible from backup.",
+                target: .guestExecutable(path: "/System/Library/PrivateFrameworks/UserProfilesDaemon.framework/Support/userprofilesd"),
+                applicability: VPhonePatchApplicability(iOSBase: .release(major: 27, minor: 2)),
+            ),
+            VPhonePatchDeclaration(
+                identifier: homeViewDisplayLookups,
+                title: "HomeView shell display access",
+                summary: "Adds backboard/frontboard and Metal compiler Mach service lookups to BreadBoard's temporary sandbox for the older research kernel. Preserves its existing entitlements and keeps an executable backup for deselection.",
+                target: .guestExecutable(path: "/System/Library/CoreServices/BreadBoard.app/BreadBoard"),
+                applicability: VPhonePatchApplicability(iOSBase: .release(major: 27, minor: 2)),
+            ),
+            VPhonePatchDeclaration(
+                identifier: homeViewSetupBypass,
+                title: "HomeView setup bypass",
+                summary: "Sets the native SetupAssistant ForceNoBuddy preference as mobile, with a key-level journal restored when disabled. Account, activation and HomeKit state remain native. Off by default; takes effect at boot.",
+                target: .guestFile(path: homeViewSetupPath),
                 applicability: ios27,
             ),
             VPhonePatchDeclaration(
@@ -419,6 +461,17 @@ public enum FirmwareGuestSystemPatchSet {
                 compact command keeps an index buffer's heap offset in 16 bits, so meshes whose \
                 indices sit 64 KiB or more into an MTLHeap (Unity games) draw with another \
                 mesh's indices.
+                """,
+                target: .guestExecutable(path: "/\(paravirtGPUDriverPath)"),
+                applicability: VPhonePatchApplicability(cloudOS: .release(major: 26, minor: 4)),
+            ),
+            VPhonePatchDeclaration(
+                identifier: paravirtGPUPrimitiveRestart,
+                title: "GPU primitive restart",
+                summary: """
+                Stops the paravirtual GPU driver sending the primitive restart override OpenGL ES \
+                sets before its draws. The host checks its restart index as if it were a viewport \
+                index and fails the whole command buffer, so nothing an OpenGL ES app draws appears.
                 """,
                 target: .guestExecutable(path: "/\(paravirtGPUDriverPath)"),
                 applicability: VPhonePatchApplicability(cloudOS: .release(major: 26, minor: 4)),

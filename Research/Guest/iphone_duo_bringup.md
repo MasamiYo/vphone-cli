@@ -5106,3 +5106,323 @@ surface (`willUnblank` never runs: the panel goes off by display state). So
 `display.orientation` reports `screen_off`, and the VM window covers the
 panel with black while it is off and for 0.3 s after it comes on. Both wakes
 now go from black to the lock screen (60 fps capture).
+
+## 2026-10-31: the inner display's point scale, for every process
+
+Issue #784: WebDriverAgent saw the inner display at scale 2 (logical
+1426.5×1003.5) and captured it at 1x in a corner, and vphoned's
+`display.modes` said `pointScale` 1. Only SpringBoard saw 3, through the
+adapter's `-[CADisplay pointScale]` answer; applications took 3 from
+SpringBoard's display configuration. Every other process (XCTest's, vphoned)
+read the render display itself, which a virtual display creates at 1. The
+raw scale also showed in SpringBoard's own mode:
+`FBSDisplayMode 669x951@3x (2007x2853/2(3.0))`.
+
+Where the value lives (iOS 27.1 QuartzCore, 24A94425):
+
+- A client's `-[CADisplay pointScale]` is the published display info's field
+  0x310 (`CA::Display::Display::update`), which
+  `CA::WindowServer::Display::build_display_info_data` copies from the server
+  display's field 0x94. `Display`'s constructor sets 1, `AppleDisplay`'s takes
+  the panel's; `kCAVirtualDisplay*` options have no scale.
+- The only other writer is `Server::set_display_properties`, reached by
+  `-[CADisplay setDisplayProperties:]` with `-[CADisplayProperties
+  setPointScale:]` (update mask 0x20, 1 to 4), which republishes the info.
+  `_CASSetDisplayProperties` clears mask bits 0x10 and 0x20 unless the
+  caller's audit flags have bit 1, `com.apple.QuartzCore.displayable-context`
+  in `entitlements_for_audit_token`'s table. Sent from SpringBoard it changed
+  nothing; from backboardd it took.
+- A client keeps the scale it first read: a running Settings and vphoned
+  still said 1 after the change, a relaunched Settings 3.
+
+So backboardd sends `pointScale` 3 for the inner display as soon as its
+render server answers (`vpSetInnerDisplayPointScale`, on the main queue after
+`_detectDisplays`, since a CADisplay call from inside that never returns), a
+second after the display is added and before applications start. SpringBoard
+is already running by then (its adapter logs a second before the display is
+added) and reads the inner display at 1, so the adapter's answer stays. A
+build without it came up after a cold boot on the Trust alert over a bare
+backdrop with the status column on its side and no Home Screen, twice; the
+same machine on the previous bundle reached the Home Screen (seen on
+duoscale-784).
+
+Measured on sbdisplay-duo after a backboardd restart and after a cold boot
+with the new bundle: vphoned's `display.modes` gives the inner display
+`pointScale` 3 (display type still 3, virtual: no property sets it); a fresh
+Settings has `CADisplay.pointScale` 3, `UIScreen` 951×669 at scale 3 and
+`FBSDisplayMode 669x951@3x (2007x2853/3)`, and the inner `CADisplayMode`'s
+`preferredScale` is 3 (the empty `Wireless` displays' is 2). testmanagerd
+reports that value as `XCUIScreen.scale` (found on duoscale-784). The Home
+Screen on both panels draws as before and taps open apps on both. An
+application started while the device is closed lists only the cover's
+`UIScreen`, and one started while open lists both, in the same boot. Not
+run: WebDriverAgent itself, and #784's secondary points (`hingeAngle` POST,
+and the empty `Wireless` displays, type 2 at 0×0, that WDA lists at
+1408×2048 @2).
+
+## 2026-11-02: the inner display's type, and XCTest's screenshot of it
+
+After #788, WebDriverAgent's screenshot of the inner display (display 7,
+`currentDisplayId=7`) still came back 2006×2852 portrait with the landscape
+Home Screen upright in the top 2006 pixels and the rest black (PR #788
+comment, WDA 16.17.6). The cover's screenshot was right.
+
+What Apple's devices return for the same XCTest request (`XCUIScreen
+screenshot` → testmanagerd's `ScreenshotProvider`, a small UI test that
+captures every `XCUIScreen` with 2007×2853 pixel bounds):
+
+| inner display, landscape | stored pixels | `UIImage.imageOrientation` (EXIF) |
+| --- | --- | --- |
+| real iPhone Duo, iOS 27.2 24B91020, held landscape | 2006×2852 portrait, UI turned, fills it | 3 (6) |
+| Xcode 27.2 iPhone Duo simulator, open | 2006×2852 portrait, UI turned, fills it | 3 (6) |
+| this guest (sbdisplay-duo), before | **2852×2006 landscape**, UI turned in the left 2006 columns, rest black | 3 (6) |
+
+WDA applies the tag, so hardware gives 2852×2006 and the guest gave
+isaac's cropped portrait image. The odd-to-even size is testmanagerd's own
+(its buffer callback rounds 2007×2853 down). On the real Duo, display 2 is
+the inner panel; set from XCTest, `XCUIDevice.orientation` never turns the
+inner panel (it stays portrait-shaped face up), so only a phone held
+landscape shows the case.
+
+How testmanagerd renders a screen (Xcode 27.2 DDI, iOS 27.1 UIKit):
+
+- `ScreenshotProvider` calls `_UIRenderDisplay` with `src-screen` =
+  `+[UIScreen _screenWithIntegerDisplayID:]`, `dst-scale` = its `scale`,
+  `src-rect` = its `bounds`, no `src-orientation`. The destination is
+  `src-rect` × scale; `_UISnapshotContainerTransform` turns only by the
+  angle between `src-orientation` (1 when absent) and portrait, so it is the
+  identity here, and the render is `CARenderServerSnapshot` of the display
+  with a 3× scale.
+- The tag is `-[XCAXManager_iOS systemUIOrientation]`: AX attribute 1503 of
+  the system app (attribute 1001 of the system-wide element), 3 → EXIF 8,
+  4 → 6, anything else 1. It was right on the guest.
+- `CARenderServerSnapshot` of the inner display from SpringBoard with those
+  options gave the hardware picture on the guest too, so the render path was
+  fine; the difference was the screen's bounds.
+
+Inside testmanagerd on the guest (lldb during a held XCTest session),
+`_screenWithIntegerDisplayID:7` had bounds and `_referenceBounds` 951×669,
+and its configuration `Unknown[7-1]; mode: "951x669@3x 120Hz"` with
+`FBSDisplayMode 951x669@3x (2007x2853/3r270)`. SpringBoard's configuration
+of the same display has no rotation (the simulator's never rotates). The
+rotation comes from FrontBoardServices (27.1):
+
+- `-[FBSDisplayConfiguration _initWithImmutableDisplay:originalDisplay:
+  isMainDisplay:assertIfInvalid:]` sets the mode's rotation to
+  `FBSDisplayRotationFromCADisplayRotation(nativeOrientation)`, and when the
+  identity is not `isAlwaysConnected`, minus that of `currentOrientation`
+  (mod 4). The inner display is native rot0 and current rot90 in landscape,
+  so a not-always-connected identity gets r270 and landscape bounds.
+- `_FBSCADisplayToDisplayTypes` derives always-connected from
+  `-[CADisplay displayType]`: 0 → always connected, UIKit-main-like,
+  connection 0; 1 → always connected only if main; 2 and 3 → not always
+  connected, connection type 2 or 3; 4 → always connected, connection 0. The
+  identity type comes from the tag (65536 → 7, `Unknown`).
+
+The guest's inner display is a `CAWindowServerVirtualDisplay`, so every
+client reads `displayType` 3; the simulator's and the real Duo's inner
+panel is type 0. SpringBoard was right only because its adapter answers 0
+(4 while FrontBoard classifies the display). testmanagerd builds its own
+configuration from `CADisplay`, and so did vphoned's `display.modes`, which
+reported type 3 (#784).
+
+Where the type lives (iOS 27.1 QuartzCore, 24A94425):
+
+- `-[CAWindowServerVirtualDisplay initWithOptions:]` sets bits 10–12 of the
+  C++ display's halfword at +0x2c0 to 3 (`and #0xffffefff; orr #0xc00`),
+  unconditionally; no `kCAVirtualDisplay*` option sets a type.
+- `-[CAWindowServerDisplay displayType]` is `ldr x8, [x0, #8]` (`_impl`);
+  `cbz`; `ldr x8, [x8, #0x40]` (server); `ldr x8, [x8, #0x60]` (display);
+  `ldrh w8, [x8, #0x2c0]`; `ubfx w8, w8, #10, #3`.
+- `Display::build_display_info_data` copies the raw bits to the info's
+  +0x358; `Display::publish_display_info_state` copies the info into the
+  display's shared memory (+0x360, a sequence counter then the data) that
+  clients map. It runs from `post_display_changed`, `set_all_modes`,
+  `set_display_properties` and `set_clone_master`, all inside QuartzCore,
+  so the published copy cannot be corrected after each publish.
+- The server itself reads the field: `Server`'s constructor (callbacks for
+  type 0 or not), `Display::allocate_surface` (surface flags for type 0),
+  `Renderer::render` and `MetalContext::begin_rendering` (type-0 branches),
+  `VirtualServer::copy_display_timings` (of a source server that is not
+  virtual), `render_for_time` and `supports_throttle` (type 1), and
+  `update_clones` (type 2).
+
+So backboardd clears the field once the render server runs, just before it
+sends the inner display's point scale (`vpMarkInnerDisplayBuiltIn`); that
+`setDisplayProperties:` publishes the type with the scale. The Server was
+built for type 3 and stays so. The offsets and the bit range are read from
+`-[CAWindowServerDisplay displayType]`'s instructions, the field is cleared
+with a compare-and-swap (other flags share the halfword), and the getter
+must answer 3 before and answers 0 after; if the getter's shape differs,
+the display stays virtual. A running client keeps the type it read, as
+with the scale.
+
+Tried live first, on sbdisplay-duo over lldb in backboardd (field 0xd01 →
+0x101, then a point-scale publish): the panel kept drawing, a fresh
+testmanagerd captured the inner display as 2006×2852 portrait with the UI
+turned and filling it, tagged EXIF 6, as on hardware, and the running
+vphoned still said type 3.
+
+Measured on sbdisplay-duo (iPhone19,4, iOS 27.1) with the new bundle,
+after `vm set-bundle --update-environment` and a cold boot: backboardd logs
+`inner display: type 0 (display +0x2c0 bits 10-12)` just before `point
+scale 3 sent`; vphoned's `display.modes` gives the inner display
+`displayType` 0 and `pointScale` 3, mode 2007×2853 at 120 Hz; the inner
+pages context is published as before. XCTest's capture of display 7 open
+and landscape is 2006×2852 portrait with the UI turned and filling it,
+`imageOrientation` 3 (EXIF 6), and with the inner panel portrait-shaped
+(`display.rotation` 0) 2006×2852 upright, `imageOrientation` 0: both as the
+real Duo. Taps open apps on the inner panel and on the cover after a close,
+and SpringBoard and backboardd kept their boot pids with no new crash
+report.
+
+WebDriverAgent 16.17.7 (appium-ios, the same native code as 16.17.6) on the
+same guest: `/wda/screens` lists display 7 (2007×2853 @3) and display 1
+(1398×2034 @3), both `traits` 1 (the inner display was 0 before), and
+`isMain` is the lit panel; `/wda/screen` for display 7 is 951×669 @3. Its
+screenshot with `currentDisplayId` 7, open and landscape, is 2852×2006 with
+the whole UI; forcing `screenshotOrientation` keeps that canvas (WDA sizes
+the canvas from the image's own orientation and only redraws). Closed,
+display 1 is 1398×2034 (the cover's Home Screen is portrait-only).
+
+With two integrated displays, testmanagerd now follows the active one, as
+on the real Duo: when `hasMultipleIntegratedDisplays`, it watches the
+default main display's `FBSDisplayLayoutMonitor` and takes the layout's
+display `hardwareIdentifier` as active, and a capture of the other display
+fails with "Cannot screenshot inactive display" (XCTDaemon
+ScreenshotProvider error 9). The real Duo refuses the dark cover the same
+way. Before, with one integrated display, the guest captured both panels
+in either posture.
+
+A process running across a backboardd restart keeps the displays it read,
+and the restarted backboardd creates the inner display under a new unique
+id: vphoned, dtdeviceinfod and a running testmanagerd still named the old
+id, so testmanagerd held the cover active while open and refused the inner
+display. Restarting testmanagerd (and dtdeviceinfod) cleared it; after the
+backboardd restart itself, backboardd logged `type 0` again and a fresh
+vphoned read type 0. A SpringBoard restart changes nothing here.
+
+Also measured: DeviceHub streams the inner display; `devicectl device info
+displays` lists both as `integrated`, the inner one `active` while open,
+and `devicectl device capture screenshot` of it gives the 2007×2853 native
+buffer (dtscreencaptured rotates by current and native orientation, not by
+type); backboardd idles at 1.5% of a core on a still Settings screen;
+Settings' inner `UIScreen` is 951×669 @3, 120 fps, mode `669x951@3x
+(2007x2853/3)`, as before.
+
+Not changed: WDA's `POST /wda/device/hingeAngle` still returns null with
+the angle unchanged. WDA builds DeviceHub's hinge-slider payload (vendor
+page 0xFF61, usage 0x5B, provider `com.apple.Virtualization.VirtualMachines`)
+and dispatches it from its runner with `IOHIDEventSystemClientDispatchEvent`;
+the guest's hinge relay follows the events DeviceHub's controls arrive in,
+from dtuhidd's HID service, and nothing takes a client-dispatched one. Its
+GET reads CMAngleManager and reports the guest's hinge (180 open). Taken
+since; see "2026-11-02: WebDriverAgent's hinge POST".
+
+## 2026-11-02: WebDriverAgent's hinge POST
+
+WDA's `POST /wda/device/hingeAngle` (appium-ios 16.17.x,
+`XCUIDevice+FBHinge.m`) builds DeviceHub's slider dictionary
+`{provider: com.apple.Virtualization.VirtualMachines, source:
+hinge-slider-control, type: range, value: <angle>}`, IOKit
+binary-serializes it, wraps it in `IOHIDEventCreateVendorDefinedEvent`
+(page `0xFF61`, usage `0x5B`) and sends it from the runner with
+`IOHIDEventSystemClientCreate` + `IOHIDEventSystemClientDispatchEvent`.
+The dispatch returns nothing, so the endpoint answers WDA's success
+(`FBResponseWithOK`, `value: null`) whatever happened; `null` is success
+here, and a refused argument comes back as an error object.
+
+**Where it went.** backboardd's HID server refused it, every time:
+
+    Error: the client with pid 1211 is missing the
+    'com.apple.private.hid.client.event-dispatch' entitlement.
+
+The MIG stub `_Xio_hideventsystem_dispatch_event` calls
+`_io_hideventsystem_dispatch_event(port, data, length)` (IOKit, exported).
+That function turns the out-of-line buffer into a CFData
+(`_IOHIDUnserializeAndVMDeallocWithTypeID`, freeing the buffer), finds the
+connection, and for any connection type but 0 requires bit 3 of
+`IOHIDEventSystemConnectionGetEntitlements` before
+`IOHIDEventCreateWithDataInternal` and `_IOHIDEventSystemDispatchEvent`.
+WDA's connection is "Rate Controlled" with entitlements `0x0`. Even
+dispatched, the event would have had no service, and locationd's relay
+reads the host controls from services matching `0xFF61/0x5B`. A runner
+signed by a developer team cannot carry a private entitlement.
+
+**The buffer's formats** (iOS 27.1 IOKit, 24A94425), all needed to read it:
+
+- the buffer is a CFData in a **binary property list**
+  (`_IOHIDCreateBinaryData`: `CFPropertyListWrite`, format 200), not an
+  IOKit serialization; `IOCFUnserializeBinary` returns nil on it;
+- the CFData is the event in `IOHIDEventCreateDataInternal`'s form, read by
+  `IOHIDEventCreateWithDataInternal`; the public pair passes format flag 1,
+  the internal one 0;
+- the vendor payload inside is IOKit binary (WDA serializes with option 1,
+  as dtuhidd's DeviceHub events are), read with `IOCFUnserializeBinary`.
+
+**What changed.** `libvphonehinge` (backboardd, iPhone19,4 only) detours
+`_io_hideventsystem_dispatch_event` from its constructor, before backboardd
+serves clients. The detour decodes the buffer; an event that is a
+host-control vendor event whose dictionary names the VM provider,
+`hinge-slider-control`, `range` and a value of 0–180 is the hinge's: the
+detour frees the buffer as the server would, answers `KERN_SUCCESS`, and
+the hinge dispatches the event unchanged on its own `0xFF61/0x5B` virtual
+service from its queue. The server never sees it, so it neither refuses nor
+logs the missing entitlement. Anything else, including the orientation
+picker, goes to the server unchanged. From the hinge's service the event takes DeviceHub's path:
+locationd's relay moves the hinge, and vphoned's unmatched monitor sees the
+provider and follows it as a DeviceHub value (`vp_hinge_note`: stored
+quietly, the screen lit when opening from closed). The hinge status
+(`VPhoneHingeStatus`) gains `client_dispatch` (`installed` or why not) and
+`client_controls` (values taken).
+
+Ways not taken:
+
+- Granting the entitlement bit to unentitled connections would let any app
+  dispatch any event (touches, buttons).
+- Swapping the routine in `_iohideventsystem_subsystem` (found by the stub
+  whose `BL` targets the exported function; `blraaz`, so a plain function
+  pointer fits): the table is in the cache's `__AUTH_CONST`, and
+  `vm_protect(VM_PROT_COPY | READ | WRITE)` there returns
+  `KERN_PROTECTION_FAILURE`. Text pages take the copy, as libmisfix's
+  detour measured.
+- libmisfix's detour (`MISFix/MISFixDetour.c`, now built into the hinge too)
+  relocates the target's first four instructions. In an X1 cache the
+  prologue is `pacibsppc`, which signs LR with its own address; moved, it
+  signs for the trampoline and the function's `retabsppc` fails. The guest
+  runs the X1-lowered cache on hosts without PAuth_LR (this M5 Pro has
+  none), where the prologue is `pacibsp`. The detour now refuses
+  `PACIASPPC`, `PACIBSPPC`, `PACNBIASPPC` and `PACNBIBSPPC` instead of
+  copying them, so on an unlowered cache the hinge reports `HID server
+  dispatch not detoured: a displaced instruction is PC-relative` and WDA's
+  POST stays a no-op.
+
+**Measured** on sbdisplay-duo (iPhone19,4, iOS 27.1 24A94425, product-id
+patch on), the hinge library pushed with `environment.install` and
+backboardd restarted, WDA 16.17.x from appium-ios:
+
+| request | WDA GET | `display.orientation` `fold_angle` | `screen_off` |
+| --- | --- | --- | --- |
+| before the change, POST 120 | 180 | 180 | |
+| POST 120 | 120 | 120 | |
+| POST 0 | 0 | 0 | false |
+| POST 180 | 180 | 180 | false (lit on opening) |
+| POST 120, 12 s later (past the 5 s resend) | 120 | 120 | |
+
+vphoned stored each value quietly (`VPhoneHingeAngle` `quiet: true`, angle
+as posted) and `client_controls` counted one per POST. DeviceHub (restarted
+after the backboardd restart) still folds the guest from its own buttons:
+Closed 0, Open 180, Partially Open 130, with `client_controls` unchanged,
+since its values come through dtuhidd's virtual service, not a client
+dispatch. After DeviceHub's, WDA's POST 0 and 180 turned DeviceHub's model
+to the cover face and to the open inner panel. `display.pose` is the
+test-automation snapshot and is not current on a relay guest; its hinge
+field is not evidence here.
+
+With the server bypassed for these events, a POST leaves only the
+connection's `Connection added` and `Connection removed` lines in
+backboardd's log, with no entitlement error; POST 120, 0 and 180 and
+DeviceHub's Closed and Open were repeated with the same results. Checked
+off-guest in `make test-hinge`: WDA's payload in the internal form inside a
+binary plist is taken, and another usage page, no provider, the orientation
+picker and values of -1, 181, a Boolean or a string are not.

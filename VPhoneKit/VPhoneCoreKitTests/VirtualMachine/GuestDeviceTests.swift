@@ -6,6 +6,32 @@ import Testing
 /// VM's `config.plist` keeps it.
 @Suite("Guest device")
 struct GuestDeviceTests {
+    @Test func `experimental iPhone 15 keeps its board and display through manifest encoding`() throws {
+        let device = try #require(VPhoneGuestDevice.named("iPhone15,4"))
+        #expect(device.deviceClass == "d37ap")
+        #expect(device.screen.width == 1179 && device.screen.height == 2556)
+        #expect(device.screen.scale == 3)
+        #expect(VPhoneGuestDevice.detect(buildManifest: ["SupportedProductTypes": ["iPhone15,4"]]) == device)
+        let manifest = VPhoneVirtualMachineManifest.newVM().updating(guestDevice: device)
+        let decoded = try PropertyListDecoder().decode(VPhoneVirtualMachineManifest.self, from: PropertyListEncoder().encode(manifest))
+        #expect(decoded.guestDevice == device)
+        #expect(VPhoneGuestDevice.default == .iPhone17_3)
+    }
+
+    @Test(arguments: ["HomeAccessory17,1", "HomeAccessory17,2"])
+    func `HomeView keeps distinct board identities and the tvOS executable platform`(type: String) throws {
+        let device = try #require(VPhoneGuestDevice.named(type))
+        #expect(device.family == .homeView && device.usesTVOS)
+        #expect(!device.isPad && !device.hasPlainArm64Userland && device.presentsBoard)
+        #expect(device.restoreBase == .appleTV5_3)
+        #expect(device.deviceClass == (type == "HomeAccessory17,1" ? "j490ap" : "j491ap"))
+        let manifest = VPhoneVirtualMachineManifest.newVM().updating(guestDevice: device)
+        let decoded = try PropertyListDecoder().decode(VPhoneVirtualMachineManifest.self, from: PropertyListEncoder().encode(manifest))
+        #expect(decoded.guestDevice == device && decoded.screenConfig.scale == 2)
+        #expect(VPhoneResources.vphonedName(for: device.family) == "vphoned-tvos")
+        #expect(VPhoneGuestDevice.detect(buildManifest: ["SupportedProductTypes": ["HomeAccessory17,1", "HomeAccessory17,2"]], preferring: type) == device)
+    }
+
     @Test
     func `a restore manifest names its device`() {
         #expect(VPhoneGuestDevice.detect(buildManifest: ["SupportedProductTypes": ["iPhone17,3"]]) == .iPhone17_3)

@@ -322,7 +322,7 @@ public enum FirmwareKernelCustomFirmwarePatchSet {
                 prewarm its shaders and crash-loops at every boot.
                 """,
                 target: .firmware(.kernelcache),
-                applicability: VPhonePatchApplicability(iOSBase: .oneOf([.major(26), .major(18)])),
+                applicability: VPhonePatchApplicability(iOSBase: .oneOf([.major(26), .major(18), .major(17)])),
             ),
 
             // MARK: Display
@@ -354,6 +354,17 @@ public enum FirmwareKernelCustomFirmwarePatchSet {
                 // The task initializer and owning-task anchors differ on the
                 // cloudOS 26.1–26.3 kernels; discovery fails there.
                 applicability: VPhonePatchApplicability(cloudOS: .release(major: 26, minor: 4)),
+            ),
+
+            VPhonePatchDeclaration(
+                identifier: FirmwarePatchSetCatalog.paravirtGLESPatch,
+                title: "OpenGL ES",
+                summary: """
+                Names AppleMetalGLRenderer as the paravirtual GPU's OpenGL ES renderer, \
+                as Apple GPUs do, so apps that create an EAGLContext get OpenGL ES over \
+                Metal instead of nil.
+                """,
+                target: .firmware(.kernelcache),
             ),
         ],
         requires: ["vphone.kernel.base"],

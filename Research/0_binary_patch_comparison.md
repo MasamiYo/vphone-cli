@@ -1,11 +1,138 @@
 # Patch Comparison: Regular / Development / Jailbreak / Experimental
 
+> **Watch audio budget runtime check (2026-10-31).** A fresh Watch7,18 VM on
+> 26.4 (23T240): native Resonate text-message
+> alert completed with `BudgetNotAvailable = 0`; explicit Playback-category
+> AVAudioPlayer prepared, started and advanced on Speaker/PuffinOutput. HAL I/O
+> ran on both paths. Untruncated live audiomxd captures show PID 110 throughout
+> and none of the previous budget failures. The owner confirmed audible
+> output. See [budget runtime check](Guest/watch_audio.md#mediaexperience-budget-fresh-restore-runtime-check-2026-10-31).
+
+> **Watch audio budget patch (2026-10-31).** The `filesystem-exp-watch_audio`
+> payload includes a MediaExperience budget patch: `patchWatchAudioBudget`
+> NOPs the `CMSMDeviceState_UpdateDeviceClass` token-mismatch branch in the arm64e
+> cache so a watch VM takes MediaExperience's virtual-device budget exit,
+> version-gated to watchOS 26.4 and reported as the
+> `filesystem-exp-watch_audio.budget_device_class` sub-record. Covered by an
+> always-on synthetic discovery test plus fixture-gated real-image tests; its
+> runtime effect on Playback media is confirmed on a 26.4 restore (host
+> audibility confirmed; see the budget runtime check above). See [watch audio](Guest/watch_audio.md).
+
+> **Watch audio validated on a fresh restore (2026-10-31).** A new VM restored
+> from the latest bundle with the shipped `watchos` payload produces audible
+> system sounds (the charging chime and ringtones). A paired control restore
+> with `filesystem-exp-watch_audio` blocked produced no audio: the live HAL
+> directory had no virtio sound plugin, AVAudioSession reported no output routes
+> and zero rate/channels, and AVAudioPlayer of the built-in NanoRingtone3.caf
+> failed to prepare or play. Together these attribute the speaker route to the
+> payload. Playback-category media (music, text and notification tones) still
+> depends on the MediaExperience power-budget fix. No code change.
+> See [watch audio](Guest/watch_audio.md).
+
+> **Watch preset audio (2026-10-30).** The standard `watchos` preset now includes
+> the validated watch audio payload, owned by the single `filesystem-exp-watch_audio`
+> declaration. The separate experimental speaker preset has been removed. Local-speaker
+> Playback sessions still fail MediaExperience's power budget, which this does not
+> address. Existing guests need a restore; other presets and the remaining broad
+> audio patches are unchanged. See [watch audio](Guest/watch_audio.md).
+
+> **HomeView distance simulation (2026-10-30, runtime validation pending).**
+> `dyld-exp-homeview_environment_service` opens only BreadBoardServices'
+> environment-service internal-install branch on the reviewed 27.2 userland.
+> The preceding client entitlement check remains intact; no global internal
+> build identity is changed. The reveal follows the native Platform getter's
+> call and validates the service's separate rejection paths with Capstone.
+> Writes use cache-page re-attestation and the existing undo log. The patch is
+> off in every shipped preset and is admitted only for HomeView installs.
+> The guest RPC uses the native environment request, near/increased detail and
+> far/decreased detail. Native reset clears all environment overrides and
+> requires explicit acknowledgement. Retail runtime probes confirmed the
+> internal-build gate; no live distance override or patch deployment has been
+> performed. See [distance investigation](Firmware/homeview_distance.md).
+> Offline validation passes against an APFS cache clone: unique reviewed gate,
+> one instruction and one page hash changed, repeat is a no-op, and undo restores
+> every cache file byte-identically. Finished bundle build/admission and 94
+> focused Xcode tests pass; the live Near/Far UI effect is still unverified.
+> After user authorization, HomeView received this patch and guest environment
+> `2.15.0-local.b1ed0817`. Native ABI validation was corrected to accept the
+> protocol's `Vv` (oneway void) qualifier, with a focused regression test. The
+> installed daemon now activates the service and fetches native detail as root.
+> No distance override was written by the agent; the user will test Near/Far/reset.
+
+> **HomeView guest-profile backend lookup (2026-10-30).** The BreadBoard
+> display exception clears its first assertion, but its native guest-profile
+> fetch still fails with an NSError chain ending in sandbox restriction 159
+> for `com.apple.mobile.keybagd.UserManager.xpc`. A mobile native probe with
+> BreadBoard's relevant client entitlements reproduces it. Userprofilesd's
+> donor sandbox lacks that lookup. New `system-userprofilesd-exp-keybag_lookup`
+> adds exactly that one exception to userprofilesd, preserving the native
+> profile/persona APIs and authorizations; it never fabricates a profile.
+> Selected only in `homeview`, gated to 27.2, reversible from executable backup.
+> Native setup bypass verification passed independently (`NeedsSetup=false`,
+> `CompletedInitialRun=true`, with `SetupDone` untouched). Validated on the
+> clean HomeView VM: native guest-profile retrieval succeeds, BreadBoard
+> stays up, and Setup.app renders. Touch navigation works from the bypassed
+> dashboard into World Clock and its city chooser.
+
+> **HomeView native shell display startup (2026-10-30).** The clean guest
+> reaches vphoned and backboardd, but BreadBoard traps in
+> `BKSDisplayServicesStart+436`, at the nonzero display-service query status
+> assertion, before drawing its UI. Its donor entitlements use
+> `temporary-sandbox` and lack `com.apple.backboard.display.services` and the
+> backboard HID/render lookups already repaired for Campo on the 26.4 kernel.
+> New `system-breadboard-exp-mach_lookup` reuses that scoped exception merger,
+> preserves the rest of BreadBoard's entitlements, and keeps an executable
+> backup for deselection. On only in `homeview`, gated to 27.2; native setup
+> still stays on. Validated: the display-service assertion is gone. Native
+> startup also needs the userprofilesd lookup repair above. No new kernel or
+> instruction patch.
+
+> **HomeView bringup (2026-10-30).** Adds the opt-in
+> `system-homeview-exp-setup_bypass`, off in every shipped preset, including
+> the new `homeview` preset. The existing mobile setup helper runs in an
+> isolated HomeView mode, journals only `com.apple.purplebuddy/ForceNoBuddy`,
+> verifies the native SetupAssistant gates, and restores the exact original
+> key on deselection. No completion, activation or HomeKit state is fabricated.
+> `devicetree-cfw-homeview_touch` enables DriverKit for the VM's USB HID touch
+> screen on J490/J491 installed trees only. The existing
+> `devicetree-cfw-tv_app_architecture` also copies the `home` donor's app
+> architecture. `system-tv-exp-ota_userland` is reused for HomeView's own
+> arm64e full OTA over the HD restore base; Apple TV remote/setup adapters
+> remain off. No new instruction replacement or kernel patch. Restore,
+> native setup, bypass enable/disable, framebuffer and touch are now tested; see
+> [HomeView bringup](Firmware/homeview_bringup.md).
+
 > **Camera session teardown (2026-10-29).** Source-only change in libcamfix.
 > Session tracking uses `objc_storeWeakOrNil` and a strong weak-load before
 > weak-table insertion. It skips sessions already in deallocation.
 > No firmware patch or preset changes. A small camera app reproduces the
 > original abort on iOS 27.0.1 (24A446). See
 > [reproduction and crash stack](Guest/virtual_camera_transport.md#session-registration-during-teardown-2026-10-29).
+
+> **Watch speaker audio (2026-10-28).** `filesystem-exp-watch_audio`, selected
+> only by `watchos`, installs the watchOS-retargeted virtio sound HAL plugin
+> before the system image is sealed; native product 4017 for Watch7,18 selects
+> the existing HALSPP tunings and PuffinOutput publishes the speaker port. The
+> installer also rewrites the eight `speaker_*` chainTypes from `clhs` to `dflt`
+> in `Library/Audio/Tunings/AID*/VAD/graph_configurations_halspp.plist` through
+> the confined file-edit path, retaining all graphs, AU tunings, volume commands
+> and microphone entries. Native product selection and the graph rewrite alone
+> were not enough (the generic playback handler still declined the route), so
+> the payload also applies three playback-only VirtualAudio bypasses:
+> `patchSpeakerProtectionGate(handler: .playback)`, `patchVolumeModePrecondition`,
+> and the fault-logged inactive-protection terminating call, each matched by
+> source/log/mask or walker/epilogue control-flow anchors and each one four
+> bytes. Mute, play-and-record, the other walker exceptions, raw tunings and
+> microphone patches stay disabled. Verified on WatchAudioGraphTest: live
+> executable text differs from stock only in the three intended instructions
+> (twelve bytes total) and graph data only in the eight speaker chainTypes.
+> Ringtone playback selects Speaker / PuffinOutput, starts HAL I/O, survives
+> repeated stop/start, and keeps audiomxd at PID 110; the owner confirmed
+> audible output after unmuting the Mac. Local-speaker Playback sessions still
+> fail MediaExperience's power budget, which this does not address, and other
+> session categories and long-duration playback are not covered. All 103 focused
+> tests and full bundle build/admission passed. See
+> [watch audio](Guest/watch_audio.md).
 
 > **Apple TV RootHide bootstrap and environment hooks (2026-10-26).** No new
 > declaration or instruction patch. An arm64e Apple TV now admits
@@ -619,6 +746,54 @@
 >   because the pose provider publishes a moving pose only on display frames.
 >   `libdevicehubfix`'s CMAngleManager stand-in steps aside when CoreMotion's
 >   own manager is available.
+
+> **Inner display point scale (2026-10-31, issue #784):**
+> `system-springboard-cfw-fold_display`'s `libvphonefolddisplay` now has
+> backboardd send `-[CADisplay setDisplayProperties:]` with `pointScale` 3
+> for the inner virtual display as soon as the render server answers. A
+> virtual display is created at point scale 1 and only SpringBoard's adapter
+> answered 3, so a process outside SpringBoard (XCTest under WebDriverAgent,
+> vphoned) saw the inner panel at 1x or 2x. The server takes the scale only
+> from a caller with `com.apple.QuartzCore.displayable-context`: backboardd's
+> request took, SpringBoard's changed nothing. No patch was added or
+> changed; see `Research/Guest/iphone_duo_bringup.md`, "the inner display's
+> point scale, for every process".
+
+> **Inner display type (2026-11-02, PR #788 follow-up):** the same library
+> has backboardd clear the inner virtual display's type field (bits 10–12 of
+> the server display's flags, read from `-[CAWindowServerDisplay
+> displayType]`'s instructions) just before that point-scale publish, so
+> every process started later reads `CADisplay.displayType` 0, as the real
+> Duo's and the simulator's inner panel do. With type 3 (virtual),
+> FrontBoardServices built a not-always-connected identity in testmanagerd
+> and turned the mode by `nativeOrientation − currentOrientation`, so XCTest
+> (WebDriverAgent) captured the landscape inner display into a cut-off
+> landscape buffer. The render server's own Server keeps its type-3 setup.
+> No patch was added or changed; see `Research/Guest/iphone_duo_bringup.md`,
+> "the inner display's type, and XCTest's screenshot of it".
+
+> **Client-dispatched hinge values (2026-11-02, issue #784):**
+> `system-backboardd-cfw-hinge`'s `libvphonehinge.dylib` now, on iPhone19,4
+> only, detours IOKit's exported `_io_hideventsystem_dispatch_event` in
+> backboardd from its constructor, with libmisfix's detour
+> (`MISFix/MISFixDetour.c`, built into the hinge). An event that is
+> DeviceHub's hinge slider (host-control vendor event `0xFF61/0x5B`, its
+> IOKit dictionary naming provider `com.apple.Virtualization.VirtualMachines`,
+> `hinge-slider-control`, `range`, value 0–180) never reaches the server,
+> which would refuse a client without
+> `com.apple.private.hid.client.event-dispatch`: the detour frees its buffer,
+> answers success, and the hinge dispatches the event unchanged on
+> the hinge's own host-control service, where locationd's relay and vphoned
+> follow it as they follow DeviceHub's. This is what WebDriverAgent's
+> `POST /wda/device/hingeAngle` sends, from a runner without the
+> entitlement. `MISFixDetour` also now refuses to relocate the PAuth_LR
+> prologues (`PACIASPPC`, `PACIBSPPC`, `PACNBIASPPC`, `PACNBIBSPPC`), which
+> sign with their own address; the X1-lowered cache a guest runs on a host
+> without PAuth_LR has the SP-only forms there. Checked in
+> `make test-hinge`; measured on sbdisplay-duo (27.1): WDA POST 120, 0 and
+> 180 move `fold_angle` and WDA's CoreMotion reading to each, and DeviceHub's
+> own buttons still fold the guest. No firmware patch was added or changed;
+> see `Research/Guest/iphone_duo_bringup.md`, "WebDriverAgent's hinge POST".
 
 > **SpringBoard fold-guard (2026-10-25):** `system-springboard-cfw-fold_guard`
 > (guest system set, on in `standard`, blocked in `tvos`, `tvos-4k` and
@@ -1560,6 +1735,7 @@ Apple's ROM and this patch. See `Firmware/openavb_boot_rom.md`.
 | JB-33 | B     | `patchTproOff` (record `kernel-exp-frida_tpro_off`) | `_xprr_tpro_enabled` (`__DATA_CONST`), found via the `if (xprr_tpro_enabled)` guard of the VM_REGION_FLAG_TPRO_ENABLED store | **Frida spawn support (opt-in, Frida set; port of mowisec/frida_patches_srd `tpro-off`).** libdyld asserts on every API entry that TPRO pages are read-only and aborts (`TPRO regions should not be writable on entry to dyld`); Frida's spawn handshake re-enters libdyld inside dyld's own TPRO window, so `frida -f` and spawn-gated apps abort. Clearing the flag takes the kernel's existing no-TPRO path for every process (global). Anchor: unique `adrp/ldr/cbz/ldr/cmp/b.lo/ldrh/orr #2/strh` window, decoded with Capstone; the flag must resolve into `__DATA_CONST` and hold 1, else fail closed. 26.4 `c0ecdb4b`: flag at file-off `0x7526D4` (1 → 0). See `Research/KernelCustomFirmwarePatches/patch_tpro_off.md`. | Frida set |
 | JB-34 | B     | `patchSyscallFilterOff` (record `kernel-exp-frida_syscall_filter_off`) | `_task_get_mach_trap_filter_mask`, `_task_get_mach_kobj_filter_mask`, `_mac_proc_check_syscall_unix` | **Frida in syscall-filtered processes (opt-in, Frida set; port of mowisec/frida_patches_srd `syscall-filter-off`).** Sandbox syscall filters (`syscall-unix/-mach/-mig`) deny the agent's own calls inside the target: attaching to trustd, apsd, cfprefsd, backboardd or runningboardd kills them, and in locationd `thread_get_state` returns `KERN_DENIED` (no threads for Stalker). The two mask accessors return NULL ("no filter", XNU `bsd_arm64.c:249`, `ipc_kobject.c:563`) and the MACF BSD check returns 0 (`systemcalls.c:162`); the rest of the sandbox is untouched. JB-07 (`kernel-boot-syscallmask`, which rewrites the masks as they are installed) does not reach these processes; this is the NULL-mask alternative that row mentions. Anchors: the inlined `bitstr_test` of each check (kobject one behind `cmn #1 ; b.eq`), and `and w1,#0xffff ; mov x0 ; bl ; mov ; cbnz w0` in unix_syscall; each must match once and the three functions must open `pacibsp ; stp`, else fail closed. 26.4 `c0ecdb4b`: file-off `0x1D43090`, `0x1D43120`, `0x24CCAE8` (2 words each). See `Research/KernelCustomFirmwarePatches/patch_syscall_filter_off.md`. | Frida set |
 | JB-35 | C     | `patchAksUnlockBagCount5` (records `kernel-cfw-aks_unlock_bag.redirect` / `.cave`) | AppleSEPKeyStore keybag-unlock external-method handler (the one whose `IOExternalMethodArguments` count check is `cmp w8,#3 ; b.eq ; cmp w8,#4 ; b.ne BadArg`) | **Escrow-bag unlock / encrypted backups for an iOS 26.6-or-newer userland on the 26.4 kernel (`iOSBase: .atLeast(26, 6)`; pipeline `applyAksUnlockBag5`, not `applyIOS27`).** From iOS 26.6 on, the userland keybag unlock sends `inputScalarCount == 5` (scalars[3]=flags&1, scalars[4]=flags); the 26.4 AppleSEPKeyStore handler accepts only 3 or 4 and rejects 5 with `kIOReturnBadArgument`, so every escrow-bag unlock fails and `backup2 encryption` returns EscrowFailure. The count-4 path reads only scalars[3] (the same flag bit), so a count-5 call is handled correctly by it unchanged. Redirect the `cmp w8,#4` into a 6-word cave that accepts 4 or 5 (both → the original count-4 path) else takes the handler's own BadArgument branch. Anchor (structural): the 13-word count-dispatch block matched by its fixed words with the four branch words masked (opcode+condition kept, imm19/imm26 wildcarded); BadArgument/count-4 targets decoded from the anchor's own branches, no absolute offset. The `cset w25,ne` word is part of the fixed match and is what makes the block unique among the five keystore handlers that share this 3/4-count preamble — see caveat (2). **Self-guarding:** the anchor requires `cmp w8,#4 ; b.ne` (the 3/4-only reject shape), so on a kernel that already accepts 5 (Apple-native 26.6+, or this patch's own output) it finds no match and no-ops — hence no cloudOS bound is needed. Replacement bytes from the keystone-verified `ARM64Encoder.encodeCmpWImmediate`/`encodeBCond`/`encodeB`. Kernelcache is SPTM-content-measured, so apply at create time (not hot-swappable). **Version floor empirically pinned (2026-10-26)** by scanning native iPhone17,3 kernelcaches: the keybag handler is `cmp#3;b.eq ; cmp#4;b.ne` (3/4 only) on 18.6.2 / 26.1 / 26.4 / **26.5 (23F77)**, and becomes `cmp#3;b.eq ; cmp#4;b.eq ; cmp#5;b.ne` (accepts 5) on **26.6 (23G71)** / 26.6.1 / 27.0.1 — Apple's own 26.6+ handler is byte-identical to the shape this patch synthesizes. **Review caveats (not yet on-device validated):** (1) the dispatch-table index of the patched handler is 13, not the "selector 12" the introducing commit's comment states — cosmetic (the block, not the label, is patched), but the comment should be corrected; (2) uniqueness rests on the arbitrary `cset w25` register allocation, so a kernel rebuild that reallocates it would drop the match (fail-closed) — the robust key would be the IOExternalMethod dispatch-table entry for the real keybag-unlock selector, needing on-device confirmation of that selector number before retargeting. See `KernelCustomFirmwarePatchAksUnlockBag.swift`. | `26.6+` |
+| JB-36 | B     | `patchParavirtGLESRenderer` (record `kernel-cfw-paravirt_gles_renderer`) | The `AppleParavirtGPUARM` IOKit personality (AppleParavirtGPUIOGPUFamily) in `__PRELINK_INFO` | **OpenGL ES over Metal (upstream issue #793, on in `standard`).** `gfxInitializeLibrary` (OpenGLES `libGFXShared`) takes the renderer only from the `IOAcceleratorES` service's `IOGLESBundleName` / `IOGLESMetalBundleName` registry properties and loads `/System/Library/Extensions/<name>.bundle`; with neither, every `-[EAGLContext initWithAPI:]` returns nil although Metal works. Real AGX personalities carry `IOGLESBundleName = AppleMetalGLRenderer` (j236c `AGXG14X`, cloudOS 26.4); the paravirtual one names only its Metal plugin. A personality's keys become the matched driver's property table, so the key is added after `IOClass` in the prelink XML, indented like that line; the bytes come from the leading tabs of the lines that follow, so the record is about a hundred bytes and nothing else moves. Anchor: the one personality whose `IOClass` is `AppleParavirtGPU` and `IOMatchCategory` is `IOAcceleratorES`, flat dict; already present → no-op. The patched XML is parsed back and must equal the original plus that key. No code, no instruction bytes. Gated by `applyParavirtGLES`, set from the plan; tvOS and HomePod presets block it. Draws also need the compiler plugin's GLES metadata completion and guest row 30; see "OpenGL ES in guests (2026-11-02)" and `Research/Guest/gpu_acceleration.md`. | Y |
 
 ### EXP-Only Kernel Methods (Reference List)
 
@@ -1606,6 +1782,7 @@ do NOT execute these).
 | 27  | No binary change: both spawn hooks insert `libdevicename.dylib` into `configd` and `lockdownd` (after `libmisfix.dylib`, the first process to take two inserted libraries). In `configd` it interposes `SCDynamicStoreSetMultiple` and `SCDynamicStoreSetValue` and pins `Setup:/System`'s `ComputerName`; in `lockdownd` it interposes `SCPreferencesSetComputerName`, `SCPreferencesSetHostName` and `SCPreferencesSetLocalHostName` and refuses every rename with `kSCStatusAccessError`. Inert unless `/var/db/vphone/devicename.plist` holds a valid `DeviceName` — **all bases** | none (new guest dylib `VPhoneGuestComponents/DeviceName/libdevicename.c`, installed at `/usr/lib/libdevicename.dylib`; vphoned `device.name.get`/`device.name.set`) | **Pin the guest's device name to the VM's name.** The name is `System/System/ComputerName` in `preferences.plist`; configd's PreferencesMonitor (`updateConfiguration`, 24A435 `0x100062098`) flattens it into `Setup:/System` with one `SCDynamicStoreSetMultiple`, and every reader (`SCDynamicStoreCopyComputerName` in lockdownd's `copy_device_name`, MobileGestalt `UserAssignedDeviceName`, `UIDevice.name`) reads the store. The hook rewrites that publication, not the preferences read: the monitor's model-change path (`sub_10006155c`) writes the `kSCPrefSystem` value it reads back to disk, and the publication route leaves `preferences.plist` with the guest's own name. A publication that leaves `Setup:/System` out as unchanged gets the store's value pinned; one that removes it gets the pinned name instead. `vphone-vm` sends the VM's name to vphoned's `device.name.set` after every connect; vphoned writes the file (one rename, 0644) and applies the preferences unchanged, so configd publishes again and the new pin, or the guest's own name when the file is removed, is live within a second. The file outlives a reboot, so configd's first publication at boot carries it. The library re-reads the file when its inode, size or mtime change. lockdownd's `set_device_name` (`0x1000073b0`) is the only caller of the three setters; it logs their failure and still commits, and the `SetValue DeviceName` handler ignores the result, so a host rename reports success and the name stays. The pinned name itself is refused too: lockdownd runs `set_device_name(copy_device_name())` whenever it starts, and a lockdownd restarted after configd published would otherwise write the pinned name and derived host names into `preferences.plist` (seen once). An NVRAM variable was the first channel and never reached the guest: iBoot keeps only the variables it knows (even `vphone-vm`'s `boot-args` write is replaced). Interposing works because both daemons are standalone images. Ships with `system-launchdaemons-boot-environment` and the environment update; takes effect at the next boot. Verified on iOS 27.0 (24A435) on 2026-10-07: pin at boot and live, host rename refused, `vm rename` followed, preferences untouched. CoreDevice (`devicectl`, DeviceHub) reads the name when the device appears and can lag one boot after a rename. Details: `Research/Guest/device_name_pinning.md`. |    Y    |  Y  |  Y  |
 | 28  | `cbz`/`cbnz` -> `b` at the four compact-command choices in `-[PGSerializerRenderCommandEncoder drawIndexedPrimitives:…]` (`0x140b0`, `0x1421c`, `0x143b4`, `0x143c4` in 23E5207q) — **cloudOS 26.4** | `AppleParavirtGPUMetalIOGPUFamily` (`/System/Library/Extensions/AppleParavirtGPUMetalIOGPUFamily.bundle`) | **Heap index buffer fix.** The compact command stores `parentResourceOffset + indexBufferOffset` in 16 bits but is chosen by testing `indexBufferOffset` alone, so an index buffer 64 KiB or more into an `MTLHeap` is read from the wrong address and meshes (Unity games) draw with another mesh's indices. Every indexed draw takes the 64-bit command instead. `system-paravirt_gpu-cfw-heap_index_offset`; see "Heap index buffers reach the host whole (2026-10-14)" and `Research/Guest/gpu_acceleration.md` |    Y    |  Y  |  Y  |
 | 29  | No binary change: SystemHook calls `setenv("FS_CACHE_REUSE_ON_REBOOT", "1", 0)` first thing in its constructor, in every process it is inserted into, while `/usr/lib/vphone-metal-cache-reuse` exists — **all bases** | none (`VPhoneGuestComponents/SystemHook/SystemHook-vphone.c`; marker written by `cfw install` / `cfw update-environment`) | **Keep the guest's Metal shader caches across a reboot.** `libCoreFSCache` stamps each cache with `kern.bootsessionuuid` and resets it at the next boot unless the variable is set; on the paravirtual GPU CoreAnimation's precompiled pipelines are disabled, so backboardd rebuilt every pipeline after every boot. `system-systemhook-cfw-metal_cache_reuse`; see "Guest Metal caches survive a reboot (2026-10-19)" |    Y    |  Y  |  Y  |
+| 30  | `pacibsp` -> `ret` at the entry of `-[PGSerializerRenderCommandEncoder setPrimitiveRestartEnabled:index:]` (`0x174b4` in 23E5207q) — **cloudOS 26.4** | `AppleParavirtGPUMetalIOGPUFamily` (`/System/Library/Extensions/AppleParavirtGPUMetalIOGPUFamily.bundle`) | **OpenGL ES draws reach the host.** AppleMetalGLRenderer sets `NO, 0xffffffff` before its draws; the driver sends it as command 0x91 and the host's GPU task checks the index against `maxViewportCount`, throws "Invalid viewport index" and fails the command buffer (guest: `kIOGPUCommandBufferCallbackErrorHang`, GPU restart). The command is no longer sent, so Metal's own restart (on, at the index type's maximum) applies. Found by command 0x91's unique `mov w2, #0x8 ; mov w3, #0x91` and the nearest `pacibsp` before it. `system-paravirt_gpu-cfw-primitive_restart`, verb `patch-paravirt-gpu-primitive-restart`, staged with the heap index patch on one copy; see "OpenGL ES in guests (2026-11-02)" |    Y    |  Y  |  Y  |
 
 
 ### Swift port status — the eight DSC patchers (2026-09-23)
@@ -4158,6 +4335,7 @@ gone. The preset names three sets:
 | `filesystem-boot-mobileactivationd_should_hactivate` | The `should_hactivate` patch, in the image |
 | `filesystem-boot-vphoned` | vphoned and its launch daemon, in the image |
 | `filesystem-boot-launchd_cache_loader_unsecure_cache_gate` | Lets launchd read the launch daemons from the volume |
+| `filesystem-exp-watch_audio` | Watch images only, via `watchos`: the watchOS-marked virtio sound HAL plugin, a generic-DSP speaker chain, the three VirtualAudio playback routing-gate bypasses, and on watchOS 26.4 the MediaExperience device-class NOP for the virtual-device audio budget. Cannot be toggled without another restore |
 | `manifest-boot-digest_rehash` | Rewrites every BuildManifest digest to the files the restore now sends; for an AEA archive, the digest of its decrypted image, which is what Apple's manifests hold and what an 18.x restore checks the written image against |
 
 The kernel and TXM stay stock, and the restore installs a system whose seal
@@ -5677,3 +5855,141 @@ The host VM view now derives its input geometry from the active Duo viewport (`a
 > **Duo: folds through SpringBoard, and DeviceHub follows them (2026-10-29 night, PR Lakr233/vphone-cli#774):** no binary change. vphoned's `display.posture` `position` asks SpringBoard to fold itself through `SBSDisplayToolService` (entitlement `com.apple.springboard.sbdisplay.service`) and then sets only the virtual hinge (`Research/vphoned_http_api.md`, "Device pose"). In `system-springboard-cfw-fold_display`, `libvphonefolddisplay.dylib` (1) re-reads the shared panel's owner on `-[SpringBoard displayContentModeCoordinator:handleSwapTransitionFromPrimaryWindowScene:toPrimaryWindowScene:withContinuationLockProvider:]` as well, because a continuous close swaps the primary content as it finishes and the panel kept showing the (black) inner display for 3 s; and (2) in backboardd keeps every clone on the panel: `-[CAWindowServerDisplay addClone:options:]` on the inner render display attaches the clone to display 1 instead, and `removeClone:` removes a clone from its real `cloneMaster` (CoreAnimation aborts otherwise). backboardd moves a mirror (DeviceHub's capture display, AirPlay, recording) to the display with the primary content, so open it carried the inner display upright, while DeviceHub draws an open Duo's stream as the inner panel's native portrait framebuffer and turned it a quarter more; the panel is that framebuffer. Row 26's `libdevicehubfix` gains a `CMDeviceStateManager` stand-in in dtdeviceinfod (`VPCMAngleManager.m`: `isAvailable`, `startUpdatesToQueue:withHandler:`, `stopUpdates`, real `CMDeviceStateEvent`s with A device orientation 1, B the hinge state from `VPhoneHingeLatest`, C 0, delivered at start and on change): Xcode 27.1's DeviceHub (CoreDevicePop plugins) draws a foldable from CoreDevice's device motion state (`streamdevicemotionstate`), which a guest's CoreMotion could not answer ("Pose monitoring failed … 1001"), so the device was always drawn closed. **Validated on iPhone19,4 27.1 (24A94425):** closed shows the folded device with the cover screen, open the opened device with the inner screen upright and filling the panel, following live folds; the VM window is unchanged. **Open:** at book DeviceHub draws the cover (it names the inner panel only from DisplayInfo's `active` integrated display, and reporting the inner display as integrated makes DeviceHub want a per-display stream the guest cannot supply); DeviceHub's own pose controls (vendor-defined HID) are not wired to the guest.
 
 > **Duo: a hardware-shaped inner display, and DeviceHub's controls (2026-10-29 late, PR Lakr233/vphone-cli#774):** supersedes the clone redirect above and closes both of its open items. In `system-springboard-cfw-fold_display`, backboardd's inner `CAWindowServerVirtualDisplay` is now a portrait 2007×2853 framebuffer at 3× (the simulator's inner `CADisplay`), its `extendedProperties` adding `DisplayRotation` 270, `DisplayScale` 3, `ChromeIdentifier` `com.apple.dt.devicekit.chrome.phone14` and `DeviceCornerRadius` 55 beside `DeviceSurfaceType` 2; its one 120 Hz timing is 2007×2853; the digitizer's 270° position turn and both clone hooks (`addClone:options:`, `removeClone:`) are removed; SpringBoard's compositor draws the inner display's frames onto the panel without a turn. SpringBoard lays the inner UI out at interface orientation 90 into that framebuffer. Row 26's `libdevicehubfix`: `dtremotedisplayd` answers `0x184` (adds `0x100`, drops system audio `0x8`, video output by display ID: DeviceHub draws each integrated panel from its own stream and shows its pose controls only then); in `dtdeviceinfod`, `CADisplay` `displayType` answers 0 (integrated) and `pointScale` 3 for the display named `VPhone Duo Inner`; the `CMAngleManager` stand-in skips `-[CMAngleManagerInternal stopAngleUpdatesPrivate]` (reached from `-[CMAngleManager dealloc]`, it asserts the real hinge notifier is available and aborted `dtdeviceinfod` whenever DeviceHub reconnected), its `minAngleDegrees`/`maxAngleDegrees` return floats, and its `angleDegrees`, `mechanicalAngleDegrees` and `velocityDegreesPerSeconds` return floats, as `dtdeviceinfod`'s `CMAngle_Bridge` declares them (`Tf`, read from `s0`): doubles read as 0° for every whole angle, which in book (where DeviceHub takes the angle from this stream) drew the device nearly shut and focused the cover; `CMDeviceStateManager`'s A is the device orientation vphoned publishes (`VPhoneDeviceOrientation`). vphoned (no binary change) decodes DeviceHub's vendor-defined HID controls (usage page `0xFF61`, usage `0x5B`, an IOKit binary-serialized dictionary from the DDI's `dtuhidd`) and folds or turns through `display.posture`'s paths. **Validated on iPhone19,4 27.1 (24A94425), sbdisplay-duo:** open and closed from DeviceHub's buttons follow and settle; book at 130° (DeviceHub's preset) draws the inner face upright with a vertical crease, as DeviceHub draws a simulator Duo; open and book fill the panel without black bars; 48 scripted folds over every path came back in the expected orientation; `display.rotation` 0/90/180/270 on the open inner panel turns it and DeviceHub's model with it. **Open:** DeviceHub's orientation picker and its book button were not pressed since the float fix (both run the paths measured above). **With the foldable product-id** (on in standard since Lakr233/vphone-cli#778) both `dtdeviceinfod` stand-ins (`CMAngleManager`, `CMDeviceStateManager`) step aside for CoreMotion's own managers, and locationd's relay takes DeviceHub's controls itself (dtuhidd's avpCustom service has the host controls' usage) while vphoned keeps the virtual hinge on each slider value and lights a sleeping cover before an opening run; measured on sbdisplay-duo, one guest fold per DeviceHub click. **2026-10-30:** in `system-springboard-cfw-fold_display` FoldDisplay turns SpringBoard's fold fade to black off for folds made awake (`SBDeviceContinuousFoldInteractionSettings.fadeToBlackEnabled`, via `+[SBDeviceContinuousFoldInteractionDomain rootSettings]`; kept for a fold that starts with the panel off or just lit, where it hides the inner content the effect carries over) and hands the shared panel to the inner display inside the primary-swap callback, so opening out of closed shows a few dark frames instead of 0.12 to 0.2 s of black (`Research/Guest/iphone_duo_bringup.md`, "the fold's fade to black on one panel").
+
+## HomeView shell Metal compiler lookup (2026-10-30)
+
+The existing `system-breadboard-exp-mach_lookup` patch now also appends exactly
+`com.apple.MTLCompilerService` to BreadBoard's global Mach lookup exception list.
+Campo's shared backboard/frontboard list is unchanged. This retains the native
+`temporary-sandbox` profile, every donor entitlement, and the existing executable
+backup/deselection path; no kernel or shader binary is changed.
+
+Live HomeView 27.2 / 24V514 on cloudOS 26.4 repeatedly stalled BreadBoard during
+app/Home gestures in RenderBox → Metal function specialization → compiler queue
+wait. A unique-source public Metal probe, signed with the installed BreadBoard's
+exact entitlements and run as mobile501, failed with MTLLibraryErrorDomain3,
+lookup error159, `Sandbox restriction`. Earlier identical-source probes hit
+cached libraries and concealed this denial. Adding only the compiler lookup to
+that probe's entitlements made a fresh unique library compile in 0.05217s and
+specialize in 0.001099s. Cache-path sandbox-extension warnings remained nonfatal;
+no file permission exceptions were added. Raw evidence and variant entitlements
+are in `.build/homeview-distance-runtime/public-metal-*`; native consumer tracing
+is in `Research/Firmware/homeview_distance_consumers.md`. Full shell retest after
+deployment remains pending at this entry's creation.
+
+Deployment retest: Xcode built `VPhone` successfully (60.743s,
+`BuildProject-Log-20261030-211312.txt`); Launchpad installed
+`2.15.0-local.0cfd6bd1` with policy/preflight passing and updated HomeView's host
+and guest environment bindings. The installed BreadBoard entitlements differ
+from b53c29c8 only by the compiler lookup. The formerly hanging bottom Home
+gesture now renders the glass app drawer, native environment fetch stays fast,
+and Timers visibly launches to its native preset grid. Screenshot evidence is
+`0cfd-after-home.jpg` and `0cfd-timers-settled.jpg` under the runtime directory.
+The entitlement merge suite passed all7 tests, including the new HomeView
+sandbox-preservation/Campo-isolation regression. Native distance ABI checks
+also passed. No extra patch selection or boot-chain update was needed.
+
+Final rollout: **2.15.0-local.e2850909** adds the native app-latching explanation
+to Controls, preserving the same validated compiler lookup repair. Host and
+guest environment bindings updated successfully, vphoned answered in6seconds,
+and an acknowledged environment reset plus independent fetch returned
+Automatic/detail2/override=false/style0/backlight2. The native clock is visibly
+awake. Far/Near/Far actual FrontBoard settings and UIKit scene/view traits were
+verified0→2→0 in the temporary observer; the Far reduction flushes when the app
+backgrounds, matching Charcuterie's explicit latching policy. No ActivityKit
+permission expansion is part of this patch or the installed bundle. All guest
+test timers, activities, apps, helpers and overrides were cleaned up.
+
+
+## Experimental iPhone 15 / iOS 17.7 desktop bring-up
+
+See `Research/Guest/ios17_bringup.md`. The existing seputil data patch now
+accepts a Capstone-decoded ADR reference as well as ADRP+ADD. The measured
+21H16 input has ADR x2 at 0x10000B85C referencing the complete format literal
+at 0x10001D3B3; no UUID or instruction replacement is hardcoded. The existing
+SwapEnd patch resolves size 0x508 and emits the cloudOS 26.1 size 0x560.
+Existing thread-guard and paravirtual-user-client gates include 17. The iOS 18
+BSD-only skywalk boot argument also covers 17. New opt-in declaration
+`system-springboard-exp-ios17_desktop` installs a SpringBoard-only, iOS-17-only
+library. It skips synchronous initial widget discovery and unavailable
+AVFlashlight construction; no shared-cache code is modified for these hooks.
+Selection restores SpringBoard and removes the library on opt-out; a restart
+restores native methods.
+No native iOS 17 kernel, Metal driver, camera or networking support is claimed.
+
+## OpenGL ES in guests (2026-11-02)
+
+Upstream issue Lakr233/vphone-cli#793: every `-[EAGLContext initWithAPI:]`
+returned nil in a guest while Metal worked, so apps that need OpenGL ES refused
+to start or aborted (WeChat's `OpenGLContextManager: root_ctx_ != nullptr`).
+Three pieces make OpenGL ES render, each needed by the next.
+
+**1. Kernel: the renderer name (JB-36, `kernel-cfw-paravirt_gles_renderer`).**
+`gfxInitializeLibrary` (`libGFXShared`) loads
+`/System/Library/Extensions/<name>.bundle` from the `IOAcceleratorES` service's
+`IOGLESBundleName` / `IOGLESMetalBundleName`; `AppleParavirtGPU` had neither.
+AGX personalities carry `IOGLESBundleName = AppleMetalGLRenderer`, and the
+patch adds that key after `IOClass` in the `AppleParavirtGPUARM` personality in
+`__PRELINK_INFO`. On 23E5207q the record is 609 bytes at file offset
+`0x256824C`: the key's two lines, and the next lines' indentation shortened by
+the same 76 bytes, so nothing else in the kernelcache moves. The patched XML must
+parse to the original plus that key. Contexts are created from here on, but every
+draw failed in the next two pieces.
+
+**2. Compiler plugin: GLES modules (no binary patch; `VPhoneGuestComponents/GraphicLoader`).**
+AppleMetalGLRenderer hands the backend AIR whose `air.language_version` is
+`"OpenGL ES GLSL" 1.0.0`, with no `air.version` and with the argument metadata
+the AGX backend reads: a buffer stops after `"air.read"`, most nodes have no
+`air.arg_type_name` or `air.arg_name`. `MTLDowngradeAIRModule`,
+`MetalModule::materialize` and `air::Reflection::create` index those
+operands without checks, so `MTLCompilerService` crashed (`NamedMDNode::getOperand`,
+then `MDString::getString`) on every GLES shader. The plugin now completes such a
+module before the downgrade: every node gets the fields the Metal front end
+writes after its own, in its order (`air.address_space`, `air.arg_type_size`,
+`air.arg_type_align_size` for a buffer; `air.arg_type_name`; `air.arg_name`
+except on a render target), derived from the entry point's parameter and return
+types, and the module gets `!air.version = !{i32 2, i32 7, i32 0}`, the version
+the guest's front end (metalfe-32023.921) writes and the plugin's target
+(the value MTLCompilerService passes the plugin as `targetTriple` is a packed
+version tuple, `0x700000002`). The guest's libLLVM C API cannot replace a
+node's operand, so the module is printed, its argument lines extended, and the
+text parsed back in the same context. `make -C VPhoneGuestComponents test-gles-air`
+runs three guest-captured modules through the plugin on the host (same
+GPUCompiler 32023) and into the host's Metal.
+
+The plugin comes from the bundle (`guest-resources`), and an installed guest
+used to keep the one it was restored with. `cfw update-environment` (and `cfw
+install` without a restore tree) now replaces it when the bundle's differs and
+reseals the GPU bundle (`[+] system-extensions-boot-gpu_bundle: compiler plugin
+updated from this bundle`); tvOS guests, whose plugin is retargeted, are left alone.
+
+**3. Driver: primitive restart (guest row 30, `system-paravirt_gpu-cfw-primitive_restart`).**
+With shaders compiling, the host's `ParavirtualizedGraphicsGPUTask` threw
+`NSGenericException: Invalid viewport index` replaying each GL command buffer
+(caught with lldb on the task; Debugging Restrictions are off on this host). The
+throwing handler is command 0x91, `setPrimitiveRestartEnabled:index:`, which
+checks the index against `[device maxViewportCount]`; GL sends the restart index
+itself, `0xffffffff`. The guest saw a GPU hang and restart. The serialiser method
+now returns at entry: `0x174b4` `7f2303d5` `pacibsp` -> `c0035fd6` `ret`. Patched
+alone, 23E5207q hashes to `1992ab68…24d3dc`; with the heap index patch, as the
+installer stages both, `870ba415…3996d8`.
+
+**Verified** on `glestest-iphone` (iPhone17,3 iOS 27.0.1, cloudOS 26.4, host
+macOS 27.2, bundle built from this branch; plugin and driver delivered by
+`vm set-bundle --update-environment`, kernel by the restore): EAGL APIs 1-3 OK,
+`GL_RENDERER` "Apple Paravirtual device GPU", `GL_VERSION` "OpenGL ES 3.0 Metal -
+105"; as root and as mobile, a shader draw reads back exactly; an ES 2 program
+with a 2x2 texture, `mat4`/`float`/`vec4` uniforms and varyings reads back all four
+texels; an ES 3 program with a uniform block, a flat `int` varying, `texelFetch`
+and a `GL_PRIMITIVE_RESTART_FIXED_INDEX` strip split at `0xFFFF` reads back right
+with the gap clear; an app drawing through `CAEAGLLayer` presented 1560 frames
+with a rotating triangle on screen. No `MTLCompilerService` crash and no GPU
+restart in those runs.
+
+**Not covered.** Real apps (WeChat, the #463 game) were not run. The metadata
+completion covers the argument kinds the probes produced (buffers, the vertex
+fetch buffer, vertex id, textures, samplers, fragment inputs, position and
+vertex outputs, render targets); an argument kind the reflection reads in a
+layout the completion does not produce could still crash the compiler
+service. With primitive restart no longer sent, an OpenGL ES 2 strip that draws
+vertex 65535 is cut there.

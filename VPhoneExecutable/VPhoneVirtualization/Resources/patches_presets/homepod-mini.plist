@@ -73,11 +73,16 @@
 		<string>Block</string>
 		<key>Patches</key>
 		<array>
+			<string>system-userprofilesd-exp-keybag_lookup</string>
+			<string>system-breadboard-exp-mach_lookup</string>
+			<string>system-homeview-exp-setup_bypass</string>
+			<string>dyld-exp-homeview_environment_service</string>
 			<string>system-exp-ota_userland</string>
 			<string>kernel-exp-frida_thread_set_state_entitlement_flag</string>
 			<string>kernel-exp-frida_tpro_off</string>
 			<string>kernel-exp-frida_syscall_filter_off</string>
 			<string>kernel-cfw-paravirt_gpu_task3</string>
+			<string>kernel-cfw-paravirt_gles_renderer</string>
 			<string>kernel-exp-frida_vm_map_delete_immutable_code</string>
 			<string>kernel-exp-hv_vmm</string>
 			<string>dyld-exp-hv_vmm</string>
@@ -137,6 +142,7 @@
 			<string>system-mobileactivationd-boot-should_hactivate</string>
 			<string>system-mount-boot-arm64e_x1_bootstrap</string>
 			<string>system-paravirt_gpu-cfw-heap_index_offset</string>
+			<string>system-paravirt_gpu-cfw-primitive_restart</string>
 			<string>system-systemhook-cfw-metal_cache_reuse</string>
 			<string>system-systemversion-cfw-build_version</string>
 			<string>system-virtualaudio-cfw-microphone_graph_chains</string>
@@ -149,6 +155,7 @@
 			<string>system-virtualaudio-cfw-device_state_null_gate</string>
 			<string>system-dyld-exp-tv_tpro</string>
 			<string>kernel-exp-tv_tpro_pagers</string>
+			<string>system-springboard-exp-ios17_desktop</string>
 		</array>
 	</dict>
 	<key>Summary</key>

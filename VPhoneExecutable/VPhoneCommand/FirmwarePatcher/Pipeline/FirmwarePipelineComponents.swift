@@ -122,7 +122,7 @@ extension FirmwarePipeline {
         // Network.framework uses the BSD path (the 26.1-kernel skywalk
         // channel-create traps in the 18.x Network.framework and crash-loops
         // mDNSResponder → no DNS). Empty on 26.x bases (stock boot-args).
-        let extraBootArgs = baseIs18 ? "if_attach_nx=0x3" : ""
+        let extraBootArgs = (baseIs18 || iOSBase?.major == 17) ? "if_attach_nx=0x3" : ""
 
         // 1. AVPBooter — Apple's ROM, in the VM root. Patched when the plan keeps
         //    the boot chain set. A machine booting OpenAVB has nothing
@@ -340,6 +340,7 @@ extension FirmwarePipeline {
                         applyTVTPROPagers: isEnabled(FirmwareKernelCustomFirmwarePatchSet.tvTPROPagers, fallback: false),
                         applyParavirtUserClients: applyParavirtUserClients,
                         applyParavirtTask3: isEnabled(FirmwarePatchSetCatalog.paravirtTask3Patch, fallback: false),
+                        applyParavirtGLES: isEnabled(FirmwarePatchSetCatalog.paravirtGLESPatch, fallback: false),
                         includeBase: includeKernelBase,
                         includeCustomFirmware: includeKernelCustomFirmware,
                         includeHypervisor: includeHypervisor,
@@ -533,6 +534,7 @@ extension FirmwarePipeline {
         applyTVTPROPagers: Bool,
         applyParavirtUserClients: Bool,
         applyParavirtTask3: Bool,
+        applyParavirtGLES: Bool,
         includeBase: Bool,
         includeCustomFirmware: Bool,
         includeHypervisor: Bool,
@@ -556,6 +558,7 @@ extension FirmwarePipeline {
                 p.applyTVTPROPagers = applyTVTPROPagers
                 p.applyParavirtUserClients = applyParavirtUserClients
                 p.applyParavirtTask3 = applyParavirtTask3
+                p.applyParavirtGLES = applyParavirtGLES
                 p.gate = gate
                 return p
             }
