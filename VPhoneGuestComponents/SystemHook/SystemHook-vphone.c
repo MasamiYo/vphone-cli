@@ -18,6 +18,7 @@
 
 static int vpInXPCProxy;
 static int vpInBootstrap;
+extern void vpInstallSurfaceAdapter(void);
 
 static int vpIsBootstrapPath(const char *path, const char *root) {
     if (path && strncmp(path, "/var/jb/", 8) == 0)
@@ -222,11 +223,18 @@ static void vpLoadLibrary(const char *kind, const char *library) {
 
 // xpcproxy needs this bridge because launchd only spawns the proxy, not its target.
 __attribute__((constructor)) static void vpLogProcess(void) {
+    vpInstallSurfaceAdapter();
     // Request cross-boot reuse at constructor entry: libCoreFSCache normally
     // invalidates Metal caches when the boot session changes. Preserve an
     // explicit environment setting. See Research/Guest/gpu_acceleration.md.
     if (access("/usr/lib/vphone-metal-cache-reuse", F_OK) == 0) {
         setenv("FS_CACHE_REUSE_ON_REBOOT", "1", 0);
+    }
+    // The paravirtual GPU does not preserve IOSurface attachment yInvert.
+    // Select AppleMetalGLRenderer's native viewport/scissor alternative before
+    // an EAGLContext exists, preserving an explicit application setting.
+    if (access("/usr/lib/vphone-gles-upper-left", F_OK) == 0) {
+        setenv("AGX_GL_VIEWPORT_INVERT_CONFIG", "UPPER_LEFT", 0);
     }
 
     char path[PATH_MAX];

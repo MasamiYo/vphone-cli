@@ -85,6 +85,10 @@
 			<string>dyld-boot-iomfb_swapend</string>
 			<string>dyld-cfw-arm64e_x1_cache</string>
 			<string>dyld-cfw-camera</string>
+			<string>dyld-cfw-metal_vertex_id_format</string>
+			<string>dyld-cfw-gles_primitive_restart</string>
+			<string>dyld-cfw-metal_cache_reuse_key</string>
+			<string>dyld-cfw-gles_point_draw</string>
 			<string>dyld-exp-hv_vmm</string>
 			<string>dyld-exp-mis_trust_auth</string>
 			<string>dyld-exp-settings_software_update_row</string>
@@ -144,12 +148,14 @@
 			<string>system-mount-boot-arm64e_x1_bootstrap</string>
 			<string>system-paravirt_gpu-cfw-heap_index_offset</string>
 			<string>system-paravirt_gpu-cfw-primitive_restart</string>
+			<string>system-paravirt_gpu-cfw-compiler_cache</string>
 			<string>system-preferences-cfw-followup_groups</string>
 			<string>system-preferences-exp-root_rows</string>
 			<string>system-setup-exp-deferred_focus</string>
 			<string>system-setupbackground-exp-pineboard_lookup</string>
 			<string>system-springboard-cfw-fold_display</string>
 			<string>system-springboard-cfw-fold_guard</string>
+			<string>system-systemhook-cfw-gles_upper_left</string>
 			<string>system-systemhook-cfw-metal_cache_reuse</string>
 			<string>system-systemversion-cfw-build_version</string>
 			<string>system-tv-exp-legacy_setup</string>
@@ -164,6 +170,16 @@
 			<string>system-virtualaudio-cfw-volume_mode_precondition</string>
 			<string>system-watchdogd-exp-hv_vmm_cache</string>
 			<string>system-springboard-exp-ios17_desktop</string>
+			<string>system-launchd-exp-ios16_mach_ports</string>
+			<string>dyld-exp-ios16_mach_ports_lookup</string>
+			<string>system-backboard-exp-ios16_migration</string>
+			<string>system-keybag-exp-ios16_ephemeral</string>
+			<string>system-springboard-exp-ios16_desktop</string>
+			<string>system-systemhook-exp-ios16_surface</string>
+			<string>system-systemhook-exp-ios16_framebuffer</string>
+			<string>preboot-exp-ios16_ephemeral_storage</string>
+			<string>system-vphoned-exp-ios16_touchscreen</string>
+			<string>system-springboard-exp-ios16_keybagless_ui</string>
 		</array>
 	</dict>
 	<key>Summary</key>

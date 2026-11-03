@@ -49,14 +49,67 @@ extension CryptexFilesystemPatcher {
         }
     }
 
+    /// The launchd change `cfw install` makes for
+    /// `system-launchd-boot-jetsam_panic_guard_bypass` (``CustomFirmwareJetsamPatcher``),
+    /// in the pre-reseal merge. Re-signed ad hoc over its own entitlements, so
+    /// the new hash lands in the regenerated trust cache.
+    func patchLaunchdJetsam(targetMount: String) throws {
+        try editGuestFile("sbin/launchd", targetMount: targetMount, mode: 0o755) { file in
+            try thinToArm64e(file)
+            try CustomFirmwareJetsamPatcher.patch(fileAt: file, log: { print("  \($0)") })
+            try setMode(0o755, at: file)
+
+            try VPhoneSigner.sign(
+                fileAt: file,
+                options: guestSigningOptions(identifier: "com.apple.xpc.launchd"),
+            )
+        }
+        print("  [+] Patched launchd's jetsam panic guard")
+    }
+
     func injectLaunchDaemons(targetMount: String) throws {
         let target = try VPhoneConfinedDirectory.pin(absolutePath: targetMount)
         let source = resources.guestResources.appendingPathComponent("vphoned.plist")
         try target.replaceFile("System/Library/LaunchDaemons/vphoned.plist", fromFileAt: source, mode: 0o644, owner: (0, 0))
-        try editGuestFile("System/Library/xpc/launchd.plist", targetMount: targetMount, mode: 0o644) { file in
+        try editGuestFile(CustomFirmwareDetachedSignature.launchdCachePath, targetMount: targetMount, mode: 0o644) { file in
             try CustomFirmwareDaemons.injectDaemon(into: file, name: "vphoned", from: source)
         }
         print("  [+] Injected vphoned")
+        try resignLaunchdCache(targetMount: targetMount)
+    }
+
+    /// Sign the edited `launchd.plist` as Apple signs it, so the stock
+    /// `launchd_cache_loader` takes it as the secure cache. `createTrustcache`
+    /// adds the new cdhashes to the static trust cache, which is what the loader
+    /// asks AMFI about. See `CustomFirmwareDetachedSignature`.
+    ///
+    /// The new cdhashes take the launch-constraint category of Apple's
+    /// signature, as a re-signed binary does (`resignedCDHashes`): Apple's
+    /// static trust cache gives both cdhashes of its `launchd.plist.sig`
+    /// category 2 (iOS 18.6 22G86).
+    func resignLaunchdCache(targetMount: String) throws {
+        let target = try VPhoneConfinedDirectory.pin(absolutePath: targetMount)
+        let original = try target.exists(CustomFirmwareDetachedSignature.launchdCacheSignaturePath)
+            ? CustomFirmwareDetachedSignature.codeDirectoryHashes(
+                in: target.readData(CustomFirmwareDetachedSignature.launchdCacheSignaturePath),
+            ).map(\.cdhash)
+            : []
+        let cache = try target.readData(CustomFirmwareDetachedSignature.launchdCachePath)
+        let signature = CustomFirmwareDetachedSignature.sign(cache, identifierStem: "launchd")
+        let file = try createTmpDir().appending(path: "launchd.plist.sig")
+        try signature.write(to: file)
+        // root:admin 0644, as Apple installs it.
+        try target.replaceFile(CustomFirmwareDetachedSignature.launchdCacheSignaturePath,
+                               fromFileAt: file, mode: 0o644, owner: (0, 80))
+        for cdHash in original {
+            print("  [+] Apple's launchd.plist.sig: cdhash \(cdHash.map { String(format: "%02x", $0) }.joined())")
+        }
+        for hash in try CustomFirmwareDetachedSignature.codeDirectoryHashes(in: signature) {
+            if !original.isEmpty, !original.contains(hash.cdhash) {
+                resignedCDHashes[hash.cdhash] = original
+            }
+            print("  [+] Signed launchd.plist: cdhash \(hash.cdhash.map { String(format: "%02x", $0) }.joined()) (hash type \(hash.hashType))")
+        }
     }
 
     func addVphoned(targetMount: String) throws {
@@ -216,6 +269,39 @@ extension CryptexFilesystemPatcher {
                                  at: "System/DriverKit/System/Library/dyld")
     }
 
+    /// Re-sign the guest's debugserver so it can attach in the guest: the same
+    /// entitlement change `cfw install` makes (``CustomFirmwareDebugserver``), but
+    /// in the pre-reseal merge, so debugserver's new hash lands in the image's
+    /// regenerated trust cache and the stock kernel admits it. A logged no-op when
+    /// the merged system ships no debugserver (a stock userland carries it only in
+    /// the Developer disk image). Running and attaching also need kernel and TXM
+    /// patches; ``FirmwarePatchSetCatalog/userspaceDebugging`` groups them.
+    func patchDebugserver(targetMount: String) throws {
+        let target = try VPhoneConfinedDirectory.pin(absolutePath: targetMount)
+        let relative = CustomFirmwareDebugserver.guestPath
+        guard try target.isRegularFile(relative) else {
+            print("  [!] debugserver absent in the merged image; re-sign skipped")
+            return
+        }
+        try editGuestFile(relative, targetMount: targetMount, mode: 0o755) { file in
+            // A watch's debugserver also carries an arm64_32 slice, which the
+            // signer cannot rewrite; the guest runs the arm64e one.
+            try thinToArm64e(file)
+            guard let source = try VPhoneSigner.entitlements(ofFileAt: file).first(where: { !$0.isEmpty }) else {
+                throw VPhonePatchKit.PatcherError.patchVerificationFailed(
+                    "debugserver has no readable entitlements; cannot grant task_for_pid",
+                )
+            }
+            let entitlements = try CustomFirmwareDebugserver.attachEntitlements(from: source)
+            // Replacement, not merge — see CustomFirmwareDebugserver.attachEntitlements.
+            try VPhoneSigner.sign(
+                fileAt: file,
+                options: VPhoneSignOptions(entitlements: entitlements, style: .appleAdHoc),
+            )
+        }
+        print("  [+] Re-signed debugserver with task_for_pid-allow")
+    }
+
     /// Path-based patchers only see this private copy. Guest symlinks cannot
     /// redirect their reads or writes into the host filesystem.
     func editGuestFile(_ relative: String, targetMount: String, mode: mode_t, edit: (URL) throws -> Void) throws {
@@ -224,6 +310,10 @@ extension CryptexFilesystemPatcher {
         let file = try createTmpDir().appending(path: "payload")
         try data.write(to: file)
         try edit(file)
+        let original = TrustCache.cdHashes(ofMachO: data)
+        for cdHash in try TrustCache.cdHashes(ofMachO: Data(contentsOf: file)) where !original.contains(cdHash) {
+            resignedCDHashes[cdHash] = original
+        }
         try target.replaceFile(relative, fromFileAt: file, mode: mode, owner: (0, 0))
     }
 

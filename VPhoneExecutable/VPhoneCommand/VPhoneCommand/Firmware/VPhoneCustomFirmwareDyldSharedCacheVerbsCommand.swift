@@ -49,23 +49,34 @@ struct DyldSharedCacheUndoOptions: ParsableArguments {
     /// ``DyldSharedCacheUndoLog/updated(existing:captured:patchID:)``). A dry run
     /// never writes. The log is given the owner and mode of the cache's own main
     /// chunk, not 0777: it lives inside the guest System volume, whose modes
-    /// stay unchanged (AGENTS.md).
+    /// stay unchanged (AGENTS.md). A verb that captured no words leaves the
+    /// words file alone instead of reading and rewriting hundreds of megabytes.
     func persist(_ captured: DyldSharedCacheUndoLog, dryRun: Bool) throws {
-        guard let undoLog, captures, !dryRun, !captured.records.isEmpty else { return }
+        guard let undoLog, captures, !dryRun, !captured.isEmpty else { return }
         let url = URL(fileURLWithPath: undoLog)
-        let existing = (try? Data(contentsOf: url)).flatMap { try? DyldSharedCacheUndoLog.decode($0) }
+        let wordsPath = DyldSharedCacheUndoLog.wordsPath(forLog: undoLog)
+        let withWords = captured.words.values.contains { !$0.isEmpty }
+        let existing = withWords
+            ? (try? DyldSharedCacheUndoLog.load(log: url)) ?? nil
+            : (try? Data(contentsOf: url)).flatMap { try? DyldSharedCacheUndoLog.decode($0) }
         guard let merged = DyldSharedCacheUndoLog.updated(
             existing: existing, captured: captured, patchID: undoID ?? "",
         ) else { return }
-        try merged.encoded().write(to: url, options: .atomic)
+        if withWords {
+            try merged.write(log: url)
+        } else {
+            try merged.encoded().write(to: url, options: .atomic)
+        }
         // Match the cache chunk's owner and mode rather than widening it: the
         // directory name is the cache directory, so its main chunk is the
         // reference for what a file here should be owned and permissioned as.
         let mainChunk = DyldSharedCacheChunkSet.mainCacheURL(in: url.deletingLastPathComponent())
         var metadata = stat()
         if lstat(mainChunk.path, &metadata) == 0 {
-            chmod(url.path, metadata.st_mode & 0o7777)
-            chown(url.path, metadata.st_uid, metadata.st_gid)
+            for path in [url.path, wordsPath] where FileManager.default.fileExists(atPath: path) {
+                chmod(path, metadata.st_mode & 0o7777)
+                chown(path, metadata.st_uid, metadata.st_gid)
+            }
         }
     }
 }
@@ -74,13 +85,21 @@ enum VPhoneCustomFirmwareDyldSharedCacheVerbs {
     /// Registered into `vphone-cli cfw` by `VPhoneCustomFirmwareCommand`.
     static var all: [ParsableCommand.Type] {
         [
+            VPhoneCustomFirmwarePatchMetalVertexIDFormatCommand.self,
+            VPhoneCustomFirmwarePatchGLESPrimitiveRestartCommand.self,
+            VPhoneCustomFirmwarePatchMetalCacheReuseKeyCommand.self,
+            VPhoneCustomFirmwarePatchGLESPointDrawCommand.self,
             VPhoneCustomFirmwarePatchHomeViewEnvironmentCommand.self,
             VPhoneCustomFirmwarePatchSettingsSoftwareUpdateCommand.self,
             VPhoneCustomFirmwarePatchArm64eX1BootstrapCacheCommand.self,
             VPhoneCustomFirmwarePatchArm64eX1CacheCommand.self,
             VPhoneCustomFirmwareDyldSharedCacheRevertCommand.self,
+            VPhoneCustomFirmwareDyldSharedCacheUndoWordsCommand.self,
             VPhoneCustomFirmwarePatchHypervisorVirtualMachineDyldSharedCacheCommand.self,
             VPhoneCustomFirmwarePatchIOMFBSwapEndCommand.self,
+            VPhoneCustomFirmwarePatchIOS16MachPortsCommand.self,
+            VPhoneCustomFirmwarePrepareIOS16SurfaceCommand.self,
+            VPhoneCustomFirmwarePrepareIOS16FramebufferCommand.self,
             VPhoneCustomFirmwarePatchIOMFBForceKernCommand.self,
             VPhoneCustomFirmwarePatchDyldSharedCacheMaxSlideCommand.self,
             VPhoneCustomFirmwarePatchLSDEmbeddedRegCommand.self,
@@ -218,6 +237,182 @@ struct VPhoneCustomFirmwarePatchHypervisorVirtualMachineDyldSharedCacheCommand: 
     }
 }
 
+// MARK: - patch-metal-vertex-id-format
+
+struct VPhoneCustomFirmwarePatchMetalVertexIDFormatCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "patch-metal-vertex-id-format",
+        abstract: "Serialize legacy GLES vertex ID formats as UInt for the paravirtual GPU",
+    )
+
+    @Argument(
+        help: "The guest's /System/Library/Caches/com.apple.dyld directory",
+        transform: URL.init(fileURLWithPath:),
+    )
+    var chunksDirectory: URL
+
+    @Flag(name: .customLong("dry-run"), help: "Report the patch sites without writing")
+    var dryRun = false
+
+    @OptionGroup var undo: DyldSharedCacheUndoOptions
+
+    func run() throws {
+        var captured = DyldSharedCacheUndoLog()
+        do {
+            try DyldSharedCacheMetalVertexFormatPatcher.patch(
+                chunksDirectory: chunksDirectory,
+                dryRun: dryRun,
+                captureUndo: undo.captures,
+                onUndo: { captured.merge($0) },
+                log: VPhoneCustomFirmwareDyldSharedCacheVerbs.stdout,
+            )
+        } catch {
+            // A rollback failure returns all pre-write originals, including
+            // partially written ranges. Preserve them before reporting failure.
+            // A verified rollback returns no records and changes no undo log.
+            do {
+                try undo.persist(captured, dryRun: dryRun)
+            } catch let persistenceError {
+                throw ValidationError("\(error.localizedDescription) Recovery undo could not be saved: \(persistenceError.localizedDescription)")
+            }
+            throw error
+        }
+        try undo.persist(captured, dryRun: dryRun)
+    }
+}
+
+// MARK: - patch-gles-primitive-restart
+
+struct VPhoneCustomFirmwarePatchGLESPrimitiveRestartCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "patch-gles-primitive-restart",
+        abstract: "Preserve disabled GLES primitive restart through native primitive expansion",
+    )
+
+    @Argument(
+        help: "The guest's /System/Library/Caches/com.apple.dyld directory",
+        transform: URL.init(fileURLWithPath:),
+    )
+    var chunksDirectory: URL
+
+    @Flag(name: .customLong("dry-run"), help: "Report the patch sites without writing")
+    var dryRun = false
+
+    @OptionGroup var undo: DyldSharedCacheUndoOptions
+
+    func run() throws {
+        var captured = DyldSharedCacheUndoLog()
+        do {
+            try DyldSharedCacheGLESPrimitiveRestartPatcher.patch(
+                chunksDirectory: chunksDirectory,
+                dryRun: dryRun,
+                captureUndo: undo.captures,
+                onUndo: { captured.merge($0) },
+                log: VPhoneCustomFirmwareDyldSharedCacheVerbs.stdout,
+            )
+        } catch {
+            // A rollback failure returns all pre-write originals, including
+            // partially written ranges. Preserve them before reporting failure.
+            // A verified rollback returns no records and changes no undo log.
+            do {
+                try undo.persist(captured, dryRun: dryRun)
+            } catch let persistenceError {
+                throw ValidationError("\(error.localizedDescription) Recovery undo could not be saved: \(persistenceError.localizedDescription)")
+            }
+            throw error
+        }
+        try undo.persist(captured, dryRun: dryRun)
+    }
+}
+
+// MARK: - patch-metal-cache-reuse-key
+
+struct VPhoneCustomFirmwarePatchMetalCacheReuseKeyCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "patch-metal-cache-reuse-key",
+        abstract: "Validate compiler cache identities while permitting reuse across boots",
+    )
+
+    @Argument(
+        help: "The guest's /System/Library/Caches/com.apple.dyld directory",
+        transform: URL.init(fileURLWithPath:),
+    )
+    var chunksDirectory: URL
+
+    @Flag(name: .customLong("dry-run"), help: "Report the patch sites without writing")
+    var dryRun = false
+
+    @OptionGroup var undo: DyldSharedCacheUndoOptions
+
+    func run() throws {
+        var captured = DyldSharedCacheUndoLog()
+        do {
+            try DyldSharedCacheMetalCacheReusePatcher.patch(
+                chunksDirectory: chunksDirectory,
+                dryRun: dryRun,
+                captureUndo: undo.captures,
+                onUndo: { captured.merge($0) },
+                log: VPhoneCustomFirmwareDyldSharedCacheVerbs.stdout,
+            )
+        } catch {
+            // A rollback failure returns all pre-write originals, including
+            // partially written ranges. Preserve them before reporting failure.
+            // A verified rollback returns no records and changes no undo log.
+            do {
+                try undo.persist(captured, dryRun: dryRun)
+            } catch let persistenceError {
+                throw ValidationError("\(error.localizedDescription) Recovery undo could not be saved: \(persistenceError.localizedDescription)")
+            }
+            throw error
+        }
+        try undo.persist(captured, dryRun: dryRun)
+    }
+}
+
+// MARK: - patch-gles-point-draw
+
+struct VPhoneCustomFirmwarePatchGLESPointDrawCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "patch-gles-point-draw",
+        abstract: "Submit valid GLES points despite missing paravirtual pipeline usage flags",
+    )
+
+    @Argument(
+        help: "The guest's /System/Library/Caches/com.apple.dyld directory",
+        transform: URL.init(fileURLWithPath:),
+    )
+    var chunksDirectory: URL
+
+    @Flag(name: .customLong("dry-run"), help: "Report the patch sites without writing")
+    var dryRun = false
+
+    @OptionGroup var undo: DyldSharedCacheUndoOptions
+
+    func run() throws {
+        var captured = DyldSharedCacheUndoLog()
+        do {
+            try DyldSharedCacheGLESPointDrawPatcher.patch(
+                chunksDirectory: chunksDirectory,
+                dryRun: dryRun,
+                captureUndo: undo.captures,
+                onUndo: { captured.merge($0) },
+                log: VPhoneCustomFirmwareDyldSharedCacheVerbs.stdout,
+            )
+        } catch {
+            // A rollback failure returns all pre-write originals, including
+            // partially written ranges. Preserve them before reporting failure.
+            // A verified rollback returns no records and changes no undo log.
+            do {
+                try undo.persist(captured, dryRun: dryRun)
+            } catch let persistenceError {
+                throw ValidationError("\(error.localizedDescription) Recovery undo could not be saved: \(persistenceError.localizedDescription)")
+            }
+            throw error
+        }
+        try undo.persist(captured, dryRun: dryRun)
+    }
+}
+
 // MARK: - patch-iomfb-swapend
 
 struct VPhoneCustomFirmwarePatchIOMFBSwapEndCommand: ParsableCommand {
@@ -325,6 +520,50 @@ struct VPhoneCustomFirmwarePatchIOMFBForceKernCommand: ParsableCommand {
             captureUndo: undo.captures,
             onUndo: { captured.merge($0) },
             log: VPhoneCustomFirmwareDyldSharedCacheVerbs.stdout,
+        )
+        try undo.persist(captured, dryRun: dryRun)
+    }
+}
+
+struct VPhoneCustomFirmwarePrepareIOS16FramebufferCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "prepare-ios16-framebuffer",
+        abstract: "Prepare UUID-checked runtime metadata for the iOS 16 framebuffer adapter"
+    )
+    @Argument(transform: URL.init(fileURLWithPath:)) var chunksDirectory: URL
+    @Argument(transform: URL.init(fileURLWithPath:)) var output: URL
+    func run() throws {
+        let metadata = try DyldSharedCacheIOS16SurfaceAdapter.swapMetadata(directory: chunksDirectory)
+        try metadata.write(to: output, options: .atomic)
+    }
+}
+
+struct VPhoneCustomFirmwarePrepareIOS16SurfaceCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "prepare-ios16-surface",
+        abstract: "Prepare UUID-checked runtime metadata for the iOS 16 IOSurface adapter"
+    )
+    @Argument(transform: URL.init(fileURLWithPath:)) var chunksDirectory: URL
+    @Argument(transform: URL.init(fileURLWithPath:)) var output: URL
+    func run() throws {
+        let metadata = try DyldSharedCacheIOS16SurfaceAdapter.metadata(directory: chunksDirectory)
+        try metadata.write(to: output, options: .atomic)
+    }
+}
+
+struct VPhoneCustomFirmwarePatchIOS16MachPortsCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "patch-ios16-mach-ports",
+        abstract: "Adapt iOS 16's early registered-port lookup to the cloudOS 26.1 protocol"
+    )
+    @Argument(transform: URL.init(fileURLWithPath:)) var chunksDirectory: URL
+    @Flag(name: .customLong("dry-run")) var dryRun = false
+    @OptionGroup var undo: DyldSharedCacheUndoOptions
+    func run() throws {
+        var captured = DyldSharedCacheUndoLog()
+        try DyldSharedCacheMachPortsPatcher.apply(
+            directory: chunksDirectory, dryRun: dryRun, captureUndo: undo.captures,
+            onUndo: { captured.merge($0) }, log: VPhoneCustomFirmwareDyldSharedCacheVerbs.stdout
         )
         try undo.persist(captured, dryRun: dryRun)
     }
@@ -682,11 +921,10 @@ struct VPhoneCustomFirmwareDyldSharedCacheRevertCommand: ParsableCommand {
 
     func run() throws {
         let url = URL(fileURLWithPath: undoLog)
-        guard let data = try? Data(contentsOf: url) else {
+        guard let log = try DyldSharedCacheUndoLog.load(log: url) else {
             print("  [=] no dyld undo log at \(undoLog); nothing to revert")
             return
         }
-        let log = try DyldSharedCacheUndoLog.decode(data)
         let wanted = Set(patches)
         let present = wanted.intersection(log.patchIDs)
         guard !present.isEmpty else {
@@ -697,6 +935,11 @@ struct VPhoneCustomFirmwareDyldSharedCacheRevertCommand: ParsableCommand {
             for record in log.records(forPatchIDs: present) {
                 print("  [.] dry-run: would restore \(record.original.count) byte(s) at 0x"
                     + String(record.vma, radix: 16, uppercase: true) + " (\(record.patchID))")
+            }
+            for patchID in present.sorted() {
+                if let words = log.words[patchID], !words.isEmpty {
+                    print("  [.] dry-run: would restore \(words.count) instruction(s) (\(patchID))")
+                }
             }
             return
         }
@@ -714,8 +957,54 @@ struct VPhoneCustomFirmwareDyldSharedCacheRevertCommand: ParsableCommand {
             )
         }
         let remaining = log.removing(patchIDs: present)
-        try remaining.encoded().write(to: url, options: .atomic)
-        try? FileManager.default.setAttributes([.posixPermissions: 0o777], ofItemAtPath: url.path)
+        try remaining.write(log: url)
+        for path in [url.path, DyldSharedCacheUndoLog.wordsPath(forLog: undoLog)] {
+            try? FileManager.default.setAttributes([.posixPermissions: 0o777], ofItemAtPath: path)
+        }
         print("  [+] reverted \(present.count) dyld patch(es): \(present.sorted().joined(separator: ", "))")
+    }
+}
+
+// MARK: - dsc-undo-words
+
+/// Convert the X1 lowering's page runs in an undo log written by 2.15.0 or
+/// earlier into words, once. Those runs are gigabytes of originals, and every cache verb
+/// that records anything decodes and re-encodes the whole log; the words keep
+/// only the instructions the lowering changed, in the file beside it.
+/// `cfw install` and `cfw update-environment` invoke this before the cache
+/// patches; it is not a verb a researcher reaches for by hand.
+struct VPhoneCustomFirmwareDyldSharedCacheUndoWordsCommand: ParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "patch-dsc-undo-words",
+        abstract: "Keep the X1 lowering's undo as words instead of page runs",
+        shouldDisplay: false,
+    )
+
+    @Argument(
+        help: "The guest's /System/Library/Caches/com.apple.dyld directory",
+        transform: URL.init(fileURLWithPath:),
+    )
+    var chunksDirectory: URL
+
+    @Option(name: .customLong("undo-log"), help: "The undo log the patch verbs wrote")
+    var undoLog: String
+
+    func run() throws {
+        let url = URL(fileURLWithPath: undoLog)
+        guard let log = try DyldSharedCacheUndoLog.load(log: url),
+              let converted = try log.convertingRunsToWords(
+                  of: DyldSharedCacheArm64eX1BootstrapPatcher.wordUndoPatchIDs,
+                  in: chunksDirectory,
+              )
+        else { return }
+        try converted.write(log: url)
+        var metadata = stat()
+        if lstat(url.path, &metadata) == 0 {
+            let wordsPath = DyldSharedCacheUndoLog.wordsPath(forLog: undoLog)
+            chmod(wordsPath, metadata.st_mode & 0o7777)
+            chown(wordsPath, metadata.st_uid, metadata.st_gid)
+        }
+        let words = converted.words.values.reduce(0) { $0 + $1.count }
+        print("  [+] dyld undo log: \(log.records.count - converted.records.count) X1 page run(s) kept as \(words) instruction(s)")
     }
 }

@@ -25,6 +25,9 @@
 extern NSString *const vpInnerDisplayName;
 /// Its state is the context id backboardd shows the inner display's pages in, 0 for none.
 extern const char *const vpInnerPagesNotification;
+/// Its state is 1 while the panel has stayed on since SpringBoard last lit the
+/// screen (the always-on Lock Screen), 2 once it has gone off, 0 unknown.
+extern const char *const vpPanelDarkNotification;
 void vpFoldDisplayLog(NSString *line);
 id vpReadObject(id object, const char *name);
 id vpReadObjectIvar(id object, const char *name);
@@ -32,6 +35,7 @@ id vpReadObjectIvar(id object, const char *name);
 // MARK: - FoldDisplayBackboard.m
 
 void vpInstallInnerRenderDisplay(void);
+void vpTagRenderDisplay(id display, NSString *tagName);
 
 // MARK: - FoldDisplayInnerPages.m
 
@@ -40,6 +44,9 @@ void vpShareInnerDisplayPages(id display);
 // MARK: - FoldDisplayAdapter.m
 
 BOOL vpIsInnerDisplay(id display);
+BOOL vpIsInnerDisplayIdentity(id identity);
+void vpInstallExternalDisplay(BOOL serverProcess);
+void vpPrepareExternalRenderDisplays(id server);
 BOOL vpSceneIsOnInnerDisplay(id scene);
 /// The SpringBoard window scene (not an aperture subclass) on the inner
 /// display, or on Main.

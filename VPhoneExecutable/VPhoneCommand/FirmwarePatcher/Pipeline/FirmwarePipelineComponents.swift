@@ -46,16 +46,26 @@ extension FirmwarePipeline {
         let includeBootChain = includesSet(FirmwareBootChainPatchSet.identifier)
 
         // Whether the plan turns on any patch for a boot chain component. A
-        // preset that keeps the set for some components only (`minimal`: iBEC and
-        // LLB) leaves the others stock, and a patcher built to write nothing
-        // would only log that it found nothing.
+        // preset that names the set but turns on patches for some components only
+        // (`minimal` and `watchos`: none) leaves the others stock, and a patcher
+        // built to write nothing would only log that it found nothing.
         func patchesBootChain(_ component: VPhoneFirmwareComponent) -> Bool {
             guard includeBootChain else { return false }
             guard let plan else { return true }
             return plan.declarations.contains { $0.target == .firmware(component) && plan.isEnabled($0.identifier) }
         }
-        let includeKernelBase = includesSet(FirmwareKernelBasePatchSet.identifier)
-        let includeKernelCustomFirmware = includesSet(FirmwareKernelCustomFirmwarePatchSet.identifier)
+        // Whether the plan turns on any patch from the two kernel sets. `minimal`
+        // names them so a machine can turn some on, but selects none itself; its
+        // kernel stays stock, and the kernel patchers would only log every site
+        // they skipped. (The research board's kext mix targets the kernelcache
+        // too, so it is not enough to ask about the target.)
+        let patchesKernel = plan.map { plan in
+            plan.patchSets
+                .filter { [FirmwareKernelBasePatchSet.identifier, FirmwareKernelCustomFirmwarePatchSet.identifier].contains($0.identifier) }
+                .contains { set in set.patches.contains { plan.isEnabled($0.identifier) } }
+        } ?? true
+        let includeKernelBase = includesSet(FirmwareKernelBasePatchSet.identifier) && patchesKernel
+        let includeKernelCustomFirmware = includesSet(FirmwareKernelCustomFirmwarePatchSet.identifier) && patchesKernel
         let includeDeviceTree = includesSet(FirmwareDeviceTreePatchSet.identifier)
 
         // A guest that presents its board boots a device tree of its own (7b),
@@ -122,7 +132,7 @@ extension FirmwarePipeline {
         // Network.framework uses the BSD path (the 26.1-kernel skywalk
         // channel-create traps in the 18.x Network.framework and crash-loops
         // mDNSResponder → no DNS). Empty on 26.x bases (stock boot-args).
-        let extraBootArgs = (baseIs18 || iOSBase?.major == 17) ? "if_attach_nx=0x3" : ""
+        let extraBootArgs = (baseIs18 || iOSBase?.major == 17 || iOSBase?.major == 16) ? "if_attach_nx=0x3" : ""
 
         // 1. AVPBooter — Apple's ROM, in the VM root. Patched when the plan keeps
         //    the boot chain set. A machine booting OpenAVB has nothing

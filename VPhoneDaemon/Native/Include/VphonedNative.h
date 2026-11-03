@@ -105,6 +105,10 @@ char * _Null_unspecified vp_homeview_distance_copy_json(const char * _Null_unspe
 /// safe to call more than once; returns false (injection then stays a no-op)
 /// on bases that do not expose the private symbols.
 bool vp_hid_load(void);
+/// Register the opt-in iOS 16 lab's missing main touchscreen service.
+void vp_ios16_touchscreen_start(void);
+/// Maintain the explicitly selected fresh ephemeral lab's UI-only lease.
+void vp_ios16_keybagless_ui_start(void);
 /// A keyboard/consumer hold transition, including KeyboardLongPress on release.
 bool vp_hid_keyboard_hold(uint16_t page, uint16_t usage, bool down);
 
@@ -234,11 +238,19 @@ bool vp_devicehub_controls_start(void (^_Nonnull handler)(NSDictionary * _Nonnul
 /// hinge stand-ins in dtdeviceinfod read the virtual hinge's newest sample,
 /// without moving the hinge.
 void vp_hinge_reading_publish(double angleDegrees, int hingeState);
+/// Whether the device tree node at `path` (an `IODeviceTree:` path) has the
+/// property `name`, whatever its value.
+bool vp_device_tree_has_property(const char * _Nonnull path, const char * _Nonnull name);
+
 /// Every display-ish IOService object the guest published, with its small
 /// properties: what the display stack bound, for the foldable display work.
 NSArray * _Nonnull vp_display_probe(void);
 /// Read-only CoreAnimation display modes and capability surface.
 NSDictionary<NSString *, id> * _Nonnull vp_display_modes(void);
+NSDictionary<NSString *, id> * _Nonnull vp_external_display_status(void);
+NSDictionary<NSString *, id> * _Nonnull vp_external_display_diagnostics(void);
+NSDictionary<NSString *, id> * _Nonnull vp_external_display_configure(BOOL enabled, NSInteger width, NSInteger height);
+NSData * _Nullable vp_external_display_frame(NSString * _Nullable * _Nullable error);
 NSDictionary<NSString *, id> * _Nonnull vp_device_pose_get(void);
 /// Set the hinge to `angleDegrees` at once. `orientation` is CoreMotion's
 /// device orientation for the host controls (1 portrait … 6 face down), or 0

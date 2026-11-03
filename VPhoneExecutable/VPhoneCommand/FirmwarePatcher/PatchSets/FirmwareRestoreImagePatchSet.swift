@@ -8,11 +8,12 @@
 // chain, kernel and TXM stay stock, and nothing writes the System volume after the
 // restore, because that would break the seal.
 //
-// Only the `minimal` preset and its watch form, `watchos`, name this set, and both
-// allow all of it. Every patch in it but the two experiments is boot-essential for
-// them, and naming it nowhere else keeps `standard` from counting them as dropped.
-// A watchOS image has no cryptexes: for a watch the merge only reseals the image
-// with the guest payload.
+// Only the `minimal` preset and its watch form, `watchos`, name this set,
+// and both allow all of it but the launchd_cache_loader gate. Every patch in
+// it but the three experiments is boot-essential for them, and naming it
+// nowhere else keeps `standard` from counting them as dropped. A watchOS image
+// has no cryptexes: for a watch the merge only reseals the image with the
+// guest payload.
 
 import Foundation
 import VPhonePatchKit
@@ -28,10 +29,24 @@ public enum FirmwareRestoreImagePatchSet {
     public static let surfaceCompression = "filesystem-boot-ios18_surface_compression"
     public static let mobileActivation = "filesystem-boot-mobileactivationd_should_hactivate"
     public static let vphoned = "filesystem-boot-vphoned"
-    public static let launchdCacheLoader = "filesystem-boot-launchd_cache_loader_unsecure_cache_gate"
+    /// No longer needed by `minimal` or `watchos`: the vphoned step re-signs the
+    /// edited launchd.plist and the trust cache takes its cdhashes.
+    public static let launchdCacheLoader = "filesystem-exp-launchd_cache_loader_unsecure_cache_gate"
     public static let virtualBluetooth = "filesystem-exp-btvc_le_connection"
     public static let watchAudio = "filesystem-exp-watch_audio"
+    public static let debugserver = "filesystem-exp-debugserver"
+    public static let launchdJetsam = "filesystem-exp-launchd_jetsam_panic_guard"
     public static let digestRehash = "manifest-boot-digest_rehash"
+
+    /// Patches a machine asks for by name (`--allow`, or a preset that lists them);
+    /// `minimal` and `watchos` leave them off, so the plain presets stay a lifelike
+    /// stock guest.
+    public static let optInPatches: Set = [debugserver, launchdJetsam]
+    /// What `minimal` and `watchos` select from this set: everything but the
+    /// opt-in patches.
+    public static var presetPatches: Set<String> {
+        Set(manifest.patches.map(\.identifier)).subtracting(optInPatches)
+    }
 
     private static func filesystem(_ identifier: String, _ title: String, _ summary: String) -> VPhonePatchDeclaration {
         VPhonePatchDeclaration(
@@ -71,12 +86,13 @@ public enum FirmwareRestoreImagePatchSet {
             filesystem(
                 vphoned,
                 "vphoned",
-                "Installs the guest daemon and its launch daemon, which the host talks to.",
+                "Installs the guest daemon and its launch daemon, which the host talks to, and signs the edited launchd.plist so the stock launchd_cache_loader accepts it.",
             ),
-            filesystem(
-                launchdCacheLoader,
-                "Launch daemon cache",
-                "Lets launchd load the launch daemons from the system volume instead of the signed cache, so vphoned starts.",
+            VPhonePatchDeclaration(
+                identifier: launchdCacheLoader,
+                title: "Unsigned launch daemon cache",
+                summary: "NOPs launchd_cache_loader's launchd_unsecure_cache= gate, so launchd takes launchd.plist without checking its detached signature against the trust cache. Not needed: the vphoned step signs the edited launchd.plist and the rebuilt trust cache holds its cdhashes.",
+                target: .firmware(.filesystem),
             ),
             VPhonePatchDeclaration(
                 identifier: virtualBluetooth,
@@ -88,6 +104,18 @@ public enum FirmwareRestoreImagePatchSet {
                 identifier: watchAudio,
                 title: "Watch speaker",
                 summary: "Installs the virtio sound HAL plugin on watchOS.",
+                target: .firmware(.filesystem),
+            ),
+            VPhonePatchDeclaration(
+                identifier: debugserver,
+                title: "debugserver",
+                summary: "Re-signs the guest's debugserver with task_for_pid-allow and no sandbox profile, before the reseal, so it can attach to a process in the guest. Off by default — a lifelike guest ships no debugger, and a stock userland carries debugserver only in the Developer disk image, where this is a no-op. On its own it does not run on minimal's stock kernel and TXM: turn on Userspace debugging, which adds the kernel and TXM patches it needs.",
+                target: .firmware(.filesystem),
+            ),
+            VPhonePatchDeclaration(
+                identifier: launchdJetsam,
+                title: "launchd jetsam panic guard",
+                summary: "Patches launchd, before the reseal, so a daemon without jetsam properties does not panic the guest. Off by default. With developer mode on, MobileStorageMounter mounts the Developer disk image, and launchd's guard against its daemons kills init (\"jetsam property category (Daemon) is not initialized\"). The same change cfw install makes with system-launchd-boot-jetsam_panic_guard_bypass.",
                 target: .firmware(.filesystem),
             ),
             VPhonePatchDeclaration(

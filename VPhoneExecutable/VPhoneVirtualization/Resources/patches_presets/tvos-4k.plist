@@ -114,6 +114,10 @@
 			<string>dyld-boot-arm64e_x1_bootstrap</string>
 			<string>dyld-boot-iomfb_swapend</string>
 			<string>dyld-cfw-camera</string>
+			<string>dyld-cfw-metal_vertex_id_format</string>
+			<string>dyld-cfw-gles_primitive_restart</string>
+			<string>dyld-cfw-metal_cache_reuse_key</string>
+			<string>dyld-cfw-gles_point_draw</string>
 			<string>dyld-cfw-arm64e_x1_cache</string>
 			<string>system-cibarcode-cfw-arm64e_x1</string>
 			<string>kernel-boot-arm64e_x1</string>
@@ -149,6 +153,8 @@
 			<string>system-mount-boot-arm64e_x1_bootstrap</string>
 			<string>system-paravirt_gpu-cfw-heap_index_offset</string>
 			<string>system-paravirt_gpu-cfw-primitive_restart</string>
+			<string>system-paravirt_gpu-cfw-compiler_cache</string>
+			<string>system-systemhook-cfw-gles_upper_left</string>
 			<string>system-systemhook-cfw-metal_cache_reuse</string>
 			<string>system-systemversion-cfw-build_version</string>
 			<string>system-virtiosound-cfw-hal_plugin</string>
@@ -163,6 +169,16 @@
 			<string>system-dyld-exp-tv_tpro</string>
 			<string>kernel-exp-tv_tpro_pagers</string>
 			<string>system-springboard-exp-ios17_desktop</string>
+			<string>system-launchd-exp-ios16_mach_ports</string>
+			<string>dyld-exp-ios16_mach_ports_lookup</string>
+			<string>system-backboard-exp-ios16_migration</string>
+			<string>system-keybag-exp-ios16_ephemeral</string>
+			<string>system-springboard-exp-ios16_desktop</string>
+			<string>system-systemhook-exp-ios16_surface</string>
+			<string>system-systemhook-exp-ios16_framebuffer</string>
+			<string>preboot-exp-ios16_ephemeral_storage</string>
+			<string>system-vphoned-exp-ios16_touchscreen</string>
+			<string>system-springboard-exp-ios16_keybagless_ui</string>
 		</array>
 	</dict>
 	<key>Summary</key>
