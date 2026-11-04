@@ -2,70 +2,648 @@
   "sourceLanguage" : "en",
   "strings" : {
     "Changes HomeView’s detail level. Apps can defer lower detail until you switch away. Some screens use a fixed detail level." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改 HomeView 的细节级别。App 可能会等你切换离开后才降低细节。部分屏幕使用固定的细节级别。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomeView の詳細レベルを変更します。アプリは、ほかの画面に切り替えるまで詳細レベルを下げないことがあります。一部の画面では詳細レベルが固定されています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomeView의 세부 수준을 변경합니다. 앱은 다른 화면으로 전환할 때까지 낮은 세부 수준 적용을 미룰 수 있습니다. 일부 화면은 고정된 세부 수준을 사용합니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thay đổi mức chi tiết của HomeView. Ứng dụng có thể hoãn giảm chi tiết cho đến khi bạn chuyển đi nơi khác. Một số màn hình dùng mức chi tiết cố định."
+          }
+        }
+      }
     },
     "Apply" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "適用"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "적용"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Áp dụng"
+          }
+        }
+      }
     },
     "Automatic" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自動"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자동"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tự động"
+          }
+        }
+      }
     },
     "Current" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện tại"
+          }
+        }
+      }
     },
     "Far" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "远距离"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "遠距離"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "원거리"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xa"
+          }
+        }
+      }
     },
     "Near" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近距离"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "近距離"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "근거리"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gần"
+          }
+        }
+      }
     },
     "Near and Far simulate HomeView’s distance-driven detail levels without changing other environment overrides." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“近距离”和“远距离”模拟 HomeView 随距离变化的细节级别，不更改其他环境覆盖设置。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「近距離」と「遠距離」は、ほかの環境の上書き設定を変更せずに、HomeView の距離に応じた詳細レベルをシミュレートします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "'근거리'와 '원거리'는 다른 환경 재정의를 변경하지 않고 HomeView의 거리에 따른 세부 수준을 시뮬레이션합니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gần và Xa mô phỏng các mức chi tiết theo khoảng cách của HomeView mà không thay đổi các thiết lập ghi đè môi trường khác."
+          }
+        }
+      }
     },
     "Reset Environment Simulation" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置环境模拟"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "環境シミュレーションをリセット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "환경 시뮬레이션 재설정"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt lại mô phỏng môi trường"
+          }
+        }
+      }
     },
     "Resets all native environment simulation overrides, including persona, display style, detail, and backlight." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重置所有原生环境模拟覆盖设置，包括用户身份、显示样式、细节级别和背光。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ペルソナ、表示スタイル、詳細レベル、バックライトを含む、ネイティブ環境シミュレーションの上書き設定をすべてリセットします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "페르소나, 디스플레이 스타일, 세부 수준, 백라이트를 포함한 모든 네이티브 환경 시뮬레이션 재정의를 재설정합니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt lại tất cả thiết lập ghi đè mô phỏng môi trường gốc, bao gồm persona, kiểu hiển thị, mức chi tiết và đèn nền."
+          }
+        }
+      }
     },
     "Simulated Distance" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "模拟距离"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シミュレートする距離"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시뮬레이션 거리"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khoảng cách mô phỏng"
+          }
+        }
+      }
     },
     "Standard Detail" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标准细节"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "標準の詳細レベル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "표준 세부 수준"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chi tiết tiêu chuẩn"
+          }
+        }
+      }
     },
     "This guest environment does not support distance simulation." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此客户机环境不支持距离模拟。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このゲスト環境は距離のシミュレーションに対応していません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 게스트 환경은 거리 시뮬레이션을 지원하지 않습니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Môi trường máy khách này không hỗ trợ mô phỏng khoảng cách."
+          }
+        }
+      }
     },
     "Viewing Distance" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "观看距离"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "視聴距離"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시청 거리"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khoảng cách xem"
+          }
+        }
+      }
     },
     "Angle" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "角度"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "角度"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "각도"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Góc"
+          }
+        }
+      }
     },
     "Animate the fold (sweep)" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以动画方式折叠"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折りたたみをアニメーションで表示（スイープ）"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "접기 애니메이션(스윕)"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tạo hiệu ứng gập (chuyển dần)"
+          }
+        }
+      }
     },
     "Apple TV Remote" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple TV 遥控器"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple TV Remote"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple TV 리모컨"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple TV Remote"
+          }
+        }
+      }
     },
     "Book" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "书本"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブック"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "책 형태"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dạng sách"
+          }
+        }
+      }
     },
     "Click or hold. Arrow keys navigate.\nReturn selects. Esc goes back." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按或按住。使用箭头键移动。\nReturn 键选择，Esc 键返回。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "クリックまたは長押しします。矢印キーで移動します。\nReturn キーで選択、Esc キーで戻ります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "클릭하거나 길게 누르세요. 화살표 키로 이동합니다.\nReturn 키로 선택하고 Esc 키로 돌아갑니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bấm hoặc giữ. Dùng phím mũi tên để di chuyển.\nReturn để chọn. Esc để quay lại."
+          }
+        }
+      }
     },
     "Closed uses the cover screen. Book and Open use the inner screen. Screen changes apply while the device is running." : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“合上”使用外屏，“书本”和“展开”使用内屏。屏幕更改会在设备运行时生效。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「閉じた状態」はカバー画面、「ブック」と「開いた状態」は内側の画面を使用します。画面の変更はデバイスの実行中に適用されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "'닫힘'은 커버 화면을 사용하고, '책 형태'와 '열림'은 내부 화면을 사용합니다. 화면 변경은 기기가 실행 중일 때 적용됩니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gập sử dụng màn hình ngoài. Dạng sách và Mở phẳng sử dụng màn hình trong. Thay đổi màn hình được áp dụng khi thiết bị đang chạy."
+          }
+        }
+      }
     },
     "Closed" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "合上"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じた状態"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫힘"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gập"
+          }
+        }
+      }
     },
     "Down" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "下"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "아래"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xuống"
+          }
+        }
+      }
     },
     "Duration" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时长"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "継続時間"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "지속 시간"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thời lượng"
+          }
+        }
+      }
     },
     "Fold Posture" : {
-
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折叠姿态"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折りたたみの姿勢"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "접힘 자세"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tư thế gập"
+          }
+        }
+      }
     },
     "Folded to %@ — %lld°." : {
       "localizations" : {
@@ -74,70 +652,627 @@
             "state" : "new",
             "value" : "Folded to %1$@ — %2$lld°."
           }
-        }
-      }
-    },
-    "Folding…" : {
-
-    },
-    "Hinge Sensor" : {
-
-    },
-    "Hinge Service" : {
-
-    },
-    "Hinge State" : {
-
-    },
-    "Left" : {
-    },
-    "Play / Pause" : {
-    },
-    "Right" : {
-    },
-    "Screen State" : {
-
-    },
-    "Select" : {
-    },
-    "Set Again" : {
-
-    },
-    "Siri" : {
-    },
-    "Sweep Again" : {
-
-    },
-    "Sweep" : {
-
-    },
-    "TV / Control Center" : {
-    },
-    "The hinge service is off; only the pose changed." : {
-
-    },
-    "The pose reaches SpringBoard and the virtual hinge sensor (CoreMotion, CoreDevice). The screen's own layout follows the displays the guest registers, so a single-display guest keeps one full-screen layout." : {
-
-    },
-    "The pose reaches SpringBoard and the virtual hinge sensor (CoreMotion, CoreDevice). The window folds with it, and the guest's real panel follows the posture at the next start — the host does not resize a running display. A single-display guest keeps one full-screen layout." : {
-
-    },
-    "Unable to fold. %@" : {
-
-    },
-    "Up" : {
-    },
-    "%lld of %lld defaults · %lld unsaved changes" : {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "new",
-            "value": "%1$lld of %2$lld defaults · %3$lld unsaved changes"
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已折叠到“%1$@”（%2$lld°）。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%1$@」に折りたたみました（%2$lld°）。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 상태로 접었습니다(%2$lld°)."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã gập sang %1$@ — %2$lld°."
           }
         }
       }
     },
-    "Change the search or filter to browse other defaults." : {},
+    "Folding…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在折叠…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折りたたみ中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "접는 중…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang gập…"
+          }
+        }
+      }
+    },
+    "Hinge Sensor" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "铰链传感器"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヒンジセンサー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "힌지 센서"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cảm biến bản lề"
+          }
+        }
+      }
+    },
+    "Hinge Service" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "铰链服务"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヒンジサービス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "힌지 서비스"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dịch vụ bản lề"
+          }
+        }
+      }
+    },
+    "Hinge State" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "铰链状态"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヒンジの状態"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "힌지 상태"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trạng thái bản lề"
+          }
+        }
+      }
+    },
+    "Left" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "왼쪽"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trái"
+          }
+        }
+      }
+    },
+    "Play / Pause" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放/暂停"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再生/一時停止"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재생/일시 정지"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phát/Tạm dừng"
+          }
+        }
+      }
+    },
+    "Right" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "右"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "오른쪽"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phải"
+          }
+        }
+      }
+    },
+    "Screen State" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "屏幕状态"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "画面の状態"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "화면 상태"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trạng thái màn hình"
+          }
+        }
+      }
+    },
+    "Select" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "选择"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "選択"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "선택"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chọn"
+          }
+        }
+      }
+    },
+    "Set Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次设置"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 설정"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt lần nữa"
+          }
+        }
+      }
+    },
+    "Siri" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siri"
+          }
+        }
+      }
+    },
+    "Sweep Again" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再次过渡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度スイープ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 스윕"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển dần lại"
+          }
+        }
+      }
+    },
+    "Sweep" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "动画过渡"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スイープ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "스윕"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chuyển dần"
+          }
+        }
+      }
+    },
+    "TV / Control Center" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TV/控制中心"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TV/コントロールセンター"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TV/제어 센터"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "TV/Trung tâm điều khiển"
+          }
+        }
+      }
+    },
+    "The hinge service is off; only the pose changed." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "铰链服务已关闭；仅更改了姿态。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヒンジサービスがオフのため、姿勢のみ変更しました。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "힌지 서비스가 꺼져 있어 자세만 변경되었습니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dịch vụ bản lề đang tắt; chỉ tư thế được thay đổi."
+          }
+        }
+      }
+    },
+    "The pose reaches SpringBoard and the virtual hinge sensor (CoreMotion, CoreDevice). The screen's own layout follows the displays the guest registers, so a single-display guest keeps one full-screen layout." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "姿态会传递给 SpringBoard 和虚拟铰链传感器（CoreMotion、CoreDevice）。屏幕布局取决于客户机注册的显示器，因此只有一个显示器的客户机始终保持单一全屏布局。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "姿勢は SpringBoard と仮想ヒンジセンサー（CoreMotion、CoreDevice）に伝わります。画面自体のレイアウトはゲストが登録したディスプレイに従うため、ディスプレイが 1 つのゲストでは全画面レイアウトが 1 つのままです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자세는 SpringBoard와 가상 힌지 센서(CoreMotion, CoreDevice)에 전달됩니다. 화면 자체의 레이아웃은 게스트가 등록한 디스플레이를 따르므로, 디스플레이가 하나인 게스트는 단일 전체 화면 레이아웃을 유지합니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tư thế được truyền đến SpringBoard và cảm biến bản lề ảo (CoreMotion, CoreDevice). Bố cục của chính màn hình tuân theo các màn hình mà máy khách đăng ký, nên máy khách chỉ có một màn hình sẽ giữ một bố cục toàn màn hình."
+          }
+        }
+      }
+    },
+    "The pose reaches SpringBoard and the virtual hinge sensor (CoreMotion, CoreDevice). The window folds with it, and the guest's real panel follows the posture at the next start — the host does not resize a running display. A single-display guest keeps one full-screen layout." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "姿态会传递给 SpringBoard 和虚拟铰链传感器（CoreMotion、CoreDevice）。窗口会随之折叠，客户机的实际面板会在下次启动时按该姿态调整——主机不会调整正在运行的显示器的大小。只有一个显示器的客户机始终保持单一全屏布局。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "姿勢は SpringBoard と仮想ヒンジセンサー（CoreMotion、CoreDevice）に伝わります。ウインドウもそれに合わせて折りたたまれ、ゲストの実際のパネルは次回の起動時に姿勢に合わせて変わります。ホストは実行中のディスプレイのサイズを変更しません。ディスプレイが 1 つのゲストでは全画面レイアウトが 1 つのままです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자세는 SpringBoard와 가상 힌지 센서(CoreMotion, CoreDevice)에 전달됩니다. 윈도우도 함께 접히며, 게스트의 실제 패널은 다음 시작 시 이 자세를 따릅니다. 호스트는 실행 중인 디스플레이의 크기를 조절하지 않습니다. 디스플레이가 하나인 게스트는 단일 전체 화면 레이아웃을 유지합니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tư thế được truyền đến SpringBoard và cảm biến bản lề ảo (CoreMotion, CoreDevice). Cửa sổ sẽ gập theo, và tấm nền thực của máy khách sẽ theo tư thế này ở lần khởi động tiếp theo — máy chủ không đổi kích thước màn hình đang chạy. Máy khách chỉ có một màn hình sẽ giữ một bố cục toàn màn hình."
+          }
+        }
+      }
+    },
+    "Unable to fold. %@" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法折叠。%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "折りたためません。%@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "접을 수 없습니다. %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể gập. %@"
+          }
+        }
+      }
+    },
+    "Up" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "위"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lên"
+          }
+        }
+      }
+    },
+    "%lld of %lld defaults · %lld unsaved changes" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld of %2$lld defaults · %3$lld unsaved changes"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld / %2$lld 个默认设置 · %3$lld 项更改未存储"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デフォルト %2$lld 件中 %1$lld 件 · 未保存の変更 %3$lld 件"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기본값 항목 %2$lld개 중 %1$lld개 · 저장되지 않은 변경 사항 %3$lld개"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld/%2$lld giá trị mặc định · %3$lld thay đổi chưa lưu"
+          }
+        }
+      }
+    },
+    "Change the search or filter to browse other defaults." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更改搜索或筛选条件以浏览其他默认设置。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ほかのデフォルトを表示するには、検索またはフィルタを変更してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다른 기본값 항목을 보려면 검색어나 필터를 변경하세요."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thay đổi tìm kiếm hoặc bộ lọc để duyệt các giá trị mặc định khác."
+          }
+        }
+      }
+    },
     "Debug Session" : {
       "localizations" : {
         "en" : {
@@ -172,27 +1307,664 @@
         }
       }
     },
-    "Default Value" : {},
-    "Discard Changes" : {},
-    "Discard Edit" : {},
-    "Discard unsaved changes?" : {},
-    "Done" : {},
-    "Edited" : {},
-    "Enabled" : {},
-    "HomePod User Defaults" : {},
-    "HomePod user defaults" : {},
-    "Maximum" : {},
-    "Metadata" : {},
-    "Minimum" : {},
-    "No Matching Defaults" : {},
-    "Override" : {},
-    "Overrides Only" : {},
-    "Read current values and metadata. Unsaved edits are preserved." : {},
-    "Reading defaults from SoundBoard…" : {},
-    "Remove this setting's override in SoundBoard." : {},
-    "Requires reinitialization; restart SoundBoard after applying this change." : {},
-    "Reset to Default" : {},
-    "Restart SoundBoard" : {},
+    "Default Value" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "默认值"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デフォルト値"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기본값"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giá trị mặc định"
+          }
+        }
+      }
+    },
+    "Discard Changes" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放弃更改"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更を破棄"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "변경 사항 폐기"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hủy các thay đổi"
+          }
+        }
+      }
+    },
+    "Discard Edit" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "放弃编辑"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集を破棄"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "편집 폐기"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hủy chỉnh sửa"
+          }
+        }
+      }
+    },
+    "Discard unsaved changes?" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要放弃未存储的更改吗？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未保存の変更を破棄しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장되지 않은 변경 사항을 폐기하시겠습니까?"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hủy các thay đổi chưa lưu?"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完成"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "完了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "완료"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xong"
+          }
+        }
+      }
+    },
+    "Edited" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已编辑"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "編集済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "편집됨"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã chỉnh sửa"
+          }
+        }
+      }
+    },
+    "Enabled" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已启用"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有効"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "활성화됨"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã bật"
+          }
+        }
+      }
+    },
+    "HomePod User Defaults" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod 用户默认设置"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod ユーザデフォルト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod 사용자 기본값"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mặc định người dùng HomePod"
+          }
+        }
+      }
+    },
+    "HomePod user defaults" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod 用户默认设置"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod ユーザデフォルト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod 사용자 기본값"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mặc định người dùng HomePod"
+          }
+        }
+      }
+    },
+    "Maximum" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大值"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最大値"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최댓값"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tối đa"
+          }
+        }
+      }
+    },
+    "Metadata" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "元数据"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "メタデータ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "메타데이터"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Siêu dữ liệu"
+          }
+        }
+      }
+    },
+    "Minimum" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最小值"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最小値"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "최솟값"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tối thiểu"
+          }
+        }
+      }
+    },
+    "No Matching Defaults" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有匹配的默认设置"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "一致するデフォルトはありません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "일치하는 기본값 항목 없음"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không có giá trị mặc định phù hợp"
+          }
+        }
+      }
+    },
+    "Override" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已覆盖"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上書き済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재정의됨"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã ghi đè"
+          }
+        }
+      }
+    },
+    "Overrides Only" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅显示已覆盖项"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上書きのみ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재정의된 항목만"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chỉ mục đã ghi đè"
+          }
+        }
+      }
+    },
+    "Read current values and metadata. Unsaved edits are preserved." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "读取当前值和元数据。未存储的编辑会保留。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "現在の値とメタデータを読み込みます。未保存の編集は保持されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "현재 값과 메타데이터를 읽습니다. 저장되지 않은 편집 내용은 유지됩니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đọc giá trị hiện tại và siêu dữ liệu. Các chỉnh sửa chưa lưu được giữ nguyên."
+          }
+        }
+      }
+    },
+    "Reading defaults from SoundBoard…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从 SoundBoard 读取默认设置…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard からデフォルトを読み込み中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard에서 기본값 항목을 읽는 중…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang đọc giá trị mặc định từ SoundBoard…"
+          }
+        }
+      }
+    },
+    "Remove this setting's override in SoundBoard." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 SoundBoard 中移除此设置的覆盖值。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard でのこの設定の上書きを削除します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard에서 이 설정의 재정의를 제거합니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Xóa giá trị ghi đè của cài đặt này trong SoundBoard."
+          }
+        }
+      }
+    },
+    "Requires reinitialization; restart SoundBoard after applying this change." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "需要重新初始化；应用此更改后请重启 SoundBoard。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再初期化が必要です。この変更を適用したあと、SoundBoard を再起動してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 초기화해야 합니다. 이 변경 사항을 적용한 후 SoundBoard를 재시동하세요."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cần khởi tạo lại; hãy khởi động lại SoundBoard sau khi áp dụng thay đổi này."
+          }
+        }
+      }
+    },
+    "Reset to Default" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复默认值"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デフォルトに戻す"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기본값으로 재설정"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt lại về mặc định"
+          }
+        }
+      }
+    },
+    "Restart SoundBoard" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新启动 SoundBoard"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard を再起動"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard 재시동"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khởi động lại SoundBoard"
+          }
+        }
+      }
+    },
+    "fold.posture.open" : {
+      "comment" : "Fold posture: the device unfolded flat.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開いた状態"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열림"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mở phẳng"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "展开"
+          }
+        }
+      }
+    },
+    "keyboard.type" : {
+      "comment" : "Button that types the text into the guest one character at a time.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "入力"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "입력"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhập"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "键入"
+          }
+        }
+      }
+    },
     "rootless (unavailable)" : {
       "localizations" : {
         "en" : {
@@ -227,7 +1999,34 @@
         }
       }
     },
-    "Search names and descriptions" : {},
+    "Search names and descriptions" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索名称和描述"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "名前と説明を検索"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이름 및 설명 검색"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tìm tên và mô tả"
+          }
+        }
+      }
+    },
     "Session ended on signal %lld" : {
       "localizations" : {
         "en" : {
@@ -291,12 +2090,39 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "会话已退出，状态码 %lld"
+            "value" : "会话已退出，退出状态为 %lld"
           }
         }
       }
     },
-    "Stored Override" : {},
+    "Stored Override" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已存储的覆盖值"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保存済みの上書き値"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "저장된 재정의 값"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giá trị ghi đè đã lưu"
+          }
+        }
+      }
+    },
     "Terminal" : {
       "localizations" : {
         "en" : {
@@ -331,59 +2157,506 @@
         }
       }
     },
-    "This value type is available for browsing only." : {},
-    "User Defaults" : {},
-    "User Defaults…" : {},
-    "Animation": {
+    "This value type is available for browsing only." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此值类型仅供浏览。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この値の種類は閲覧のみ可能です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 값 유형은 보기만 가능합니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loại giá trị này chỉ có thể duyệt xem."
+          }
+        }
+      }
     },
-    "Commands without a reply report submission. SoundBoard applies them asynchronously.": {
+    "User Defaults" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户默认设置"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザデフォルト"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 기본값"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mặc định người dùng"
+          }
+        }
+      }
     },
-    "Copy Reply": {
+    "User Defaults…" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用户默认设置…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ユーザデフォルト…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "사용자 기본값…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mặc định người dùng…"
+          }
+        }
+      }
     },
-    "HomePod": {
+    "Animation" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "动画"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アニメーション"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "애니메이션"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hoạt ảnh"
+          }
+        }
+      }
     },
-    "Phase": {
+    "Commands without a reply report submission. SoundBoard applies them asynchronously." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有回复的命令只报告是否已提交，SoundBoard 会异步应用这些命令。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "応答のないコマンドは送信結果のみを報告します。SoundBoard はそれらを非同期で適用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "응답이 없는 명령은 제출 여부만 보고합니다. SoundBoard는 이 명령을 비동기적으로 적용합니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các lệnh không có phản hồi chỉ báo cáo việc đã gửi. SoundBoard áp dụng chúng một cách không đồng bộ."
+          }
+        }
+      }
     },
-    "Reload Controls": {
+    "Copy Reply" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拷贝回复"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "応答をコピー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "응답 복사"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sao chép phản hồi"
+          }
+        }
+      }
     },
-    "Send Command": {
+    "HomePod" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "HomePod"
+          }
+        }
+      }
     },
-    "SoundBoard Debug Control": {
+    "Phase" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "阶段"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フェーズ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "단계"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Giai đoạn"
+          }
+        }
+      }
     },
-    "SoundBoard Reply": {
+    "Reload Controls" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新载入控制项"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コントロールを再読み込み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "컨트롤 다시 불러오기"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tải lại các điều khiển"
+          }
+        }
+      }
     },
-    "This operation's native signature is unavailable on the guest firmware.": {
+    "Send Command" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "发送命令"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コマンドを送信"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "명령 보내기"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gửi lệnh"
+          }
+        }
+      }
+    },
+    "SoundBoard Debug Control" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard 调试控制"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard デバッグコントロール"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard 디버그 컨트롤"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Điều khiển gỡ lỗi SoundBoard"
+          }
+        }
+      }
+    },
+    "SoundBoard Reply" : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard 回复"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard の応答"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "SoundBoard 응답"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Phản hồi của SoundBoard"
+          }
+        }
+      }
+    },
+    "This operation's native signature is unavailable on the guest firmware." : {
+      "localizations" : {
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "客户机固件中没有此操作的原生签名。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "この操作のネイティブシグネチャはゲストのファームウェアにありません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "게스트 펌웨어에서 이 작업의 네이티브 시그니처를 사용할 수 없습니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chữ ký gốc của thao tác này không có trên firmware của máy khách."
+          }
+        }
+      }
     },
     "Control Center" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Control Center" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "コントロールセンター" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "제어 센터" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Trung tâm điều khiển" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "控制中心" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Control Center"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コントロールセンター"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제어 센터"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trung tâm điều khiển"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "控制中心"
+          }
+        }
       }
     },
     "Side Button" : {
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Side Button" } },
-        "ja" : { "stringUnit" : { "state" : "translated", "value" : "サイドボタン" } },
-        "ko" : { "stringUnit" : { "state" : "translated", "value" : "측면 버튼" } },
-        "vi" : { "stringUnit" : { "state" : "translated", "value" : "Nút sườn" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "侧边按钮" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Side Button"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サイドボタン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "측면 버튼"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nút sườn"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "侧边按钮"
+          }
+        }
       }
     },
     "Show Attitude Dials" : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Show Attitude Dials" } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "显示姿态刻度盘" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show Attitude Dials"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示姿态刻度盘"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "姿勢ダイヤルを表示"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "자세 다이얼 보기"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hiện mặt số tư thế"
+          }
+        }
       }
     },
     "Drag or scroll a dial to adjust its angle. Hover to show its rotation axis." : {
       "extractionState" : "manual",
       "localizations" : {
-        "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag or scroll a dial to adjust its angle. Hover to show its rotation axis." } },
-        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "按住拖动或滚动刻度盘可调整角度，悬停时显示对应旋转轴。" } }
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag or scroll a dial to adjust its angle. Hover to show its rotation axis."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖移或滚动刻度盘可调整角度。悬停可显示其旋转轴。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ダイヤルをドラッグまたはスクロールして角度を調整します。ポインタを重ねると回転軸が表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다이얼을 드래그하거나 스크롤하여 각도를 조절하세요. 포인터를 올리면 회전축이 표시됩니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kéo hoặc cuộn một mặt số để điều chỉnh góc. Di con trỏ lên để hiện trục xoay."
+          }
+        }
       }
     },
     "Angles describe a stationary pose. Zero is face up. Enable simulation before launching the guest app." : {
@@ -398,7 +2671,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "角度表示静止姿态。归零时屏幕朝上。请在启动来宾 App 前启用模拟。"
+            "value" : "角度表示静止姿态。角度为零时屏幕朝上。请先启用模拟，再启动客户机中的 App。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "角度は静止した姿勢を表します。0 は画面が上向きの状態です。ゲストのアプリを起動する前にシミュレーションを有効にしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "각도는 정지 상태의 자세를 나타냅니다. 0은 화면이 위를 향한 상태입니다. 게스트 앱을 실행하기 전에 시뮬레이션을 활성화하세요."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Các góc mô tả một tư thế đứng yên. Góc 0 là khi màn hình hướng lên. Hãy bật mô phỏng trước khi mở ứng dụng trên máy khách."
           }
         }
       }
@@ -417,6 +2708,24 @@
             "state" : "translated",
             "value" : "设备姿态"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デバイスの姿勢"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 자세"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tư thế thiết bị"
+          }
         }
       }
     },
@@ -432,7 +2741,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请启用设备姿态补丁并重新启动来宾 App。"
+            "value" : "请启用设备姿态补丁，然后重新打开客户机中的 App。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "デバイス姿勢のパッチを有効にして、ゲストのアプリを再起動してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기기 자세 패치를 활성화한 후 게스트 앱을 다시 실행하세요."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hãy bật bản vá tư thế thiết bị và khởi chạy lại ứng dụng trên máy khách."
           }
         }
       }
@@ -449,7 +2776,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "来宾未应用设备姿态设定"
+            "value" : "客户机未应用设备姿态设置"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲストがデバイス姿勢の設定を適用しませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "게스트가 자세 구성을 적용하지 않음"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy khách chưa áp dụng cấu hình tư thế"
           }
         }
       }
@@ -468,6 +2813,24 @@
             "state" : "translated",
             "value" : "俯仰"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ピッチ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "피치"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Góc nghiêng dọc"
+          }
         }
       }
     },
@@ -484,6 +2847,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "横滚"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ロール"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "롤"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Góc nghiêng ngang"
           }
         }
       }
@@ -502,6 +2883,24 @@
             "state" : "translated",
             "value" : "横滚和偏航：-180 到 180°。俯仰：-90 到 90°。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ロールとヨー：-180〜180°。ピッチ：-90〜90°。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "롤 및 요: -180~180°. 피치: -90~90°."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nghiêng ngang và xoay hướng: -180 đến 180°. Nghiêng dọc: -90 đến 90°."
+          }
         }
       }
     },
@@ -518,6 +2917,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "偏航"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ヨー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Góc xoay hướng"
           }
         }
       }
@@ -536,6 +2953,24 @@
             "state" : "translated",
             "value" : "%@ 轴"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 軸"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 축"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trục %@"
+          }
         }
       }
     },
@@ -552,6 +2987,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "3D 陀螺仪"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3D ジャイロスコープ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3D 자이로스코프"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Con quay hồi chuyển 3D"
           }
         }
       }
@@ -570,6 +3023,24 @@
             "state" : "translated",
             "value" : "角速度"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "角速度"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "각속도"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vận tốc góc"
+          }
         }
       }
     },
@@ -585,7 +3056,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "修改会实时同步给来宾。禁用时保留三轴设定。"
+            "value" : "更改会立即同步到客户机。停用后保留各轴数值。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "変更はすぐにゲストに同期されます。無効にしても各軸の値は保持されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "변경 사항은 게스트에 즉시 동기화됩니다. 비활성화해도 축 값은 유지됩니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thay đổi được đồng bộ với máy khách ngay lập tức. Khi tắt, các giá trị trục vẫn được giữ."
           }
         }
       }
@@ -604,6 +3093,24 @@
             "state" : "translated",
             "value" : "启用模拟"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "シミュレーションを有効にする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "시뮬레이션 활성화"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bật mô phỏng"
+          }
         }
       }
     },
@@ -621,6 +3128,24 @@
             "state" : "translated",
             "value" : "每个轴请输入 -1000 到 1000 之间的数字。"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "各軸に -1000〜1000 の数値を入力してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "각 축에 -1000에서 1000 사이의 숫자를 입력하세요."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nhập một số từ -1000 đến 1000 cho mỗi trục."
+          }
         }
       }
     },
@@ -636,7 +3161,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "来宾未应用陀螺仪设定"
+            "value" : "客户机未应用陀螺仪设置"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ゲストがジャイロスコープの設定を適用しませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "게스트가 자이로스코프 구성을 적용하지 않음"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy khách chưa áp dụng cấu hình con quay hồi chuyển"
           }
         }
       }
@@ -655,6 +3198,24 @@
             "state" : "translated",
             "value" : "运动传感器"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "モーションセンサー"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동작 센서"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cảm biến chuyển động"
+          }
         }
       }
     },
@@ -671,6 +3232,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "复位"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "リセット"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재설정"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt lại"
           }
         }
       }
@@ -689,6 +3268,24 @@
             "state" : "translated",
             "value" : "重试"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再試行"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 시도"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thử lại"
+          }
         }
       }
     },
@@ -705,6 +3302,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "将三个轴归零"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "3 軸をすべてゼロにする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세 축을 모두 0으로 설정"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt cả ba trục về 0"
           }
         }
       }
@@ -723,6 +3338,24 @@
             "state" : "translated",
             "value" : "已同步"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화됨"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đã đồng bộ"
+          }
         }
       }
     },
@@ -740,6 +3373,24 @@
             "state" : "translated",
             "value" : "正在同步…"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同期中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "동기화 중…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang đồng bộ…"
+          }
         }
       }
     },
@@ -755,7 +3406,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "等待运动传感器服务…"
+            "value" : "正在等待运动传感器服务…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "センサーサービスを待機中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "센서 서비스 대기 중…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang chờ dịch vụ cảm biến…"
           }
         }
       }
@@ -774,6 +3443,24 @@
             "state" : "translated",
             "value" : "使用硬件键盘"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハードウェアキーボードを使用"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하드웨어 키보드 사용"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dùng bàn phím phần cứng"
+          }
         }
       }
     },
@@ -790,6 +3477,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "更改硬件键盘需要重新启动虚拟机。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハードウェアキーボードを変更するには、仮想マシンの再起動が必要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하드웨어 키보드 설정을 변경하려면 가상 머신을 재시동해야 합니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thay đổi bàn phím phần cứng cần khởi động lại máy ảo."
           }
         }
       }
@@ -911,7 +3616,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "启用硬件键盘？"
+            "value" : "要启用硬件键盘吗？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハードウェアキーボードを有効にしますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하드웨어 키보드를 활성화하시겠습니까?"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bật bàn phím phần cứng?"
           }
         }
       }
@@ -928,7 +3651,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "停用硬件键盘？"
+            "value" : "要停用硬件键盘吗？"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハードウェアキーボードを無効にしますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하드웨어 키보드를 비활성화하시겠습니까?"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tắt bàn phím phần cứng?"
           }
         }
       }
@@ -945,7 +3686,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "更改硬件键盘需要重新启动虚拟机。请先保存客体系统中的工作。设置会保存在这台虚拟机中。停用硬件键盘后，点击文本框即可使用客体系统的软件键盘。"
+            "value" : "更改硬件键盘需要重新启动虚拟机。请先存储客户机中的工作。此设置仅针对这台虚拟机存储。停用硬件键盘后，轻点文本框即可使用客户机的软件键盘。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハードウェアキーボードを変更するには、仮想マシンの再起動が必要です。先にゲストで作業内容を保存してください。この設定はこのマシンに保存されます。ハードウェアキーボードを無効にすると、テキストフィールドをタップしてゲストのソフトウェアキーボードを使用できます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하드웨어 키보드 설정을 변경하려면 가상 머신을 재시동해야 합니다. 먼저 게스트에서 작업 중인 내용을 저장하세요. 이 설정은 이 머신에 저장됩니다. 하드웨어 키보드를 비활성화하면 텍스트 필드를 탭하여 게스트의 소프트웨어 키보드를 사용할 수 있습니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Thay đổi bàn phím phần cứng cần khởi động lại máy ảo. Hãy lưu công việc trên máy khách trước. Cài đặt này được lưu cho máy ảo này. Khi tắt bàn phím phần cứng, hãy chạm vào một trường văn bản để dùng bàn phím phần mềm của máy khách."
           }
         }
       }
@@ -964,6 +3723,24 @@
             "state" : "translated",
             "value" : "重新启动并应用"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再起動して適用"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재시동 및 적용"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Khởi động lại và áp dụng"
+          }
         }
       }
     },
@@ -981,6 +3758,24 @@
             "state" : "translated",
             "value" : "无法更改硬件键盘"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハードウェアキーボードを変更できません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하드웨어 키보드를 변경할 수 없음"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể thay đổi bàn phím phần cứng"
+          }
         }
       }
     },
@@ -997,6 +3792,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法重新启动虚拟机"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仮想マシンを再起動できません"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가상 머신을 재시동할 수 없음"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể khởi động lại máy ảo"
           }
         }
       }
@@ -1206,7 +4019,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请在客户机的“设置”>“隐私与安全性”>“定位服务”中打开定位服务。打开之前，客户机里的 App 拿不到位置；打开后会重新发送这台 Mac 的位置。"
+            "value" : "请在客户机的“设置”>“隐私与安全性”>“定位服务”中打开定位服务。打开之前，客户机中的 App 无法获取位置；打开后会重新发送这台 Mac 的位置。"
           }
         }
       }
@@ -1328,7 +4141,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "虚拟机已停止，键盘设置已保存。请再次启动这台虚拟机。无法重新启动：%@"
+            "value" : "虚拟机已停止，键盘设置已存储。请再次启动这台虚拟机。无法重新启动：%@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仮想マシンは停止し、キーボードの設定は保存されました。このマシンをもう一度起動してください。再起動できませんでした: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "가상 머신이 중지되었고 키보드 설정은 저장되었습니다. 이 머신을 다시 실행하세요. 재시동할 수 없음: %@"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Máy ảo đã dừng và cài đặt bàn phím đã được lưu. Hãy khởi chạy lại máy ảo này. Không thể khởi động lại: %@"
           }
         }
       }
@@ -1347,6 +4178,24 @@
             "state" : "translated",
             "value" : "正在录制"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "録画中"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "녹화 중"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang ghi hình"
+          }
         }
       }
     },
@@ -1363,6 +4212,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请先停止屏幕录制，再更改硬件键盘。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ハードウェアキーボードを変更する前に、画面の録画を停止してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "하드웨어 키보드 설정을 변경하기 전에 화면 녹화를 중지하세요."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hãy dừng ghi màn hình trước khi thay đổi bàn phím phần cứng."
           }
         }
       }
@@ -1498,7 +4365,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 个应用"
+            "value" : "%@ 个 App"
           }
         }
       }
@@ -1566,7 +4433,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 条记录"
+            "value" : "%@ 个条目"
           }
         }
       }
@@ -1838,7 +4705,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已筛选 %@ 项"
+            "value" : "%@ 项（已筛选）"
           }
         }
       }
@@ -1872,7 +4739,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已用 %1$@，共 %2$@（%3$@）"
+            "value" : "已使用 %1$@，共 %2$@（%3$@）"
           }
         }
       }
@@ -2110,7 +4977,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@，%2$lld%% 可用"
+            "value" : "%1$@，可用 %2$lld%%"
           }
         }
       }
@@ -2144,7 +5011,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@，以及另外 %2$lld 个。"
+            "value" : "%1$@，另有 %2$lld 个。"
           }
         }
       }
@@ -2246,7 +5113,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld 个应用"
+            "value" : "%1$lld 个 App"
           }
         }
       }
@@ -2450,7 +5317,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld / %2$lld 个应用"
+            "value" : "%1$lld / %2$lld 个 App"
           }
         }
       }
@@ -2518,7 +5385,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$lld 个进程中的 %1$lld 个"
+            "value" : "%1$lld / %2$lld 个进程"
           }
         }
       }
@@ -2552,7 +5419,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld / %2$lld 个服务，%3$lld 个运行中"
+            "value" : "%1$lld / %2$lld 个服务，%3$lld 个正在运行"
           }
         }
       }
@@ -2620,7 +5487,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$lld%% 可用"
+            "value" : "可用 %1$lld%%"
           }
         }
       }
@@ -2756,7 +5623,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "1 个应用"
+            "value" : "1 个 App"
           }
         }
       }
@@ -3344,7 +6211,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要同步 Mac 的位置，请在“系统设置”>“隐私与安全性”>“定位服务”中允许 VPhone。"
+            "value" : "要同步 Mac 的位置，请在“系统设置”>“隐私与安全性”>“定位服务”中允许 VPhone 使用你的位置。"
           }
         }
       }
@@ -3361,6 +6228,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "允许网络访问"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ネットワークアクセスを許可"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "네트워크 허용"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cho phép mạng"
           }
         }
       }
@@ -3388,7 +6273,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "允许此应用使用 Wi-Fi 和蜂窝数据"
+            "value" : "允许此 App 使用 Wi-Fi 和蜂窝数据"
           }
         }
       }
@@ -3404,7 +6289,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在开启网络访问…"
+            "value" : "正在允许网络访问…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ネットワークアクセスを許可中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "네트워크 접근 허용 중…"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đang cho phép truy cập mạng…"
           }
         }
       }
@@ -3540,7 +6443,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "名为 %@ 的项目已存在。"
+            "value" : "名为“%@”的项目已存在。"
           }
         }
       }
@@ -3602,7 +6505,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用"
+            "value" : "App"
           }
         }
       }
@@ -3636,7 +6539,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用浏览器"
+            "value" : "App 浏览器"
           }
         }
       }
@@ -3692,7 +6595,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用简介"
+            "value" : "App 信息"
           }
         }
       }
@@ -3726,7 +6629,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用类型"
+            "value" : "App 类型"
           }
         }
       }
@@ -3760,7 +6663,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安装应用时，描述文件会与此 UDID 比对。请输入已在你的团队中注册的设备的 UDID。Xcode 和 devicectl 仍显示客户机自身的 UDID。"
+            "value" : "安装 App 时，描述文件会与此 UDID 比对。请输入已在你的团队中注册的设备的 UDID。Xcode 和 devicectl 仍显示客户机自身的 UDID。"
           }
         }
       }
@@ -3794,7 +6697,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "现在安装应用时，描述文件会与 %@ 比对。"
+            "value" : "现在安装 App 时，描述文件会与 %@ 比对。"
           }
         }
       }
@@ -3828,7 +6731,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "现在安装应用时，描述文件会与客户机自身的 UDID 比对。"
+            "value" : "现在安装 App 时，描述文件会与客户机自身的 UDID 比对。"
           }
         }
       }
@@ -3896,7 +6799,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "应用"
+            "value" : "App"
           }
         }
       }
@@ -3930,7 +6833,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "客户机中的应用将退出，虚拟机随之停止。客户机关机完成后，此窗口会关闭。"
+            "value" : "客户机中的 App 将退出，虚拟机随之停止。客户机关机完成后，此窗口会关闭。"
           }
         }
       }
@@ -3964,35 +6867,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "客户机中的应用将退出。客户机启动后，客户机代理会重新连接。"
-          }
-        }
-      }
-    },
-    "Armed, turns on after restart" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "準備済み、再起動後にオン"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "준비됨, 재시동 후 켜짐"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Đã chuẩn bị, bật sau khi khởi động lại"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已设定，重启后开启"
+            "value" : "客户机中的 App 将退出。客户机启动后，客户机代理会重新连接。"
           }
         }
       }
@@ -4482,7 +7357,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bootstrap 工具"
+            "value" : "引导环境工具"
           }
         }
       }
@@ -4866,7 +7741,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "构建：%@"
+            "value" : "构建版本：%@"
           }
         }
       }
@@ -5210,7 +8085,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "暂停时捕获 2 秒日志 (⌘R)"
+            "value" : "暂停时捕获 2 秒日志（⌘R）"
           }
         }
       }
@@ -5532,7 +8407,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请检查客户机代理连接后重试。"
+            "value" : "请确认客户机代理已连接，然后重试。"
           }
         }
       }
@@ -5824,7 +8699,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择“开始”以流式传输客户机统一日志。"
+            "value" : "选择“开始”以实时查看客户机统一日志。"
           }
         }
       }
@@ -5886,7 +8761,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "为所选报告选择一个文件夹。"
+            "value" : "为所选报告选择文件夹。"
           }
         }
       }
@@ -5948,7 +8823,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择要安装到客户机中的 IPA 或 TIPA 包。"
+            "value" : "选择要安装到客户机中的 IPA 或 TIPA 软件包。"
           }
         }
       }
@@ -6202,7 +9077,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "清除所有已载入的条目 (⌘K)"
+            "value" : "清除所有已载入的条目（⌘K）"
           }
         }
       }
@@ -7670,7 +10545,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "拷贝文字"
+            "value" : "拷贝文本"
           }
         }
       }
@@ -7850,7 +10725,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "拷贝完整的报告文本 (⇧⌘C)"
+            "value" : "拷贝完整的报告文本（⇧⌘C）"
           }
         }
       }
@@ -8042,7 +10917,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "崩溃 (.crash)"
+            "value" : "崩溃（.crash）"
           }
         }
       }
@@ -8640,7 +11515,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "删除并重启"
+            "value" : "删除并重新启动"
           }
         }
       }
@@ -9553,40 +12428,6 @@
         }
       }
     },
-    "Download requires an updated guest agent to follow %@." : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Download requires an updated guest agent to follow %@."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ をたどってダウンロードするにはゲストエージェントの更新が必要です。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 링크를 따라 다운로드하려면 게스트 에이전트를 업데이트해야 합니다."
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cần cập nhật tác nhân máy khách để tải xuống theo liên kết %@."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下载 %@ 需要更新客户机代理，以便跟随链接。"
-          }
-        }
-      }
-    },
     "Downloading Irisin: %@ of %@" : {
       "localizations" : {
         "en" : {
@@ -9904,7 +12745,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "启用、停用、发送信号给或移除所选服务"
+            "value" : "启用、停用、移除所选服务，或向其发送信号"
           }
         }
       }
@@ -10170,7 +13011,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "输入域，然后选择“读取”。将键留空可读取该域中的所有键。"
+            "value" : "输入域，然后选择“读取”。将“键”留空可读取该域中的所有键。"
           }
         }
       }
@@ -11078,7 +13919,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按类型筛选应用"
+            "value" : "按类型筛选 App"
           }
         }
       }
@@ -11106,7 +13947,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按类型筛选应用（⌘1、⌘2、⌘3、⌘4）"
+            "value" : "按类型筛选 App（⌘1、⌘2、⌘3、⌘4）"
           }
         }
       }
@@ -12009,34 +14850,6 @@
         }
       }
     },
-    "Hold Command with the next key" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次のキーと一緒に Command を押す"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다음 키와 함께 Command 누르기"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Giữ Command cùng phím tiếp theo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下一个按键同时按住 Command"
-          }
-        }
-      }
-    },
     "Hold Control while sending a special key" : {
       "localizations" : {
         "ja" : {
@@ -12061,34 +14874,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "发送特殊键时按住 Control"
-          }
-        }
-      }
-    },
-    "Hold Control with the next key" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次のキーと一緒に Control を押す"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다음 키와 함께 Control 누르기"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Giữ Control cùng phím tiếp theo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下一个按键同时按住 Control"
           }
         }
       }
@@ -12121,34 +14906,6 @@
         }
       }
     },
-    "Hold Option with the next key" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次のキーと一緒に Option を押す"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다음 키와 함께 Option 누르기"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Giữ Option cùng phím tiếp theo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下一个按键同时按住 Option"
-          }
-        }
-      }
-    },
     "Hold Shift while sending a special key" : {
       "localizations" : {
         "ja" : {
@@ -12173,34 +14930,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "发送特殊键时按住 Shift"
-          }
-        }
-      }
-    },
-    "Hold Shift with the next key" : {
-      "localizations" : {
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "次のキーと一緒に Shift を押す"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "다음 키와 함께 Shift 누르기"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Giữ Shift cùng phím tiếp theo"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "下一个按键同时按住 Shift"
           }
         }
       }
@@ -12680,7 +15409,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安装应用包"
+            "value" : "安装 App 包"
           }
         }
       }
@@ -12714,7 +15443,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安装应用包…"
+            "value" : "安装 App 包…"
           }
         }
       }
@@ -12980,7 +15709,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已安装 Irisin %@，位置：%@。"
+            "value" : "已将 Irisin %@ 安装到 %@。"
           }
         }
       }
@@ -13771,7 +16500,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按键"
+            "value" : "密钥"
           }
         }
       }
@@ -14023,7 +16752,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "启动所选应用（⌘↩）"
+            "value" : "启动所选 App（⌘↩）"
           }
         }
       }
@@ -14339,7 +17068,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在载入应用…"
+            "value" : "正在载入 App…"
           }
         }
       }
@@ -15091,7 +17820,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已选择多个应用"
+            "value" : "已选择多个 App"
           }
         }
       }
@@ -15227,6 +17956,24 @@
             "state" : "translated",
             "value" : "网络访问"
           }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ネットワークアクセス"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "네트워크 접근"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Truy cập mạng"
+          }
         }
       }
     },
@@ -15269,7 +18016,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%@ 的网络访问未更改。请重启该应用后重试。"
+            "value" : "%@ 的网络访问未更改。请重新打开该 App 后重试。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ のネットワークアクセスは変更されませんでした。アプリを再起動してからもう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 네트워크 접근이 변경되지 않았습니다. 앱을 다시 실행한 후 다시 시도하세요."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quyền truy cập mạng của %@ không thay đổi. Hãy khởi chạy lại ứng dụng rồi thử lại."
           }
         }
       }
@@ -15286,6 +18051,24 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "网络访问受限"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ネットワークアクセスが制限されています"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "네트워크 접근이 제한됨"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Truy cập mạng bị hạn chế"
           }
         }
       }
@@ -15465,7 +18248,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "未选择应用"
+            "value" : "未选择 App"
           }
         }
       }
@@ -15499,7 +18282,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有应用"
+            "value" : "没有 App"
           }
         }
       }
@@ -15527,7 +18310,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无崩溃报告"
+            "value" : "没有崩溃报告"
           }
         }
       }
@@ -15583,7 +18366,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无设备信息"
+            "value" : "没有设备信息"
           }
         }
       }
@@ -15611,7 +18394,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无匹配条目"
+            "value" : "没有匹配的条目"
           }
         }
       }
@@ -15667,7 +18450,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无匹配的报告"
+            "value" : "没有匹配的报告"
           }
         }
       }
@@ -15971,7 +18754,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此筛选条件下没有应用。"
+            "value" : "此筛选条件下没有可用的 App。"
           }
         }
       }
@@ -15999,7 +18782,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有符合此筛选条件的应用。"
+            "value" : "没有符合此筛选条件的 App。"
           }
         }
       }
@@ -16033,7 +18816,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "没有符合搜索条件的应用。"
+            "value" : "没有符合搜索条件的 App。"
           }
         }
       }
@@ -16721,7 +19504,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重启后开启"
+            "value" : "重启后打开"
           }
         }
       }
@@ -16789,7 +19572,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开客户机的聚焦搜索"
+            "value" : "打开客户机的聚焦"
           }
         }
       }
@@ -17505,7 +20288,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "暂停流式传输 (⌘P)"
+            "value" : "暂停流式传输（⌘P）"
           }
         }
       }
@@ -17567,7 +20350,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "确定要永久删除位于 %@ 的引导环境并重启客户机吗？"
+            "value" : "要永久删除位于 %@ 的引导环境并重新启动客户机吗？"
           }
         }
       }
@@ -17601,7 +20384,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要永久删除以下引导环境并重启客户机吗？\n%@"
+            "value" : "要永久删除以下引导环境并重新启动客户机吗？\n%@"
           }
         }
       }
@@ -17635,7 +20418,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要永久删除以下引导环境且不重启客户机吗？\n%@"
+            "value" : "要永久删除以下引导环境且不重新启动客户机吗？\n%@"
           }
         }
       }
@@ -17787,7 +20570,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "平台二进制"
+            "value" : "平台二进制文件"
           }
         }
       }
@@ -18751,7 +21534,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要删除选中的钥匙串项目吗？"
+            "value" : "要删除所选钥匙串项目吗？"
           }
         }
       }
@@ -18887,7 +21670,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "切换客体输入法"
+            "value" : "切换客户机输入法"
           }
         }
       }
@@ -18955,7 +21738,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "客户机会将它们从钥匙串中移除，此操作无法撤销。"
+            "value" : "客户机会将它们从钥匙串中移除。此操作无法撤销。"
           }
         }
       }
@@ -19023,7 +21806,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法读取该钥匙串项目，请重试。"
+            "value" : "无法读取该钥匙串项目。请重试。"
           }
         }
       }
@@ -19091,7 +21874,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法更新该钥匙串项目，请重试。"
+            "value" : "无法更新该钥匙串项目。请重试。"
           }
         }
       }
@@ -19125,7 +21908,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法删除该钥匙串项目，请重试。"
+            "value" : "无法删除该钥匙串项目。请重试。"
           }
         }
       }
@@ -19227,7 +22010,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "触控板映射"
+            "value" : "触控板滚动与捏合转为触控"
           }
         }
       }
@@ -19657,7 +22440,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重新读取客户机剪贴板 (⌘R)"
+            "value" : "重新读取客户机剪贴板（⌘R）"
           }
         }
       }
@@ -19719,7 +22502,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "读取该键；键为空时读取域中的所有键 (⌘R)"
+            "value" : "读取该键；键为空时读取域中的所有键（⌘R）"
           }
         }
       }
@@ -19967,7 +22750,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在登记固件版本…"
+            "value" : "正在记录固件版本…"
           }
         }
       }
@@ -20035,7 +22818,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "刷新应用列表"
+            "value" : "刷新 App 列表"
           }
         }
       }
@@ -20153,7 +22936,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重新载入应用列表（⌘R）"
+            "value" : "重新载入 App 列表（⌘R）"
           }
         }
       }
@@ -20181,7 +22964,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重新载入崩溃报告列表 (⌘R)"
+            "value" : "重新载入崩溃报告列表（⌘R）"
           }
         }
       }
@@ -20237,7 +23020,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重新载入服务列表 (⌘R)"
+            "value" : "重新载入服务列表（⌘R）"
           }
         }
       }
@@ -20677,7 +23460,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "报告 (.ips)"
+            "value" : "报告（.ips）"
           }
         }
       }
@@ -20829,7 +23612,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重启"
+            "value" : "重新启动"
           }
         }
       }
@@ -20863,7 +23646,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要重启 %1$@ 吗？"
+            "value" : "要重新启动 %1$@ 吗？"
           }
         }
       }
@@ -20897,7 +23680,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重启客户机"
+            "value" : "重新启动客户机"
           }
         }
       }
@@ -20931,7 +23714,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重启客户机…"
+            "value" : "重新启动客户机…"
           }
         }
       }
@@ -20965,7 +23748,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要重启客户机吗？"
+            "value" : "要重新启动客户机吗？"
           }
         }
       }
@@ -21095,7 +23878,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重启…"
+            "value" : "重新启动…"
           }
         }
       }
@@ -21917,7 +24700,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将所选报告存储到 Mac (⌘S)"
+            "value" : "将所选报告存储到 Mac（⌘S）"
           }
         }
       }
@@ -21945,7 +24728,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将显示的条目存储为纯文本日志 (⌘S)"
+            "value" : "将显示的条目存储为纯文本日志（⌘S）"
           }
         }
       }
@@ -22013,7 +24796,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已存储至 %@"
+            "value" : "已存储到 %@"
           }
         }
       }
@@ -22261,7 +25044,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "搜索应用"
+            "value" : "搜索 App"
           }
         }
       }
@@ -22351,7 +25134,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "安全"
+            "value" : "安全性"
           }
         }
       }
@@ -22469,7 +25252,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择一个应用以查看其 Bundle、二进制文件和数据容器。"
+            "value" : "选择一个 App 以查看其 Bundle、二进制文件和数据容器。"
           }
         }
       }
@@ -22525,7 +25308,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择一个应用以查看其简介。"
+            "value" : "选择一个 App 以查看其简介。"
           }
         }
       }
@@ -22627,7 +25410,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要向 %2$@（pid %3$lld）发送 %1$@ 吗？"
+            "value" : "要向 %2$@（PID %3$lld）发送 %1$@ 吗？"
           }
         }
       }
@@ -23085,7 +25868,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已向客户机剪贴板发送 %lld 个字符。"
+            "value" : "已将 %lld 个字符发送到客户机剪贴板。"
           }
         }
       }
@@ -23407,7 +26190,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将客户机剪贴板设置为此文本 (⌘↩)"
+            "value" : "将客户机剪贴板设置为此文本（⌘↩）"
           }
         }
       }
@@ -23655,7 +26438,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "显示全部、运行中、已停止或已停用的服务 (⌘1–⌘4)"
+            "value" : "显示全部、运行中、已停止或已停用的服务（⌘1–⌘4）"
           }
         }
       }
@@ -23711,7 +26494,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "显示或隐藏应用简介（⌘I）"
+            "value" : "显示或隐藏 App 简介（⌘I）"
           }
         }
       }
@@ -24294,7 +27077,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "开始流式传输 (⌘P)"
+            "value" : "开始流式传输（⌘P）"
           }
         }
       }
@@ -24322,7 +27105,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "启动虚拟机并等待客户机连接。应用列表会自动载入。"
+            "value" : "启动虚拟机并等待客户机连接。App 列表会自动载入。"
           }
         }
       }
@@ -25168,7 +27951,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在读取客户机与写入客户机之间切换 (⌘1, ⌘2)"
+            "value" : "在读取客户机与写入客户机之间切换（⌘1、⌘2）"
           }
         }
       }
@@ -25382,7 +28165,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "终止所选应用（⌥⌘Q）"
+            "value" : "终止所选 App（⌥⌘Q）"
           }
         }
       }
@@ -25512,7 +28295,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "文字"
+            "value" : "文本"
           }
         }
       }
@@ -25704,7 +28487,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "前台应用不支持这个方向。"
+            "value" : "前台 App 不支持此方向。"
           }
         }
       }
@@ -25732,7 +28515,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将从客户机中移除该应用、其数据容器及其插件的数据。此操作无法撤销。"
+            "value" : "将从客户机中移除该 App、其数据容器及其插件的数据。此操作无法撤销。"
           }
         }
       }
@@ -25964,7 +28747,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "客户机未响应。请检查客户机代理连接后重试。"
+            "value" : "客户机未响应。请确认客户机代理已连接，然后重试。"
           }
         }
       }
@@ -26370,7 +29153,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ 的网络策略未更改。请重启该应用后重试。"
+            "value" : "%1$@ 的网络策略未更改。请重新打开该 App 后重试。"
           }
         }
       }
@@ -26522,7 +29305,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此应用未声明 URL Scheme。"
+            "value" : "此 App 未声明 URL Scheme。"
           }
         }
       }
@@ -26550,7 +29333,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此应用没有数据容器。"
+            "value" : "此 App 没有数据容器。"
           }
         }
       }
@@ -26702,7 +29485,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "转发 Touch ID 主屏幕键"
+            "value" : "转发触控 ID 主屏幕按钮"
           }
         }
       }
@@ -26736,7 +29519,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "传输中…"
+            "value" : "正在传输…"
           }
         }
       }
@@ -26922,7 +29705,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "输入 Mac 剪贴板中的 ASCII 文本"
+            "value" : "键入 Mac 剪贴板中的 ASCII 文本"
           }
         }
       }
@@ -27204,7 +29987,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法载入应用"
+            "value" : "无法载入 App"
           }
         }
       }
@@ -27334,7 +30117,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法重启客户机"
+            "value" : "无法重新启动客户机"
           }
         }
       }
@@ -27480,7 +30263,25 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法为 %@ 开启网络访问。"
+            "value" : "无法允许 %@ 访问网络。"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ のネットワークアクセスを許可できません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 네트워크 접근을 허용할 수 없습니다."
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Không thể cho phép %@ truy cập mạng."
           }
         }
       }
@@ -27548,7 +30349,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法捕获客户机日志：%1$@。请检查连接；将在 3 秒后重试。"
+            "value" : "无法获取客户机日志：%1$@。请检查连接；将在 3 秒后重试。"
           }
         }
       }
@@ -27990,7 +30791,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "找不到 %1$@ 的数据容器。"
+            "value" : "无法找到 %1$@ 的数据容器。"
           }
         }
       }
@@ -28058,7 +30859,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法安装应用包。请检查文件和客户机连接后重试。"
+            "value" : "无法安装 App 包。请检查文件和客户机连接后重试。"
           }
         }
       }
@@ -28126,7 +30927,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法安装引导环境。请检查客户机代理连接后重试。"
+            "value" : "无法安装引导环境。请确认客户机代理已连接，然后重试。"
           }
         }
       }
@@ -28278,7 +31079,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法载入应用。"
+            "value" : "无法载入 App。"
           }
         }
       }
@@ -28346,7 +31147,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法载入钥匙串项目。请检查客户机代理连接后重试。"
+            "value" : "无法载入钥匙串项目。请确认客户机代理已连接，然后重试。"
           }
         }
       }
@@ -28645,40 +31446,6 @@
         }
       }
     },
-    "Unable to print %@. %@" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "new",
-            "value" : "Unable to print %1$@. %2$@"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@ の説明を出力できません。%2$@"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%1$@의 설명을 출력할 수 없습니다. %2$@"
-          }
-        },
-        "vi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Không thể in mô tả của %1$@. %2$@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "无法输出 %1$@ 的描述。%2$@"
-          }
-        }
-      }
-    },
     "Unable to read %@. %@" : {
       "localizations" : {
         "en" : {
@@ -28742,7 +31509,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法读取开发者模式状态。请检查客户机代理连接后重试。"
+            "value" : "无法读取开发者模式状态。请确认客户机代理已连接，然后重试。"
           }
         }
       }
@@ -29002,7 +31769,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法读取客户机代理哈希。请检查客户机代理连接后重试。"
+            "value" : "无法读取客户机代理哈希。请确认客户机代理已连接，然后重试。"
           }
         }
       }
@@ -29234,7 +32001,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法卸载引导环境。请检查客户机代理连接后重试。"
+            "value" : "无法卸载引导环境。请确认客户机代理已连接，然后重试。"
           }
         }
       }
@@ -30236,7 +33003,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "要卸载 %1$lld 个应用吗？"
+            "value" : "要卸载 %1$lld 个 App 吗？"
           }
         }
       }
@@ -30372,7 +33139,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重建应用注册"
+            "value" : "重建 App 注册"
           }
         }
       }
@@ -30406,7 +33173,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法重建应用注册"
+            "value" : "无法重建 App 注册"
           }
         }
       }
@@ -30474,7 +33241,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法重建应用注册。\n\n%@"
+            "value" : "无法重建 App 注册。\n\n%@"
           }
         }
       }
@@ -30508,7 +33275,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无法重建应用注册。请检查客户机代理连接后重试。"
+            "value" : "无法重建 App 注册。请确认客户机代理已连接，然后重试。"
           }
         }
       }
@@ -31528,7 +34295,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "设置密码时（仅限此设备）"
+            "value" : "已设置密码时（仅限此设备）"
           }
         }
       }
@@ -31630,7 +34397,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "设置密码时（此设备）"
+            "value" : "已设置密码时（此设备）"
           }
         }
       }
@@ -31844,7 +34611,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "按面板宽度折行显示长行"
+            "value" : "长行按面板宽度自动换行"
           }
         }
       }
@@ -32042,7 +34809,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将此值写入客户机 (⌘↩)"
+            "value" : "将此值写入客户机（⌘↩）"
           }
         }
       }
@@ -32442,7 +35209,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "launchd 将把该信号发送给服务的进程。"
+            "value" : "launchd 会将该信号发送给服务的进程。"
           }
         }
       }
@@ -32532,7 +35299,7 @@
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "launchd 将记录一个持久覆盖设置，使该服务在下次启动时不再载入。正在运行的实例会继续运行。"
+            "value" : "launchd 会记录持久覆盖设置，使该服务在下次启动时不载入。正在运行的实例会继续运行。"
           }
         }
       }
@@ -32930,6 +35697,41 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "true 或 false"
+          }
+        }
+      }
+    },
+    "udid.alert.set" : {
+      "comment" : "Button that applies the UDID entered in the alert.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Set"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "설정"
+          }
+        },
+        "vi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Đặt"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "设置"
           }
         }
       }

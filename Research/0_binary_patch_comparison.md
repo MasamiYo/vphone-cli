@@ -1161,7 +1161,7 @@
 > struct (`oBbtJ8x+s1q0OkaiocPuog`, `{1488, 2266, 326, 3.0f}`) does not change
 > the live scale. Emitted only for an iPad guest.
 >
-> See `Documents/Guides/ipados.md`.
+> See `Documents/en/firmware/ipados.md`.
 >
 > **Other iPhone models (2026-10-05, issue #576):** the four
 > `devicetree-cfw-ipad_*` presentation patches and `devicetree-cfw-ipad_audio`
@@ -1179,7 +1179,7 @@
 > (23G90) with cloudOS 26.4 (23E5207q): installed tree `model` iPhone18,1,
 > artwork subtype 2622 at 3x, `/product/audio` acoustic ID 8021 from the board;
 > the guest booted to the home screen at 402x874 points. See
-> `Documents/Guides/iphone-models.md`.
+> `Documents/en/firmware/iphone-models.md`.
 >
 > **Only the camera remains of EXP by default (2026-09-28).** `standard` is now the
 > JB baseline plus the virtual camera. Off by default, besides the concealment
@@ -4361,7 +4361,7 @@ in VM selections, plans and receipts, including explicit opt-outs. New template
 keys include the enabled kernel patch, so a pre-Task3 template cannot satisfy
 the new Standard plan. Existing VMs bind the new bundle and run
 `cfw update-environment` and `cfw update-kernel` while stopped, keeping data.
-See `Documents/Guides/shader-cache.md` and the Standard promotion section in
+See `Documents/en/storage/shader-cache.md` and the Standard promotion section in
 `Guest/gpu_acceleration.md`. The previous opt-in notes describe development
 validation; older host compatibility remains untested.
 Promotion validation: 62 focused tests passed, as did the full `VPhone` bundle
@@ -4416,6 +4416,8 @@ gone. The preset names three sets:
   23E5207q it restarts right after its banner, with Apple's ROMs as with
   OpenAVB and OpenSEP (2026-10-19). Which of LLB's patches it needs is open.
   Superseded 2026-11-01/02: none; see "`minimal` boots a stock boot chain" below.
+  Reverted 2026-11-03: the stock LLB needs more guest memory than 4096 MB; see
+  "`minimal` and `watchos` keep iBEC and LLB again" below.
 - `com.vphone.patchset.devicetree`, allowing only the board presentation
   (`devicetree-cfw-serial_number`, `-home_button_type`,
   `-artwork_device_subtype`, `-island_notch_location`) and the haptics and
@@ -4609,6 +4611,45 @@ two iBEC image-4 callback instructions (the preset still kept them then),
 logged "LLB: no patches" and restored;
 its serial log shows the stock LLB's "Local boot" banner on the first boot and
 again after a reboot, and SpringBoard and vphoned came up both times.
+
+## `minimal` and `watchos` keep iBEC and LLB again (2026-11-03)
+
+The stock boot chain above was checked only at the default 8192 MB. A guest
+with 4096 MB does not boot. On a macOS 26.7.2 host OpenAVB logs `iLLB
+container accepted`, `iLLB decompressed` and `virtual firmware prepared`, and
+the virtual machine stops at once (`VZErrorDomain` 1, "The virtual machine
+stopped unexpectedly"), so `vm create` ends with "Boot check ended before the
+guest connected"; on a macOS 27.2 host it keeps running and vphoned never
+answers within the 300 s first boot check. That is the same stop the userspace debugging section below
+records for a watch guest at 2048 MB. With the ten iBEC and LLB patches back
+on (`FirmwarePatchSetCatalog.minimalBootChainPatches`, as before 2026-11-01)
+the same guests boot at 4096 MB. AVPBooter, iBSS, TXM and the restore ramdisk
+stay stock, and the rest of `minimal` (the signed `launchd.plist` instead of
+the `launchd_cache_loader` gate, the kernel sets named for userspace
+debugging) is unchanged.
+
+The regression sweep for bundle 2.15.0 plus `main` at 58368476 created every
+machine with `--cpu 4 --memory 4096` on Mac mini M4 hosts (Mac16,10, 16 GB),
+one VM per row:
+
+| Host macOS | Bundle | Guest | Memory | Result |
+| --- | --- | --- | --- | --- |
+| 26.7.2 | `main` 58368476 | iPhone17,3 26.6.2 23G90, cloudOS 23E5207q, `minimal` | 4096 MB | stops after `iLLB decompressed`; `vm config --rom apple` reaches the iBoot banner but no vphoned in 120 s |
+| 26.7.2 | `main` 58368476 | Watch7,18 26.4 23T240, cloudOS 23E244, `watchos` | 4096 MB | stops on the first boot check |
+| 26.7.2 | release 2.15.0 (iBEC and LLB patched) | iPhone17,3 26.6.2, `minimal` | 4096 MB | first boot, vphoned ping |
+| 26.7.2 | release 2.15.0 | Watch7,18 26.4, `watchos` | 4096 MB | first boot, vphoned ping |
+| 27.2 | `main` 58368476 | iPhone17,3 26.6.2, `minimal` | 4096 MB | no vphoned within the 300 s first boot check |
+| 27.2 | `main` 58368476 | iPhone17,3 26.6.2, `minimal` | 8192 MB | two boots, vphoned `device.info` 26.6.2, no panic |
+| 27.2 | this change | iPhone17,3 26.6.2, `minimal` | 4096 MB | two boots, vphoned `device.info` 26.6.2, no panic |
+| 27.2 | this change | Watch7,18 26.4, `watchos` | 4096 MB | two boots, vphoned `device.info` 26.4, no panic |
+
+Neither preset installs the roothide bootstrap: `irisin-cli` is refused as a
+bad executable on a stock kernel, with release 2.15.0 as with `main`, so
+`--bootstrap` is not part of these presets' checks.
+
+Which LLB patch the smaller guest needs, and why memory matters to a stock
+LLB, is open. Until it is known, a stock boot chain is not the default for a
+preset that can be created with less than 8192 MB.
 
 ## The research board stands in for vphone600 (2026-10-19)
 
