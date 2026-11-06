@@ -45,6 +45,8 @@ public enum FirmwareGuestSystemPatchSet {
     public static let metalCacheReuseMarker = "/usr/lib/vphone-metal-cache-reuse"
     public static let glesUpperLeft = "system-systemhook-cfw-gles_upper_left"
     public static let glesUpperLeftMarker = "/usr/lib/vphone-gles-upper-left"
+    public static let ios18GPUTransport = "system-systemhook-cfw-ios18_gpu_transport"
+    public static let ios18GPUTransportMarker = "/usr/lib/vphone-ios18-gpu"
     public static let metalVertexIDFormat = "dyld-cfw-metal_vertex_id_format"
     public static let glesPrimitiveRestart = "dyld-cfw-gles_primitive_restart"
     public static let glesPointDraw = "dyld-cfw-gles_point_draw"
@@ -604,6 +606,22 @@ public enum FirmwareGuestSystemPatchSet {
                     cloudOS: .release(major: 26, minor: 4),
                 ),
             ),
+            VPhonePatchDeclaration(
+                identifier: ios18GPUTransport,
+                title: "iOS 18 GPU transport",
+                summary: """
+                Gives an iOS 18 guest on a cloudOS 26.1 kernel a Metal device. `fw prepare` stages \
+                the paravirtual GPU driver of the iOS release's own cloudOS, and SystemHook \
+                translates the IOGPU and driver calls the 26.1 kernel renumbered or widened. \
+                Without it the guest has no GPU and draws its UI in software. Restart after changing; \
+                switching it on or off also needs a new `fw prepare` for the matching driver.
+                """,
+                target: .guestFile(path: ios18GPUTransportMarker),
+                applicability: VPhonePatchApplicability(
+                    iOSBase: .release(major: 18, minor: 6),
+                    cloudOS: .release(major: 26, minor: 1),
+                ),
+            ),
 
             // MARK: Guest Payload
 
@@ -771,7 +789,9 @@ public enum FirmwareGuestSystemPatchSet {
                 the hinge angle chosen by display.posture, so CoreMotion's angle manager — and \
                 through it CoreDevice's hingeAngle stream — reads the fold state instead of \
                 finding no sensor. With the foldable product identity patch, which is what makes \
-                CoreMotion look for the service. Foldable guests only.
+                CoreMotion look for the service. On iOS 27.2 it also loads into locationd, where \
+                the device-state relay then passes on an unchanged angle, so a CoreMotion client \
+                started while the hinge rests gets it. Foldable guests only.
                 """,
                 target: .guestFile(path: "/usr/lib/libvphonehinge.dylib"),
                 applicability: VPhonePatchApplicability(iOSBase: .atLeast(major: 18, minor: 0)),

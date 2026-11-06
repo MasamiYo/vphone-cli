@@ -126,6 +126,11 @@ difference from a real iPhone most likely to matter.
 
 Requests that were waiting on the dead locationd fail instead of blocking.
 
+A locationd stuck in its baseband client instead (seen once on an iOS 27.2
+iPhone Duo) still answers that request, so the watchdog does not see it; see
+`iphone_duo_bringup.md`, "iOS 27.2, and WebDriverAgent's hinge GET after
+boot".
+
 ### Verification
 
 Same VM, alternating between a bundle with the watchdog and one without
