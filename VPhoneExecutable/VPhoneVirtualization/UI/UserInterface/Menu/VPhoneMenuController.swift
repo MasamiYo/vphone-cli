@@ -25,6 +25,11 @@ class VPhoneMenuController {
     var softwareKeyboardItem: NSMenuItem?
     var tvControlCenterItem: NSMenuItem?
     var tvRemoteItem: NSMenuItem?
+    var visionOSImmersionItem: NSMenuItem?
+    var visionOSImmersionChoices: [NSMenuItem] = []
+    lazy var visionOSImmersionModel = VPhoneVisionOSImmersionModel { [control] method, params in
+        _ = try await control.call(method, params: params)
+    }
     lazy var tvRemoteWindowController = VPhoneTVRemoteWindowController(control: control)
 
     /// An Apple TV guest has a TV button that opens Control Center when held.
@@ -104,6 +109,8 @@ class VPhoneMenuController {
     var locationProvider: VPhoneLocationProvider?
     var locationMenuItem: NSMenuItem?
     var locationPresetMenuItem: NSMenuItem?
+    var locationCustomMenuItem: NSMenuItem?
+    var locationWindowController: VPhoneLocationWindowController?
     var locationReplayStartItem: NSMenuItem?
     var locationReplayStopItem: NSMenuItem?
     var screenRecorder: VPhoneScreenRecorder?

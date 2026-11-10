@@ -3,6 +3,7 @@ import IcliKit
 import NIOCore
 import NIOHTTP1
 import NIOPosix
+import NIOWebSocket
 
 final class GuestHyperTextHandler: ChannelInboundHandler, RemovableChannelHandler, @unchecked Sendable {
     typealias InboundIn = HTTPServerRequestPart
@@ -114,7 +115,24 @@ final class GuestHyperTextHandler: ChannelInboundHandler, RemovableChannelHandle
     private func handle(_ head: HTTPRequestHead, body: Data, channel: Channel) {
         let path = head.uri.split(separator: "?", maxSplits: 1).first.map(String.init) ?? head.uri
         if head.method == .GET, path == "/v1/health" {
-            Self.send(.json(GuestAPI.health()), on: channel)
+            GuestHealthCheck.shared.request(produce: { GuestAPI.health() }) { outcome in
+                let reply: APIReply
+                switch outcome {
+                case let .success(report):
+                    reply = .json(report)
+                case .timedOut:
+                    reply = .json(status: 503, ["error": [
+                        "code": "health_check_timed_out",
+                        "message": "Health dependencies did not respond before the deadline",
+                    ]])
+                case .busy:
+                    reply = .json(status: 503, ["error": [
+                        "code": "health_check_busy",
+                        "message": "A health check is still running or its waiting-request limit was reached",
+                    ]])
+                }
+                Self.send(reply, on: channel)
+            }
             return
         }
         if path.hasPrefix("/v1/ports/"), GuestPortForwardHandler.port(from: head.uri) == nil {
@@ -297,7 +315,9 @@ final class GuestHyperTextHandler: ChannelInboundHandler, RemovableChannelHandle
         context.fireChannelInactive()
     }
 
-    func errorCaught(context: ChannelHandlerContext, error _: Error) {
+    func errorCaught(context: ChannelHandlerContext, error: Error) {
+        // A refused or malformed WebSocket handshake: the request follows and gets its reply.
+        if error is NIOWebSocketUpgradeError { return }
         context.close(promise: nil)
     }
 }

@@ -24,19 +24,43 @@ enum GuestHomeViewDistance {
     }
 }
 
+enum HomeViewDistanceMethod: String, GuestMethod {
+    case homeviewDistanceGet = "homeview.distance.get"
+    case homeviewDistanceSet = "homeview.distance.set"
+
+    var spec: MethodSpec {
+        switch self {
+        case .homeviewDistanceGet: MethodSpec(summary: "Read the HomeView viewing-distance mode, level of detail and override state.", result: [.required("applied", .any),
+                                                       .required("available", .boolean),
+                                                       .required("backlight_state", .any),
+                                                       .required("display_style", .any),
+                                                       .required("level_of_detail", .integer),
+                                                       .required("mode", .any),
+                                                       .required("override_active", .any),
+                                                       .required("reset_scope", .string)])
+        case .homeviewDistanceSet: MethodSpec(.required("mode", .string, "Viewing distance mode", values: ["automatic", "near", "standard", "far"]), .optional("reset_environment", .boolean, "Allow clearing persona, display style, detail and backlight overrides; required true for automatic", default: false), summary: "Set the HomeView viewing-distance mode, or return to automatic with reset_environment.", result: [.required("applied", .any),
+                                                       .required("available", .boolean),
+                                                       .required("backlight_state", .any),
+                                                       .required("display_style", .any),
+                                                       .required("level_of_detail", .integer),
+                                                       .required("mode", .any),
+                                                       .required("override_active", .any),
+                                                       .required("reset_scope", .string)])
+        }
+    }
+}
+
 extension GuestAPI {
-    static func executeHomeViewDistance(_ method: String, _ params: [String: Any]) throws -> [String: Any]? {
-        switch method {
-        case "homeview.distance.get":
+    static func executeHomeViewDistance(_ m: HomeViewDistanceMethod, _ params: [String: Any]) throws -> [String: Any] {
+        switch m {
+        case .homeviewDistanceGet:
             return try GuestHomeViewDistance.call()
-        case "homeview.distance.set":
+        case .homeviewDistanceSet:
             let mode = try string(params, "mode")
             if let rejection = GuestHomeViewDistancePolicy.rejection(mode: mode, resetEnvironment: params["reset_environment"] as? Bool == true) {
                 throw GuestAPIError.invalidRequest(rejection)
             }
             return try GuestHomeViewDistance.call(mode: mode)
-        default:
-            return nil
         }
     }
 }

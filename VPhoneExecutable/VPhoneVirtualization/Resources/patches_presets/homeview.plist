@@ -86,6 +86,7 @@
 			<string>dyld-cfw-arm64e_x1_cache</string>
 			<string>dyld-cfw-camera</string>
 			<string>dyld-cfw-metal_vertex_id_format</string>
+			<string>dyld-cfw-text_recognition_ane</string>
 			<string>dyld-cfw-gles_primitive_restart</string>
 			<string>dyld-cfw-metal_cache_reuse_key</string>
 			<string>dyld-cfw-gles_point_draw</string>
@@ -105,6 +106,7 @@
 			<string>kernel-exp-tv_tpro_pagers</string>
 			<string>preboot-cfw-devicetree_board_audio</string>
 			<string>preboot-cfw-devicetree_foldable_displays</string>
+			<string>preboot-cfw-devicetree_virtual_usb_driverkit</string>
 			<string>preboot-cfw-devicetree_foldable_product_id</string>
 			<string>preboot-cfw-devicetree_foldable_vm_subtype</string>
 			<string>preboot-cfw-devicetree_haptics</string>
@@ -121,9 +123,11 @@
 			<string>system-backboardd-cfw-hinge</string>
 			<string>system-campo-cfw-entitlements</string>
 			<string>system-cibarcode-cfw-arm64e_x1</string>
+		<string>system-homepopaccessibility-cfw-arm64e_x1</string>
 			<string>system-cryptexd-exp-homepod_staging</string>
 			<string>system-debugserver-cfw-install</string>
 			<string>system-diskimagesiod-cfw-is_mount_complete</string>
+			<string>system-remotepairingdeviced-cfw-local_connections</string>
 			<string>system-dyld-boot-arm64e_x1_bootstrap</string>
 			<string>system-dyld-exp-tv_tpro</string>
 			<string>system-exp-ota_userland</string>
@@ -182,6 +186,18 @@
 			<string>preboot-exp-ios16_ephemeral_storage</string>
 			<string>system-vphoned-exp-ios16_touchscreen</string>
 			<string>system-springboard-exp-ios16_keybagless_ui</string>
+			<string>preboot-exp-visionos_virtual_product</string>
+			<string>system-featureflags-exp-visionos_legacy_uxm</string>
+			<string>system-launchd-exp-visionos_hmd_presentable_ipc</string>
+			<string>system-launchd-exp-visionos_hmd_properties_ipc</string>
+			<string>system-launchd-exp-visionos_hmd_system_setter_ipc</string>
+			<string>system-launchd-exp-visionos_uxm_ipc</string>
+			<string>system-launchd-exp-visionos_wakeboard_system_ipc</string>
+			<string>system-launchd-exp-visionos_environment_ipc</string>
+			<string>system-featureflags-exp-visionos_environments</string>
+			<string>system-wakeboard-exp-visionos_frame_pacing</string>
+			<string>system-launchdaemons-exp-visionos_nonfatal_services</string>
+			<string>system-preferences-exp-visionos_skip_buddy</string>
 		</array>
 	</dict>
 	<key>Summary</key>

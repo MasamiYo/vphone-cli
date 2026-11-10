@@ -17,6 +17,8 @@
 	<true/>
 	<key>com.apple.locationd.simulation</key>
 	<true/>
+	<key>com.apple.locationd.authorizeapplications</key>
+	<true/>
 	<key>com.apple.lsapplicationworkspace.rebuildappdatabases</key>
 	<true/>
 	<key>com.apple.powerd.lowpowermode.allow</key>
@@ -72,6 +74,8 @@
 	<key>com.apple.frontboard.launchapplications</key>
 	<true/>
 	<key>com.apple.frontboard.shutdown</key>
+	<true/>
+	<key>com.apple.frontboardservices.display-layout-monitor</key>
 	<true/>
 	<key>com.apple.gasgauge.user-access-device</key>
 	<true/>
@@ -340,6 +344,8 @@
 		<string>critical-alerts</string>
 	</array>
 	<key>com.apple.private.vfs.snapshot</key>
+	<true/>
+	<key>com.apple.private.xpc.launchd.userspace-reboot</key>
 	<true/>
 	<key>com.apple.private.xpc.service-attach</key>
 	<true/>

@@ -19,7 +19,11 @@ location_app="$bundle/Contents/Helpers/VPhoneLocation.app"
 # xcodebuild must resolve each project's own graph, especially the iOS daemon.
 build_project() {
     /usr/bin/env -i HOME="$HOME" TMPDIR="${TMPDIR:-/tmp}" \
-        PATH="/usr/bin:/bin:/usr/sbin:/sbin" /usr/bin/xcodebuild "$@"
+        PATH="/usr/bin:/bin:/usr/sbin:/sbin" \
+        ${DEVELOPER_DIR:+"DEVELOPER_DIR=$DEVELOPER_DIR"} \
+        ${SWIFTPM_NETRC_DATA:+"SWIFTPM_NETRC_DATA=$SWIFTPM_NETRC_DATA"} \
+        ${SWIFTPM_MIRROR_CONFIG:+"SWIFTPM_MIRROR_CONFIG=$SWIFTPM_MIRROR_CONFIG"} \
+        /usr/bin/xcodebuild -hideShellScriptEnvironment "$@"
 }
 
 build_project -project "$root/VPhoneExecutable/VPhoneCommand/VPhoneRestore/VPhoneRestore.xcodeproj" \
@@ -77,11 +81,11 @@ tvos_daemon_products="$root/.build/XcodeDaemon/Build/Products/$configuration-app
 amfi_products="$root/.build/XcodeAMFIAllow/Build/Products/$configuration"
 guest_products="$root/.build/guest-components/stage"
 
-# The iOS 26 Swift runtime lacks this symbol, and Swift 6.4 can import it
+# The 26.x guest Swift runtimes lack this symbol, and Swift 6.4 can import it
 # strongly even when vphoned targets iOS 15, causing a dyld crash loop.
 for daemon in "$daemon_products/vphoned" "$tvos_daemon_products/vphoned"; do
     if /usr/bin/nm -u "$daemon" | /usr/bin/grep -q '_swift_initBorrow'; then
-        print -u2 -- "${daemon#$root/} requires _swift_initBorrow, which is unavailable on iOS 26 and tvOS 26"
+        print -u2 -- "${daemon#$root/} requires _swift_initBorrow, which is unavailable on 26.x guests"
         exit 1
     fi
 done
@@ -115,6 +119,7 @@ guest_compatibility_library="$(/usr/bin/xcrun swift-stdlib-tool --print \
     /usr/bin/grep '/libswiftCompatibilitySpan.dylib$')"
 /bin/cp "$guest_compatibility_library" "$guest/libswiftCompatibilitySpan.dylib"
 /usr/bin/install_name_tool -add_rpath /usr/lib/vphone "$guest/vphoned"
+/bin/cp "$guest/vphoned" "$guest/vphoned-visionos"
 /usr/bin/codesign --force --sign - "$guest/libswiftCompatibilitySpan.dylib"
 /bin/cp "$root/VPhoneDaemon/Configuration/vphoned.plist" "$guest/vphoned.plist"
 /bin/cp "$guest_products/launchhook/launchdhook-vphone.dylib" "$guest/launchdhook-vphone.dylib"
@@ -142,11 +147,14 @@ guest_compatibility_library="$(/usr/bin/xcrun swift-stdlib-tool --print \
 /bin/cp "$guest_products/attitude/libvphoneattitude.dylib" "$guest/libvphoneattitude.dylib"
 /bin/cp "$guest_products/cryptexstaging/libvphonecryptexstaging.dylib" "$guest/libvphonecryptexstaging.dylib"
 /bin/cp "$guest_products/homepodpersona/libvphoneinstallpersona.dylib" "$guest/libvphoneinstallpersona.dylib"
+/bin/cp "$guest_products/visionosipc/libvphonevisionosipc.dylib" "$guest/libvphonevisionosipc.dylib"
 /bin/cp "$guest_products/homepodmisfix/libvphonehomepodmisfix.dylib" "$guest/libvphonehomepodmisfix.dylib"
 /bin/cp "$guest_products/homepoddisplay/libvphonehomepoddisplay.dylib" "$guest/libvphonehomepoddisplay.dylib"
 /bin/cp "$guest_products/tvsetupfocus/libvphonetvsetupfocus.dylib" "$guest/libvphonetvsetupfocus.dylib"
 /bin/cp "$guest_products/homepodsetup/vphone-homepod-setup" "$guest/vphone-homepod-setup"
 /bin/cp "$guest_products/homepodsetup/com.vphone.homepod-setup.plist" "$guest/com.vphone.homepod-setup.plist"
+/bin/cp "$guest_products/visionospreferences/vphone-visionos-preferences" "$guest/vphone-visionos-preferences"
+/bin/cp "$guest_products/visionospreferences/com.vphone.visionos-preferences.plist" "$guest/com.vphone.visionos-preferences.plist"
 /bin/cp "$guest_products/gpu/libAppleParavirtCompilerPluginIOGPUFamily.dylib" \
     "$guest/libAppleParavirtCompilerPluginIOGPUFamily.dylib"
 # The HAL plugin is a bundle, signed whole by the Makefile; copied as a tree so
@@ -193,8 +201,24 @@ fi
 
 # Native KDK extraction ports MIT-licensed reference algorithms.
 /bin/mkdir -p "$resources/Licenses"
+/bin/cp "$root/VPhoneExecutable/VPhoneVirtualization/Resources/Licenses/"Dynamic-*.txt "$resources/Licenses/"
+/bin/cp "$root/LICENSE" "$resources/Licenses/vphone-cli.txt"
+/bin/cp "$root/VPhoneExecutable/VPhoneVirtualization/Resources/Licenses/Swift-Apache-2.0-with-Runtime-Library-Exception.txt" "$resources/Licenses/"
 /bin/cp "$root/VPhoneExecutable/VPhoneCommand/FirmwarePatcher/KernelCache/KDK/LICENSE" \
     "$resources/Licenses/native-kdk-MIT.txt"
+"$root/scripts/stage-package-notices.zsh" "$resources/Licenses/packages" \
+    "$root/VPhoneExecutable/VPhoneVirtualization/VPhoneVirtualization.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "${BUILD_DIR:h:h}/SourcePackages" \
+    "$root/VPhoneExecutable/VPhoneCommand/VPhoneCommand.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "$root/.build/XcodeCommand/SourcePackages" \
+    "$root/VPhoneDaemon/VPhoneDaemon.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "$root/.build/XcodeDaemon/SourcePackages" \
+    "$root/VPhoneExecutable/VPhoneCommand/VPhoneRestore/VPhoneRestore.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved" "$root/.build/XcodeRestore/SourcePackages"
+for component in MobileRecoveryCore MobileRestoreCore; do
+    /bin/mkdir -p "$resources/Licenses/vendor/$component"
+    /bin/cp "$root/VPhoneExecutable/VPhoneCommand/VPhoneRestore/$component/COPYING" \
+        "$resources/Licenses/vendor/$component/COPYING"
+done
+/bin/mkdir -p "$resources/Licenses/vendor/VPhoneEscalator"
+/bin/cp "$root/VPhoneExecutable/VPhoneEscalator/VPhoneEscalator/LICENSE" \
+    "$resources/Licenses/vendor/VPhoneEscalator/LICENSE"
 
 "${0:a:h}/SyncStrings.sh"
 /usr/bin/xcrun xcstringstool compile \
@@ -231,6 +255,9 @@ compatibility_library="$(/usr/bin/xcrun swift-stdlib-tool --print \
 /usr/bin/codesign --force --sign - "$macos/vphone-cli"
 /usr/bin/codesign --force --sign - --entitlements "$root/VPhoneDaemon/Configuration/VPhoneDaemon.entitlements" "$guest/vphoned"
 /usr/bin/codesign --force --sign - --entitlements "$root/VPhoneDaemon/Configuration/VPhoneDaemon.entitlements" "$guest/vphoned-tvos"
+/usr/bin/codesign --force --sign - --entitlements "$root/VPhoneDaemon/Configuration/VPhoneDaemon.entitlements" "$guest/vphoned-visionos"
+"$macos/vphone-cli" sign "$guest/vphoned-visionos" --apple-adhoc --merge \
+    --entitlements "$root/VPhoneDaemon/Configuration/VPhoneVisionOS.entitlements"
 /usr/bin/codesign --force --sign - --entitlements "$root/VPhoneDaemon/Configuration/VPhoneDaemon.entitlements" "$guest/vphoned-watchos"
 /usr/bin/codesign --force --sign - "$macos/vphone-escalator"
 /usr/bin/codesign --force --sign - "$macos/libswiftCompatibilitySpan.vphone.dylib"

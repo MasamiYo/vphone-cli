@@ -4,6 +4,20 @@ import VphonedNative
 
 // MARK: - Profile UDID
 
+enum DeviceIdentityMethod: String, GuestMethod {
+    case udidGet = "udid.get"
+    case udidSet = "udid.set"
+    case udidClear = "udid.clear"
+
+    var spec: MethodSpec {
+        switch self {
+        case .udidGet: MethodSpec(summary: "Read the UDID override the guest reports to provisioning checks and the host, or null if none.", result: [.required("path", .any), .required("udid", .any)])
+        case .udidSet: MethodSpec(.required("udid", .string, "UDID to present, stored as sent with no format check"), summary: "Set the guest UDID override, restart UDID-reading daemons and re-enumerate USB so the host sees it.", result: [.required("path", .any), .required("restarted_pids", .any), .required("udid", .any), .required("usb_reenumerated", .boolean), .required("usb_serial", .string)])
+        case .udidClear: MethodSpec(summary: "Remove the UDID override so the guest reports its own, restarting daemons and re-enumerating USB.", result: [.required("path", .any), .required("restarted_pids", .any), .required("udid", .any), .required("usb_reenumerated", .boolean), .required("usb_serial", .string)])
+        }
+    }
+}
+
 /// The UDID the guest gives: to the hooked daemons checking a provisioning
 /// profile's `ProvisionedDevices`, and to the host through lockdownd, remoted
 /// and the USB serial string (`VPhoneGuestComponents/MISFix/MISFixDeviceIdentity.c`
@@ -52,19 +66,17 @@ extension GuestAPI {
     /// asks for the UDID, and stopping it would take the home screen down with it.
     static let udidHookedDaemons = ["misagent", "installd", "lockdownd", "remoted"]
 
-    static func executeDeviceIdentity(_ method: String, _ params: [String: Any]) throws -> [String: Any]? {
-        switch method {
-        case "udid.get":
+    static func executeDeviceIdentity(_ m: DeviceIdentityMethod, _ params: [String: Any]) throws -> [String: Any] {
+        switch m {
+        case .udidGet:
             udidState()
-        case "udid.set":
+        case .udidSet:
             // Stored exactly as sent, with no format check: the API is also
             // for probing what misagent does with an unusual value. The VM
             // window's menu is what holds a person to a real UDID's shape.
             try applyUDID(string(params, "udid"))
-        case "udid.clear":
+        case .udidClear:
             try applyUDID(nil)
-        default:
-            nil
         }
     }
 

@@ -72,8 +72,9 @@ struct FirmwarePatchSetCatalogTests {
         #expect(!plan.isEnabled("dyld-boot-iomfb_force_kern"))
     }
 
-    @Test func `CIBarcode lowering is scoped to the measured base and can be disabled`() throws {
-        let identifier = FirmwareGuestSystemPatchSet.arm64eX1CIBarcode
+    @Test(arguments: [FirmwareGuestSystemPatchSet.arm64eX1CIBarcode,
+                      FirmwareGuestSystemPatchSet.arm64eX1HomePopAccessibility])
+    func `Standalone X1 lowering is scoped to the measured base and can be disabled`(identifier: String) throws {
         for base in ["26.4", "27.0.1", "27.1", "27.1.1", "27.2", "28.0"] {
             for blocked in [false, true] {
                 var preset = FirmwarePatchSetCatalog.standardPreset
@@ -226,6 +227,12 @@ struct FirmwarePatchSetCatalogTests {
                     } else if restoreImagePresets.contains(preset.identifier) {
                         Set(plan.droppedBootEssentials).isSubset(of: droppable)
                             && Set(plan.droppedBootEssentials).isDisjoint(with: FirmwarePatchSetCatalog.minimalBootChainPatches)
+                    } else if preset.identifier == VPhonePatchPreset.visionOSIdentifier {
+                        Set(plan.droppedBootEssentials).isSubset(of:
+                            Set(FirmwarePatchSetCatalog.allDeclarations.filter { !$0.target.isBootChain }.map(\.identifier))
+                                .subtracting(FirmwarePatchSetCatalog.visionOSGuestPatches)
+                                .union(Set(FirmwareDeviceTreePatchSet.manifest.patches.map(\.identifier))
+                                    .subtracting(FirmwarePatchSetCatalog.visionOSDeviceTreePatches)))
                     } else {
                         plan.droppedBootEssentials.isEmpty
                     }
@@ -435,6 +442,14 @@ struct FirmwarePatchSetCatalogTests {
                     && $0.identifier != FirmwareGuestSystemPatchSet.homeViewDisplayLookups
                     && $0.identifier != FirmwareGuestSystemPatchSet.homeViewSetupBypass
                     && $0.identifier != FirmwareGuestSystemPatchSet.homeViewEnvironmentService
+                    && $0.identifier != FirmwareGuestSystemPatchSet.visionOSNonfatalServices
+                    && $0.identifier != FirmwareGuestSystemPatchSet.visionOSVirtualProduct
+                    && $0.identifier != FirmwareGuestSystemPatchSet.visionOSLegacyUXM
+                    && $0.identifier != FirmwareGuestSystemPatchSet.visionOSSkipBuddy
+                    && $0.identifier != FirmwareGuestSystemPatchSet.visionOSEnvironments
+                    && $0.identifier != FirmwareGuestSystemPatchSet.visionOSFramePacing
+                    && $0.identifier != FirmwareGuestSystemPatchSet.visionOSUXMIPC
+                    && !FirmwareGuestSystemPatchSet.visionOSDisplayIPCPatches.contains($0.identifier)
                     && $0.identifier != FirmwareGuestSystemPatchSet.homePodTopCap
                     && $0.identifier != FirmwareGuestSystemPatchSet.homePodSetupBypass
                     && $0.identifier != FirmwareGuestSystemPatchSet.homePodWelcome

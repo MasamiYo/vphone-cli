@@ -25,6 +25,21 @@ jobs:
           xcodebuild -version
           xcbeautify --version
 
+      - name: Package notice regressions
+        run: zsh scripts/tests/stage-package-notices-tests.zsh
+
+      - name: Active display capture regressions
+        run: zsh VPhoneDaemon/Tests/run-display-capture-tests.sh
+
+      - name: Active display metrics regressions
+        run: zsh VPhoneDaemon/Tests/run-display-metrics-tests.sh
+
+      - name: Process capture pipe regressions
+        run: zsh VPhoneDaemon/Tests/run-process-pipe-tests.sh
+
+      - name: Process output capture regressions
+        run: zsh VPhoneDaemon/Tests/run-process-output-tests.sh
+
       - name: Build VPhone.bundle
         env:
           SWIFT_JOBS: "4"
@@ -56,6 +71,22 @@ jobs:
           zsh VPhoneExecutable/VPhoneVirtualization/Build/ValidateBundle.sh \
             .build/XcodeBundle/Build/Products/Debug/VPhone.bundle
 
+      - name: Device tree tests
+        run: |
+          set -o pipefail
+          xcodebuild -workspace VPhone.xcworkspace -scheme FirmwarePatcherTests \
+            -configuration Debug -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath .build/XcodeBundle -jobs 2 \
+            -only-testing:FirmwarePatcherTests/DeviceTreeGuestDeviceTests \
+            -only-testing:FirmwarePatcherTests/CustomFirmwareDriverKitTests test 2>&1 \
+            | tee .build/device-tree-tests.log \
+            | xcbeautify --quiet --disable-logging --renderer github-actions
+
+      - name: Check RPC result schemas
+        run: |
+          zsh VPhoneDaemon/Tests/run-result-schema-check.sh \
+            --icli .build/XcodeBundle/SourcePackages/checkouts/icli
+
       # Xcode before 27 drops arm64e.x1 without a warning, and M6 hosts need
       # that slice of the AMFI allowlist tool.
       - name: Verify vphone-escalator slices
@@ -71,6 +102,7 @@ jobs:
       - name: Guest component tests
         run: |
           make -C VPhoneGuestComponents test-mach-ports-compat
+          make -C VPhoneGuestComponents test-x1-task-exceptions
           make -C VPhoneGuestComponents test-ios16-surface
           make -C VPhoneGuestComponents test-ios18-gpu
           make -C VPhoneGuestComponents test-ios16-lab-policy

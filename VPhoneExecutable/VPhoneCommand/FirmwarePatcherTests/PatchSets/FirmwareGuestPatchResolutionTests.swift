@@ -101,6 +101,151 @@ struct FirmwareGuestPatchResolutionTests {
         #expect(!plan.isEnabled(FirmwareGuestSystemPatchSet.tvLocalActivation))
     }
 
+    /// polarisd exits at once on a VM, and launchd panics on its exit unless
+    /// the headset jobs lose their panic-on-crash policy: without it a freshly
+    /// created visionOS 26.4 guest panics at its first boot.
+    @Test func `visionOS preset keeps headset service exits nonfatal and no other preset does`() throws {
+        let identifier = FirmwareGuestSystemPatchSet.visionOSNonfatalServices
+        for preset in FirmwarePatchSetCatalog.builtInPresets {
+            let plan = try VPhonePatchPlan.resolve(
+                preset: preset, patchSets: FirmwarePatchSetCatalog.bundled,
+                iOSBase: VPhoneVersion("26.4"), cloudOS: VPhoneVersion("26.4"),
+            )
+            #expect(plan.isEnabled(identifier) == (preset.identifier == VPhonePatchPreset.visionOSIdentifier), "\(preset.identifier)")
+        }
+        let vision = try VPhonePatchPlan.resolve(
+            preset: FirmwarePatchSetCatalog.visionOSPreset, patchSets: FirmwarePatchSetCatalog.bundled,
+            iOSBase: VPhoneVersion("26.4"), cloudOS: VPhoneVersion("26.4"),
+        )
+        for experiment in [FirmwareGuestSystemPatchSet.visionOSVirtualProduct, FirmwareGuestSystemPatchSet.visionOSLegacyUXM,
+                           FirmwareGuestSystemPatchSet.visionOSUXMIPC, FirmwareGuestSystemPatchSet.visionOSSkipBuddy,
+                           FirmwareGuestSystemPatchSet.visionOSEnvironments, FirmwareGuestSystemPatchSet.visionOSFramePacing]
+            + Array(FirmwareGuestSystemPatchSet.visionOSDisplayIPCPatches) {
+            #expect(!vision.isEnabled(experiment), "\(experiment) stays an opt-in experiment")
+        }
+    }
+
+    @Test func `visionOS Buddy preference is independent opt in for the tested OS pair`() throws {
+        let identifier = FirmwareGuestSystemPatchSet.visionOSSkipBuddy
+        let declaration = try #require(FirmwarePatchSetCatalog.allDeclarations.first { $0.identifier == identifier })
+        #expect(declaration.target == .guestFile(path: "/usr/share/vphone/VisionOSSkipBuddy.plist"))
+        #expect(!declaration.bootEssential)
+        for preset in FirmwarePatchSetCatalog.builtInPresets {
+            let plan = try VPhonePatchPlan.resolve(
+                preset: preset, patchSets: FirmwarePatchSetCatalog.bundled,
+                iOSBase: VPhoneVersion("26.4"), cloudOS: VPhoneVersion("26.4"),
+            )
+            #expect(!plan.isEnabled(identifier), "\(preset.identifier) implicitly skips headset onboarding")
+        }
+        for (base, cloud, applicable) in [
+            ("26.4", "26.4", true), ("26.4.1", "26.4.2", true),
+            ("26.3", "26.4", false), ("26.5", "26.4", false),
+            ("26.4", "26.3", false), ("26.4", "26.5", false), ("27.0", "26.4", false),
+        ] {
+            let plan = try VPhonePatchPlan.resolve(
+                preset: FirmwarePatchSetCatalog.standardPreset, patchSets: FirmwarePatchSetCatalog.bundled,
+                iOSBase: VPhoneVersion(base), cloudOS: VPhoneVersion(cloud), allowed: [identifier],
+            )
+            #expect(plan.isEnabled(identifier) == applicable)
+            #expect(!plan.isEnabled(FirmwareGuestSystemPatchSet.visionOSUXMIPC))
+            #expect(FirmwareGuestPatchResolution.missingVisionOSDisplayIPCDependencies(enabled: [identifier]).isEmpty)
+        }
+        #expect(!declaration.applicability.matches(iOSBase: nil, cloudOS: VPhoneVersion("26.4")))
+        #expect(!declaration.applicability.matches(iOSBase: VPhoneVersion("26.4"), cloudOS: nil))
+        #expect(FirmwareGuestPatchResolution.effectiveEnabled(planEnabled: [], selectionEnabled: [identifier]) == [identifier])
+        #expect(FirmwareGuestPatchResolution.effectiveEnabled(planEnabled: [identifier], selectionEnabled: []).isEmpty)
+        #expect(FirmwareGuestPatchResolution.guestPatchesOff(selectionEnabled: []).contains(identifier))
+    }
+
+    @Test(arguments: [FirmwareGuestSystemPatchSet.visionOSEnvironments, FirmwareGuestSystemPatchSet.visionOSFramePacing])
+    func `visionOS environment and pacing patches are independent opt in for the tested OS pair`(identifier: String) throws {
+        let declaration = try #require(FirmwarePatchSetCatalog.allDeclarations.first { $0.identifier == identifier })
+        let target: VPhonePatchTarget = identifier == FirmwareGuestSystemPatchSet.visionOSEnvironments
+            ? .guestFile(path: FirmwareGuestSystemPatchSet.visionOSEnvironmentsPath)
+            : .guestExecutable(path: FirmwareGuestSystemPatchSet.visionOSFramePacingPath)
+        #expect(declaration.target == target)
+        #expect(!declaration.bootEssential)
+        for preset in FirmwarePatchSetCatalog.builtInPresets {
+            let plan = try VPhonePatchPlan.resolve(
+                preset: preset, patchSets: FirmwarePatchSetCatalog.bundled,
+                iOSBase: VPhoneVersion("26.4"), cloudOS: VPhoneVersion("26.4"),
+            )
+            #expect(!plan.isEnabled(identifier))
+        }
+        for (base, cloud, applicable) in [
+            ("26.4", "26.4", true), ("26.4.1", "26.4.2", true),
+            ("26.3", "26.4", false), ("26.5", "26.4", false),
+            ("26.4", "26.3", false), ("26.4", "26.5", false), ("27.0", "26.4", false),
+        ] {
+            let plan = try VPhonePatchPlan.resolve(
+                preset: FirmwarePatchSetCatalog.standardPreset, patchSets: FirmwarePatchSetCatalog.bundled,
+                iOSBase: VPhoneVersion(base), cloudOS: VPhoneVersion(cloud), allowed: [identifier],
+            )
+            #expect(plan.isEnabled(identifier) == applicable)
+            #expect(!plan.isEnabled(FirmwareGuestSystemPatchSet.visionOSUXMIPC))
+        }
+        #expect(!declaration.applicability.matches(iOSBase: nil, cloudOS: VPhoneVersion("26.4")))
+        #expect(!declaration.applicability.matches(iOSBase: VPhoneVersion("26.4"), cloudOS: nil))
+        #expect(FirmwareGuestPatchResolution.missingVisionOSDisplayIPCDependencies(enabled: [identifier]).isEmpty)
+        #expect(FirmwareGuestPatchResolution.guestPatchesOff(selectionEnabled: []).contains(identifier))
+    }
+
+    @Test(arguments: FirmwareGuestSystemPatchSet.visionOSDisplayIPCPatches)
+    func `visionOS display and environment lookups are opt in and limited to the tested OS pair`(identifier: String) throws {
+        let adapter = FirmwareGuestSystemPatchSet.visionOSUXMIPC
+        let declaration = try #require(FirmwarePatchSetCatalog.allDeclarations.first { $0.identifier == identifier })
+        let marker: String = switch identifier {
+        case FirmwareGuestSystemPatchSet.visionOSHMDPropertiesIPC: FirmwareGuestSystemPatchSet.visionOSHMDPropertiesIPCMarker
+        case FirmwareGuestSystemPatchSet.visionOSHMDPresentableIPC: FirmwareGuestSystemPatchSet.visionOSHMDPresentableIPCMarker
+        case FirmwareGuestSystemPatchSet.visionOSHMDSystemSetterIPC: FirmwareGuestSystemPatchSet.visionOSHMDSystemSetterIPCMarker
+        case FirmwareGuestSystemPatchSet.visionOSEnvironmentIPC: FirmwareGuestSystemPatchSet.visionOSEnvironmentIPCMarker
+        default: FirmwareGuestSystemPatchSet.visionOSWakeboardSystemIPCMarker
+        }
+        #expect(declaration.target == .guestFile(path: marker))
+        #expect(!declaration.bootEssential)
+        for preset in FirmwarePatchSetCatalog.builtInPresets {
+            let plan = try VPhonePatchPlan.resolve(
+                preset: preset, patchSets: FirmwarePatchSetCatalog.bundled,
+                iOSBase: VPhoneVersion("26.4"), cloudOS: VPhoneVersion("26.4"),
+            )
+            #expect(!plan.isEnabled(identifier), "\(preset.identifier) implicitly enables the native UI service lookup")
+        }
+        for (base, cloud, applicable) in [
+            ("26.4", "26.4", true), ("26.4.1", "26.4.2", true),
+            ("26.3", "26.4", false), ("26.5", "26.4", false),
+            ("26.4", "26.3", false), ("26.4", "26.5", false), ("27.0", "26.4", false),
+        ] {
+            let plan = try VPhonePatchPlan.resolve(
+                preset: FirmwarePatchSetCatalog.standardPreset, patchSets: FirmwarePatchSetCatalog.bundled,
+                iOSBase: VPhoneVersion(base), cloudOS: VPhoneVersion(cloud), allowed: [identifier, adapter],
+            )
+            #expect(plan.isEnabled(identifier) == applicable)
+        }
+        #expect(!declaration.applicability.matches(iOSBase: nil, cloudOS: VPhoneVersion("26.4")))
+        #expect(!declaration.applicability.matches(iOSBase: VPhoneVersion("26.4"), cloudOS: nil))
+    }
+
+    @Test(arguments: FirmwareGuestSystemPatchSet.visionOSDisplayIPCPatches)
+    func `visionOS display and environment markers depend on the shared adapter and follow current selection independently`(identifier: String) {
+        let adapter = FirmwareGuestSystemPatchSet.visionOSUXMIPC
+        #expect(FirmwareGuestPatchResolution.missingVisionOSDisplayIPCDependencies(enabled: [identifier]) == [adapter])
+        #expect(FirmwareGuestPatchResolution.missingVisionOSDisplayIPCDependencies(enabled: [identifier, adapter]).isEmpty)
+        #expect(FirmwareGuestPatchResolution.missingVisionOSDisplayIPCDependencies(enabled: [adapter]).isEmpty)
+        #expect(FirmwareGuestPatchResolution.missingVisionOSDisplayIPCDependencies(enabled: []).isEmpty)
+        let enabled = FirmwareGuestPatchResolution.effectiveEnabled(planEnabled: [adapter], selectionEnabled: [adapter, identifier])
+        #expect(enabled == [adapter, identifier])
+        let disabled = FirmwareGuestPatchResolution.effectiveEnabled(planEnabled: enabled, selectionEnabled: [adapter])
+        #expect(disabled == [adapter])
+        #expect(FirmwareGuestPatchResolution.guestPatchesOff(selectionEnabled: disabled).contains(identifier))
+        #expect(!FirmwareGuestPatchResolution.guestPatchesOff(selectionEnabled: disabled).contains(adapter))
+        let others = FirmwareGuestSystemPatchSet.visionOSDisplayIPCPatches.subtracting([identifier])
+        let remaining = FirmwareGuestPatchResolution.effectiveEnabled(
+            planEnabled: enabled.union(others), selectionEnabled: others.union([adapter]),
+        )
+        #expect(remaining == others.union([adapter]))
+        #expect(FirmwareGuestPatchResolution.missingVisionOSDisplayIPCDependencies(enabled: remaining).isEmpty)
+    }
+
     @Test func `native TV setup adapters are limited to the 27 point 2 4K preset`() throws {
         for identifier in [FirmwareGuestSystemPatchSet.tvSetupDisplayLookup, FirmwareGuestSystemPatchSet.tvSetupFocus, FirmwareGuestSystemPatchSet.tvLocalActivation] {
             for version in ["26.6", "27.0", "27.1", "27.2", "27.3"] {
@@ -117,6 +262,29 @@ struct FirmwareGuestPatchResolutionTests {
             #expect(FirmwareGuestPatchResolution.guestPatchesOff(selectionEnabled: []).contains(identifier))
             #expect(FirmwareGuestPatchResolution.unvalidatedTVGuestPatches(enabled: [identifier]) == [identifier])
         }
+    }
+
+    /// `cfw install` refuses a TV-family guest whose plan enables a guest patch
+    /// its gate does not admit, after the restore has already run. Every shipped
+    /// TV-family preset must pass its own gate on every userland it is offered.
+    @Test func `TV family presets pass their installation gates`() throws {
+        let gates: [(VPhonePatchPreset, (Set<String>) -> [String])] = [
+            (FirmwarePatchSetCatalog.tvOSPreset, { FirmwareGuestPatchResolution.unvalidatedTVGuestPatches(enabled: $0) }),
+            (FirmwarePatchSetCatalog.tvOS4KPreset, { FirmwareGuestPatchResolution.unvalidatedTVGuestPatches(enabled: $0, arm64eUserland: true) }),
+            (FirmwarePatchSetCatalog.homeViewPreset, { FirmwareGuestPatchResolution.unvalidatedHomeViewGuestPatches(enabled: $0) }),
+            (FirmwarePatchSetCatalog.homePodMiniPreset, { FirmwareGuestPatchResolution.unvalidatedHomePodGuestPatches(enabled: $0) }),
+        ]
+        for (preset, unvalidated) in gates {
+            for version in ["26.5", "26.6", "27.0", "27.2"] {
+                let plan = try VPhonePatchPlan.resolve(
+                    preset: preset, patchSets: FirmwarePatchSetCatalog.bundled,
+                    iOSBase: VPhoneVersion(version), cloudOS: VPhoneVersion("26.4"),
+                )
+                #expect(unvalidated(plan.enabled).isEmpty, "\(preset.identifier) on \(version)")
+            }
+        }
+        #expect(FirmwareGuestPatchResolution.unvalidatedTVGuestPatches(enabled: [FirmwareGuestSystemPatchSet.prebootVirtualUSBDriverKit], arm64eUserland: true)
+            == [FirmwareGuestSystemPatchSet.prebootVirtualUSBDriverKit])
     }
 
     @Test func `legacy TV setup is not selected by any preset`() throws {

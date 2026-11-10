@@ -3,6 +3,19 @@ import VphonedNative
 
 // MARK: - Clock
 
+enum ClockMethod: String, GuestMethod {
+    case timeClock = "time.clock"
+
+    var spec: MethodSpec {
+        switch self {
+        case .timeClock: MethodSpec(.optional("time", .number, "Mac time, seconds since 1970, above 978307200; the clock moves only if over 1 s off and automatic time is on"), .optional("automatic", .boolean, "Turn the guest automatic time setting on or off; applied before time"), summary: "Read the guest clock, sync it to the Mac time, or switch automatic time on or off.", result: [.required("automatic", .any),
+                                             .optional("changed", .boolean),
+                                             .optional("offset", .number),
+                                             .required("time", .number)])
+        }
+    }
+}
+
 /// The guest's wall clock, kept on the Mac's.
 ///
 /// A guest boots with the Mac's time, from the virtual RTC. Once timed has
@@ -37,26 +50,28 @@ extension GuestAPI {
     private static let clockOffers = 6
     private static let clockLock = NSLock()
 
-    static func executeClock(_ method: String, _ params: [String: Any]) throws -> [String: Any]? {
-        guard method == "time.clock" else { return nil }
-        let received = DispatchTime.now()
-        let automatic = params["automatic"] as? Bool
-        guard params["time"] != nil else {
-            guard let automatic else { return try clockState() }
-            return try clockLock.withLock { try setAutomaticClock(automatic) }
-        }
-        let time = try requiredNumber(params, "time")
-        // timed refuses anything before 2001; nothing sends that in earnest.
-        guard time > kCFAbsoluteTimeIntervalSince1970 else {
-            throw GuestAPIError.invalidRequest("time must be seconds since 1970")
-        }
-        return try clockLock.withLock {
-            let switched = try automatic.map { try setAutomaticClock($0)["changed"] as? Bool ?? false } ?? false
-            var state = try offerClock {
-                time + Double(DispatchTime.now().uptimeNanoseconds - received.uptimeNanoseconds) / 1e9
+    static func executeClock(_ m: ClockMethod, _ params: [String: Any]) throws -> [String: Any] {
+        switch m {
+        case .timeClock:
+            let received = DispatchTime.now()
+            let automatic = params["automatic"] as? Bool
+            guard params["time"] != nil else {
+                guard let automatic else { return try clockState() }
+                return try clockLock.withLock { try setAutomaticClock(automatic) }
             }
-            state["changed"] = switched || state["changed"] as? Bool == true
-            return state
+            let time = try requiredNumber(params, "time")
+            // timed refuses anything before 2001; nothing sends that in earnest.
+            guard time > kCFAbsoluteTimeIntervalSince1970 else {
+                throw GuestAPIError.invalidRequest("time must be seconds since 1970")
+            }
+            return try clockLock.withLock {
+                let switched = try automatic.map { try setAutomaticClock($0)["changed"] as? Bool ?? false } ?? false
+                var state = try offerClock {
+                    time + Double(DispatchTime.now().uptimeNanoseconds - received.uptimeNanoseconds) / 1e9
+                }
+                state["changed"] = switched || state["changed"] as? Bool == true
+                return state
+            }
         }
     }
 

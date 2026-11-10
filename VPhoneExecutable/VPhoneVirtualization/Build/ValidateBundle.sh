@@ -131,6 +131,28 @@ done
     print -u2 "Missing native KDK extraction licence"
     exit 1
 }
+for name in Dynamic-Apache-2.0.txt Dynamic-NOTICE.txt; do
+    /usr/bin/cmp "$root/VPhoneExecutable/VPhoneVirtualization/Resources/Licenses/$name" "$resources/Licenses/$name" || {
+        print -u2 "Missing or changed Dynamic notice: $name"
+        exit 1
+    }
+done
+/usr/bin/cmp "$root/VPhoneExecutable/VPhoneVirtualization/Resources/Licenses/Swift-Apache-2.0-with-Runtime-Library-Exception.txt" \
+    "$resources/Licenses/Swift-Apache-2.0-with-Runtime-Library-Exception.txt" || {
+    print -u2 "Missing or changed Swift runtime notice"
+    exit 1
+}
+"$root/scripts/stage-package-notices.zsh" --check "$resources/Licenses/packages"
+for component in MobileRecoveryCore MobileRestoreCore; do
+    [[ -s "$resources/Licenses/vendor/$component/COPYING" ]] || {
+        print -u2 "Missing $component licence"
+        exit 1
+    }
+done
+[[ -s "$resources/Licenses/vendor/VPhoneEscalator/LICENSE" && -s "$resources/Licenses/vphone-cli.txt" ]] || {
+    print -u2 "Missing bundle or escalator licence"
+    exit 1
+}
 # New machines copy this ROM. Without it vm new would fail, and OpenAVB is
 # distributed only with its licences. The ROM window is 512 KiB.
 for name in OpenAVB.bin LICENSE APSL-2.0.txt; do
@@ -164,6 +186,9 @@ for name in vphoned vphoned-tvos vphoned-watchos libvphonetvsetupfocus.dylib lib
     libprefsfix.dylib libsigninfix.dylib libvphoneios17desktop.dylib libvphoneios16migration.dylib libvphoneios16desktop.dylib libvphonegyro.dylib libvphoneaccelerometer.dylib libvphonehinge.dylib libvphonefoldguard.dylib libvphonefolddisplay.dylib libvphoneattitude.dylib libvphonehomepoddisplay.dylib libvphonecryptexstaging.dylib libvphoneinstallpersona.dylib libvphonehomepodmisfix.dylib vphone-homepod-setup libAppleParavirtCompilerPluginIOGPUFamily.dylib; do
     require_signed_macho "$guest/$name"
 done
+require_signed_macho "$guest/vphoned-visionos"
+require_signed_macho "$guest/libvphonevisionosipc.dylib"
+require_signed_macho "$guest/vphone-visionos-preferences"
 # iOS 18 must be able to resolve the compatibility library without Xcode.
 # /usr/lib/swift remains first for guests whose standard library has Span.
 daemon_rpaths="$(/usr/bin/otool -l "$guest/vphoned" | /usr/bin/awk '
@@ -183,7 +208,7 @@ daemon_rpaths="$(/usr/bin/otool -l "$guest/vphoned" | /usr/bin/awk '
 # The scripting session runs on JavaScriptCore, which watchOS does not ship.
 # IcliKit's probe opens it at run time, so the daemon names no JavaScriptCore
 # symbol; a reference would leave the watch guest without a daemon at all.
-for daemon in vphoned vphoned-tvos vphoned-watchos; do
+for daemon in vphoned vphoned-tvos vphoned-watchos vphoned-visionos; do
     javascriptcore_loads="$(/usr/bin/otool -l "$guest/$daemon" | /usr/bin/awk '
         $1 == "cmd" { command = $2 }
         $1 == "name" && $2 ~ /JavaScriptCore/ { print command }
@@ -193,7 +218,7 @@ for daemon in vphoned vphoned-tvos vphoned-watchos; do
         exit 1
     }
 done
-for name in vphoned.plist libcamfix.plist libvcamcaptured.plist libmisfix.plist com.vphone.homepod-setup.plist; do
+for name in vphoned.plist libcamfix.plist libvcamcaptured.plist libmisfix.plist com.vphone.homepod-setup.plist com.vphone.visionos-preferences.plist; do
     [[ -f "$guest/$name" ]] || { print -u2 "Missing guest configuration: $name"; exit 1; }
 done
 # The virtio sound HAL plugin is a whole bundle: audiomxd finds its factory
@@ -251,6 +276,9 @@ while IFS= read -r file; do
         "$guest/vphoned-watchos")
             [[ "$platform" == WATCHOS ]] || { print -u2 "Non-watchOS binary: ${file#$bundle/}"; exit 1; }
             ;;
+        "$guest/libvphonevisionosipc.dylib"|"$guest/vphone-visionos-preferences")
+            [[ "$platform" == VISIONOS ]] || { print -u2 "Non-visionOS binary: ${file#$bundle/}"; exit 1; }
+            ;;
         "$guest/"*)
             [[ "$platform" == IOS ]] || { print -u2 "Non-iOS binary in guest-resources: ${file#$bundle/}"; exit 1; }
             ;;
@@ -274,8 +302,15 @@ vm_entitlements="$(/usr/bin/codesign -d --entitlements - --xml "$macos/vphone-vm
     print -u2 "Guest daemon entitlements leaked into vphone-vm"
     exit 1
 }
-for daemon in vphoned vphoned-tvos vphoned-watchos; do
+for daemon in vphoned vphoned-tvos vphoned-watchos vphoned-visionos; do
     daemon_entitlements="$(/usr/bin/codesign -d --entitlements - --xml "$guest/$daemon" 2>/dev/null)"
+    if [[ "$daemon" == vphoned-visionos ]]; then
+        [[ "$daemon_entitlements" == *'com.apple.surfboard.immersion-client'* ]] || {
+            print -u2 "visionOS immersion entitlement is missing"; exit 1
+        }
+    elif [[ "$daemon_entitlements" == *'com.apple.surfboard.immersion-client'* ]]; then
+        print -u2 "visionOS immersion entitlement leaked into $daemon"; exit 1
+    fi
     [[ "$daemon_entitlements" == *'com.apple.CommCenter.fine-grained'* &&
         "$daemon_entitlements" != *'com.apple.private.virtualization'* ]] || {
         print -u2 "$daemon has the wrong entitlements"

@@ -7,35 +7,385 @@ import IcliSystem
 import UIKit
 import VphonedNative
 
-enum GuestAPIError: Error, CustomStringConvertible {
-    case invalidRequest(String)
-    case unsupportedMethod(String)
-    case operationFailed(String)
-    /// The request would repeat work the guest has already done. The code is
-    /// sent as the error code so a client can tell it apart from a failure.
-    case alreadyDone(code: String, message: String)
-    /// The guest's Location Services switch is off, so locationd gives no
-    /// client a location. vphoned leaves the switch to the guest's Settings.
-    case locationServicesOff
+enum CoreMethod: String, GuestMethod {
+    case deviceSnapshot = "device.snapshot"
+    case deviceScreen = "device.screen"
+    case screenScreenshot = "screen.screenshot"
+    case appsList = "apps.list"
+    case appsSearch = "apps.search"
+    case appsRefresh = "apps.refresh"
+    case appsLaunch = "apps.launch"
+    case appsTerminate = "apps.terminate"
+    case appsUninstall = "apps.uninstall"
+    case appsForeground = "apps.foreground"
+    case appsOpenUrl = "apps.open_url"
+    case appsInstall = "apps.install"
+    case bootstrapInstall = "bootstrap.install"
+    case bootstrapPackages = "bootstrap.packages"
+    case bootstrapStatus = "bootstrap.status"
+    case bootstrapInspect = "bootstrap.inspect"
+    case bootstrapUninstall = "bootstrap.uninstall"
+    case bootstrapFirmware = "bootstrap.firmware"
+    case inputTouch = "input.touch"
+    case inputTouch2 = "input.touch2"
+    case inputPointer = "input.pointer"
+    case inputScroll = "input.scroll"
+    case inputHid = "input.hid"
+    case locationSet = "location.set"
+    case locationClear = "location.clear"
+    case locationCurrent = "location.current"
+    case developerModeStatus = "developer_mode.status"
+    case developerModeEnable = "developer_mode.enable"
+    case powerLowPowerMode = "power.low_power_mode"
+    case locationServices = "location.services"
+    case clipboardGet = "clipboard.get"
+    case clipboardSet = "clipboard.set"
+    case clipboardClear = "clipboard.clear"
+    case filesList = "files.list"
+    case filesMkdir = "files.mkdir"
+    case filesRemove = "files.remove"
+    case filesRename = "files.rename"
+    case settingsGet = "settings.get"
+    case settingsSet = "settings.set"
+    case settingsDelete = "settings.delete"
+    case keychainList = "keychain.list"
+    case keychainAdd = "keychain.add"
+    case keychainGet = "keychain.get"
+    case keychainUpdate = "keychain.update"
+    case keychainDelete = "keychain.delete"
+    case agentApplyUpdate = "agent.apply_update"
+    case methodsList = "methods.list"
 
-    var description: String {
+    var spec: MethodSpec {
         switch self {
-        case let .invalidRequest(message), let .operationFailed(message): message
-        case let .unsupportedMethod(method): "Unknown method: \(method)"
-        case let .alreadyDone(_, message): message
-        case .locationServicesOff:
-            "Location Services are turned off in the guest. Turn them on in Settings > Privacy & Security > Location Services."
+        case .deviceSnapshot: MethodSpec(summary: "Get a one-call device overview: model, OS, kernel, memory, battery, lock state, storage, jailbreak.", result: [.required("battery", .object),
+                                                  .required("boot_session_uuid", .any),
+                                                  .required("boot_time", .any),
+                                                  .required("host", .string),
+                                                  .required("ios_version", .string),
+                                                  .required("jailbreak", .object),
+                                                  .required("kernel", .string),
+                                                  .required("lock", .object),
+                                                  .required("memory_bytes", .integer),
+                                                  .required("model", .string),
+                                                  .required("processor_count", .integer),
+                                                  .required("storage", .object),
+                                                  .required("sysname", .string),
+                                                  .required("uptime_seconds", .any)])
+        case .deviceScreen: MethodSpec(summary: "Get screen size in points, scale, orientation, and whether it is locked or off.", result: [.required("height", .number),
+                                                .required("locked", .boolean),
+                                                .required("orientation", .integer),
+                                                .required("scale", .number),
+                                                .required("screen_off", .boolean),
+                                                .required("width", .number)])
+        case .screenScreenshot: MethodSpec(.optional("max_dimension", .integer, "Scale the image down so its longer side is at most this many pixels", min: 1),
+                                           .optional("quality", .number, "JPEG quality of a re-encoded image; 0.8 when omitted", default: 0.8, min: 0.1, max: 1.0),
+                                           .optional("region", .object, "Crop to {x, y, width, height} in points; the whole screen when omitted"),
+                                           summary: "Capture the screen and return it as base64 image data, optionally cropped and scaled.",
+                                           result: [.required("bytes", .integer),
+                                                    .required("coordinate_scale", .number),
+                                                    .required("data", .string),
+                                                    .required("height", .integer),
+                                                    .required("mime_type", .string),
+                                                    .required("point_height", .number),
+                                                    .required("point_width", .number),
+                                                    .required("region", .object),
+                                                    .required("width", .integer)])
+        case .appsList: MethodSpec(.optional("filter", .string, "Which apps to list", values: ["all", "running", "user", "system"], default: "all"),
+                                    summary: "List installed apps with bundle id, name, version, type, and running state.", result: [.required("apps", .array)])
+        case .appsSearch: MethodSpec(.required("query", .string, "Text to match against app names and bundle ids"),
+                                      summary: "Search installed apps by name or bundle id.", result: [.required("apps", .any), .required("query", .string)])
+        case .appsRefresh: MethodSpec(.optional("directory", .string, "App directory to rescan; the installed bootstrap Applications directory when omitted"),
+                                      summary: "Rescan one app directory and register new, changed, or removed apps with the system.", result: [
+                                          .required("directory", .string),
+                                          .required("failed", .array),
+                                          .required("registered", .array),
+                                          .required("skipped", .array),
+                                          .required("unchanged", .array),
+                                          .required("unregistered", .array),
+                                          .required("unverified", .array)])
+        case .appsLaunch: MethodSpec(.required("bundle_id", .string, "Bundle id of the app to launch"),
+                                     .optional("url", .string, "URL to open in the app instead of a plain launch"),
+                                     summary: "Launch an app by bundle id, optionally opening a URL, and verify it is frontmost.", result: [
+                                         .required("frontmost_verified", .boolean),
+                                         .required("pid", .any),
+                                         .optional("warning", .string)])
+        case .appsTerminate: MethodSpec(.required("bundle_id", .string, "Bundle id of the app to stop"),
+                                        summary: "Send SIGTERM to all processes of an app and wait up to 5 seconds for them to exit.", result: [
+                                            .required("already_stopped", .boolean),
+                                            .required("killed", .string),
+                                            .required("pids", .array)])
+        case .appsUninstall:
+            MethodSpec(.required("bundle_id", .string, "Bundle id of the app to uninstall"),
+                       summary: "Uninstall an app and remove its data containers.",
+                       force: .always("uninstall <bundle_id>") { p in try "uninstall \(GuestAPI.string(p, "bundle_id"))" }, result: [
+                           .optional("method", .string),
+                           .optional("removed_containers", .array),
+                           .required("uninstalled", .string)])
+        case .appsForeground: MethodSpec(summary: "Get the app currently in the foreground.", result: [
+                .required("bundle_id", .string),
+                .required("name", .string),
+                .required("pid", .any),
+                .required("source", .any),
+                .required("verified", .any)])
+        case .appsOpenUrl: MethodSpec(.required("url", .string, "URL or URL scheme to open"),
+                                       .optional("bundle_id", .string, "Bundle id of the app that should handle the URL; the default handler when omitted"),
+                                       summary: "Open a URL, optionally in a specific app.", result: [.optional("bundle_id", .string), .required("url", .string)])
+        case .appsInstall:
+            MethodSpec(.required("path", .string, "Guest path of the IPA file; it is deleted after install"),
+                       .optional("cert_path", .string, "Guest path of a signing certificate; deleted after install"),
+                       .optional("registration", .string, "Register the app as a System or User app", values: ["System", "User"], default: "User"),
+                       summary: "Install an IPA from a guest path, sign it, and register it with the system.", result: [
+                           .required("bundle_container", .string),
+                           .required("bundle_id", .string),
+                           .required("bundle_path", .string),
+                           .required("containerized", .any),
+                           .required("data_container", .any),
+                           .required("method", .string),
+                           .required("msg", .string),
+                           .required("plugins", .any),
+                           .required("registration", .string),
+                           .required("unregistered_plugins", .any),
+                           .required("upgraded", .boolean)])
+        case .bootstrapInstall: MethodSpec(.required("layout", .string, "Jailbreak bootstrap layout to install (visionOS supports rootless only)", values: ["rootless", "roothide"]),
+                                           .optional("package_path", .string, "Guest path of a local bootstrap package to use instead of downloading"),
+                                           summary: "Install the Irisin jailbreak bootstrap; poll bootstrap.status for progress.", result: [
+                                               .required("app_path", .any),
+                                               .required("architecture", .string),
+                                               .required("dpkg_database_updated", .boolean),
+                                               .required("firmware_version", .string),
+                                               .required("jbroot", .string),
+                                               .required("layout", .string),
+                                               .required("maintainer_scripts_executed", .boolean),
+                                               .required("registration", .any),
+                                               .optional("roothide_base", .object),
+                                               .required("service_load", .object),
+                                               .optional("service_start", .object),
+                                               .optional("service_start_warning", .string),
+                                               .required("service_status", .object),
+                                               .required("tag", .string),
+                                               .required("version", .any)])
+        case .bootstrapPackages: MethodSpec(summary: "Install the initial package set into the installed bootstrap.", result: [
+                .optional("jbroot", .string),
+                .required("packages", .array),
+                .optional("repositories", .array),
+                .optional("skipped", .string)])
+        case .bootstrapStatus: MethodSpec(summary: "Report bootstrap install progress: phase, download bytes, and any error.", result: [
+                .optional("downloaded_bytes", .integer),
+                .optional("error", .string),
+                .optional("jbroot", .any),
+                .optional("layout", .any),
+                .optional("packages", .array),
+                .required("phase", .string),
+                .optional("tag", .any),
+                .optional("total_bytes", .integer),
+                .optional("version", .any)])
+        case .bootstrapInspect: MethodSpec(summary: "Report whether a bootstrap is installed, its layout, and its root paths.", result: [
+                .required("installed", .boolean),
+                .optional("jbroot", .string),
+                .optional("layout", .string),
+                .required("roots", .any)])
+        case .bootstrapUninstall:
+            MethodSpec(.optional("roots", .array, "Bootstrap root paths expected to be installed; takes precedence over jbroot"),
+                       .optional("jbroot", .string, "Single bootstrap root path; required when roots is omitted"),
+                       .optional("reboot", .boolean, "Reboot after removal", default: true),
+                       summary: "Remove the installed jailbreak bootstrap, optionally rebooting afterward.",
+                       force: .always("uninstall the bootstrap"), result: [
+                           .required("deleted", .boolean),
+                           .required("reboot_scheduled", .boolean),
+                           .required("roots", .array)])
+        case .bootstrapFirmware: MethodSpec(summary: "Repair the bootstrap dpkg firmware record to match the running OS version.", result: [
+                .required("dpkg_database_updated", .boolean),
+                .required("firmware_version", .string),
+                .required("jbroot", .string),
+                .required("layout", .string)])
+        case .inputTouch:
+            MethodSpec(.required("phase", .string, "Touch phase", values: ["down", "move", "up"]),
+                       .optional("x", .number, "Horizontal position; 0..1 when normalized, else screen points"),
+                       .optional("y", .number, "Vertical position; 0..1 when normalized, else screen points"),
+                       .optional("edge", .integer, "Edge bitmask: 1 top, 2 bottom, 4 right, 8 left; nonzero starts the touch at that edge; normalized only"),
+                       .optional("normalized", .boolean, "True when x and y are fractions of the screen, false for screen points", default: true),
+                       summary: "Send a single-finger touch event (down, move, up) at a screen position.", result: [.optional("digitizer_x", .number),
+                                .optional("digitizer_y", .number),
+                                .optional("edge", .integer),
+                                .optional("normalized", .boolean),
+                                .required("phase", .any),
+                                .optional("x", .number),
+                                .optional("y", .number)])
+        case .inputTouch2:
+            MethodSpec(.required("phase", .string, "Touch phase", values: ["down", "move", "up"]),
+                       .optional("x1", .number, "First finger x as a 0..1 fraction of the screen"),
+                       .optional("y1", .number, "First finger y as a 0..1 fraction of the screen"),
+                       .optional("x2", .number, "Second finger x as a 0..1 fraction of the screen"),
+                       .optional("y2", .number, "Second finger y as a 0..1 fraction of the screen"),
+                       .optional("normalized", .boolean, "Must be true or omitted; two-finger touch takes normalized coordinates only", default: true),
+                       summary: "Send a two-finger touch event, for pinch and rotate gestures.", result: [.required("fingers", .integer), .required("phase", .any)])
+        case .inputPointer:
+            MethodSpec(.required("x", .number, "Pointer x as a 0..1 fraction of the screen from the top-left", min: 0, max: 1),
+                       .required("y", .number, "Pointer y as a 0..1 fraction of the screen from the top-left", min: 0, max: 1),
+                       .optional("seq", .integer, "Increasing move number; a move arriving after a higher one is dropped", default: 0, min: 0, max: 9007199254740992),
+                       .optional("buttons", .integer, "Held buttons bitmask: 1 primary, 2 secondary, 4 middle", default: 0, min: 0, max: 7),
+                       summary: "Move the pointer to a screen position, optionally holding mouse buttons.", result: [.required("buttons", .integer), .required("x", .number), .required("y", .number)])
+        case .inputScroll:
+            MethodSpec(.required("phase", .string, "Scroll gesture phase", values: ["began", "changed", "ended", "cancelled"]),
+                       .optional("dx", .number, "Horizontal scroll delta in points", default: 0, min: -10000, max: 10000),
+                       .optional("dy", .number, "Vertical scroll delta in points", default: 0, min: -10000, max: 10000),
+                       .optional("x", .number, "Pointer x as a 0..1 fraction to move to before scrolling; needs y", min: 0, max: 1),
+                       .optional("y", .number, "Pointer y as a 0..1 fraction to move to before scrolling; needs x", min: 0, max: 1),
+                       summary: "Send a pointer scroll event to the view under the pointer.", result: [.required("phase", .string)])
+        case .inputHid:
+            MethodSpec(.required("page", .integer, "HID usage page, 1 to 65535, for example 7 keyboard or 12 consumer"),
+                       .required("usage", .integer, "HID usage code within the page, 1 to 65535"),
+                       .optional("long_press", .boolean, "true holds the key until a call with down false; then down is required and page and usage must fit 16 bits"),
+                       .optional("down", .boolean, "Send only a press (true) or release (false); a full press and release when omitted"),
+                       summary: "Press a hardware key or button by HID usage page and code.", result: [.required("action", .string), .optional("long_press", .boolean), .required("page", .integer), .required("usage", .integer)])
+        case .locationSet:
+            MethodSpec(.required("latitude", .number, "Latitude in degrees", min: -90, max: 90),
+                       .required("longitude", .number, "Longitude in degrees", min: -180, max: 180),
+                       .optional("altitude", .number, "Altitude in meters", default: 0, min: -100000, max: 100000),
+                       .optional("horizontal_accuracy", .number, "Horizontal accuracy in meters", default: 5, min: 0),
+                       .optional("vertical_accuracy", .number, "Vertical accuracy in meters, or -1 for unknown altitude", default: 5),
+                       .optional("speed", .number, "Speed in meters per second; unset when omitted", min: 0),
+                       .optional("course", .number, "Heading in degrees from 0 up to but not including 360; unset when omitted", min: 0),
+                       summary: "Simulate the device location at a coordinate until cleared.", result: [.required("location", .object), .required("simulating", .boolean)])
+        case .locationClear: MethodSpec(summary: "Stop simulating location and return to the real one.", result: [.optional("location", .object), .required("simulating", .boolean)])
+        case .locationCurrent: MethodSpec(.optional("timeout", .number, "Seconds to wait for a fix; more than 0", default: 10, max: 300),
+                                          summary: "Get the current location fix, simulated or real.", result: [.optional("age_seconds", .any),
+                                                   .optional("altitude", .any),
+                                                   .optional("client", .string),
+                                                   .optional("course", .any),
+                                                   .optional("error", .string),
+                                                   .optional("fresh", .any),
+                                                   .optional("horizontal_accuracy", .any),
+                                                   .optional("latitude", .any),
+                                                   .optional("longitude", .any),
+                                                   .optional("simulated", .any),
+                                                   .optional("speed", .any),
+                                                   .optional("timestamp", .any),
+                                                   .optional("vertical_accuracy", .any)])
+        case .developerModeStatus: MethodSpec(summary: "Report whether developer mode is enabled or armed.", result: [.required("armed", .boolean), .required("enabled", .boolean), .required("writable", .boolean)])
+        case .developerModeEnable: MethodSpec(summary: "Enable developer mode; a restart may be required to finish.", result: [.optional("already_enabled", .any),
+                                                       .required("armed", .boolean),
+                                                       .required("enabled", .boolean),
+                                                       .optional("restart_required", .boolean),
+                                                       .required("writable", .boolean)])
+        case .powerLowPowerMode: MethodSpec(.optional("enabled", .boolean, "Turn low power mode on or off; only reads the state when omitted"),
+                                            summary: "Get or set low power mode.", result: [.optional("changed", .boolean), .required("enabled", .boolean), .required("method", .string)])
+        case .locationServices: MethodSpec(.optional("enabled", .boolean, "Turn location services on or off; only reads the state when omitted"),
+                                           summary: "Get or set the system location services switch.", result: [.required("enabled", .boolean)])
+        case .clipboardGet: MethodSpec(summary: "Read the system clipboard text and describe any image on it.", result: [
+                .required("change_count", .integer),
+                .required("has_image", .boolean),
+                .required("has_text", .boolean),
+                .optional("image", .object),
+                .required("items", .integer),
+                .required("method", .string),
+                .required("text", .any),
+                .required("types", .any)])
+        case .clipboardSet: MethodSpec(.required("text", .string, "Text to place on the clipboard"),
+                                       summary: "Replace the system clipboard contents with text.", result: [
+                                           .required("change_count", .integer),
+                                           .required("has_image", .boolean),
+                                           .required("has_text", .boolean),
+                                           .optional("image", .object),
+                                           .required("items", .integer),
+                                           .required("method", .string),
+                                           .required("text", .any),
+                                           .required("types", .any)])
+        case .clipboardClear: MethodSpec(summary: "Empty the system clipboard.", result: [
+                .required("change_count", .integer),
+                .required("has_image", .boolean),
+                .required("has_text", .boolean),
+                .optional("image", .object),
+                .required("items", .integer),
+                .required("method", .string),
+                .required("text", .any),
+                .required("types", .any)])
+        case .filesList: MethodSpec(.required("path", .string, "Guest directory path to list"),
+                                     summary: "List the entries of a guest directory.", result: [.required("entries", .array), .required("path", .string)])
+        case .filesMkdir: MethodSpec(.required("path", .string, "Guest directory path to create"),
+                                      summary: "Create a guest directory, including any missing parent directories.", result: [.required("created", .boolean), .required("path", .string)])
+        case .filesRemove: MethodSpec(.required("path", .string, "Guest file or directory path to delete"),
+                                       .optional("recursive", .boolean, "Delete a non-empty directory and everything in it; without it only an empty directory can go", default: false),
+                                       summary: "Delete a guest file or directory.", result: [
+                                          .optional("message", .string),
+                                          .required("path", .string),
+                                          .required("removed", .boolean),
+                                          .optional("type", .string)])
+        case .filesRename: MethodSpec(.required("from", .string, "Existing guest path"),
+                                       .required("to", .string, "New guest path; must not exist"),
+                                       summary: "Move or rename a guest file or directory; fails if the destination exists.", result: [.required("destination", .string), .required("source", .string)])
+        case .settingsGet: MethodSpec(.required("domain", .string, "Preferences domain, for example com.apple.springboard"),
+                                      .optional("key", .string, "Preference key; every key in the domain when omitted"),
+                                      summary: "Read one preference value or a whole preferences domain.", result: [
+                                          .optional("count", .integer),
+                                          .required("domain", .string),
+                                          .optional("exists", .boolean),
+                                          .optional("key", .string),
+                                          .optional("type", .string),
+                                          .required("user", .string),
+                                          .optional("value", .any).open(),
+                                          .optional("values", .object).open()])
+        case .settingsSet:
+            MethodSpec(.required("domain", .string, "Preferences domain, for example com.apple.springboard"),
+                       .required("key", .string, "Preference key to write"),
+                       .required("value", .any, "Value to store; type json takes an array or object, date epoch seconds or ISO-8601, data Base64"),
+                       .optional("type", .string, "Stored value type; inferred from value (bool, float, string, else json) when omitted", values: ["string", "int", "float", "bool", "date", "data", "json"]),
+                       summary: "Write a preference value for the mobile user and read it back.", result: [
+                           .optional("count", .integer),
+                           .required("domain", .string),
+                           .optional("exists", .boolean),
+                           .optional("key", .string),
+                           .optional("notified", .string),
+                           .optional("type", .string),
+                           .required("user", .string),
+                           .optional("value", .any).open(),
+                           .optional("values", .object).open()])
+        case .settingsDelete: MethodSpec(.required("domain", .string, "Preferences domain"),
+                                         .required("key", .string, "Preference key to delete"),
+                                         summary: "Delete a preference key for the mobile user.", result: [
+                                             .required("domain", .string),
+                                             .required("exists", .boolean),
+                                             .required("key", .string),
+                                             .optional("notified", .string),
+                                             .required("removed", .boolean),
+                                             .required("user", .string)])
+        case .keychainList: MethodSpec(.optional("class", .string, "Keychain item class to list; all classes when omitted", values: ["genp", "inet", "cert", "keys", "idnt"]),
+                                       summary: "List keychain items, optionally of one class.", result: [.required("count", .integer), .required("diag", .array), .required("items", .array)])
+        case .keychainAdd:
+            MethodSpec(.required("account", .string, "Account name of the item"),
+                       .required("service", .string, "Service name of the item"),
+                       .required("password", .string, "Password to store"),
+                       summary: "Add a generic password item to the keychain.", result: [.required("ok", .boolean), .required("status", .integer)])
+        case .keychainGet:
+            MethodSpec(.optional("class", .string, "Keychain item class", values: ["genp", "inet", "cert", "keys", "idnt"], default: "genp"),
+                       .optional("account", .string, "Account attribute; one of account, service, or server is required"),
+                       .optional("service", .string, "Service attribute; one of account, service, or server is required"),
+                       .optional("server", .string, "Server attribute; one of account, service, or server is required"),
+                       .optional("group", .string, "Access group attribute"),
+                       .optional("accessGroup", .string, "Alias of group"),
+                       summary: "Read the secret value of a keychain item.", result: [.required("ok", .boolean), .required("value", .string).open()])
+        case .keychainUpdate:
+            MethodSpec(.optional("class", .string, "Keychain item class", values: ["genp", "inet", "cert", "keys", "idnt"], default: "genp"),
+                       .required("account", .string, "Account attribute; the item can instead be found by service or server alone"),
+                       .optional("service", .string, "Service attribute; one of account, service, or server is required"),
+                       .optional("server", .string, "Server attribute; one of account, service, or server is required"),
+                       .optional("group", .string, "Access group attribute"),
+                       .optional("accessGroup", .string, "Alias of group"),
+                       .required("value", .string, "New secret value"),
+                       summary: "Replace the secret value of a keychain item.", result: [.required("ok", .boolean)])
+        case .keychainDelete:
+            MethodSpec(.optional("class", .string, "Keychain item class", values: ["genp", "inet", "cert", "keys", "idnt"], default: "genp"),
+                       .optional("account", .string, "Account attribute; one of account, service, or server is required"),
+                       .optional("service", .string, "Service attribute; one of account, service, or server is required"),
+                       .optional("server", .string, "Server attribute; one of account, service, or server is required"),
+                       .optional("group", .string, "Access group attribute"),
+                       .optional("accessGroup", .string, "Alias of group"),
+                       summary: "Delete a keychain item.", result: [.required("ok", .boolean), .required("removed", .boolean)])
+        case .agentApplyUpdate: MethodSpec(.required("sha256", .string, "SHA-256 hex digest of the staged vphoned update"),
+                                           summary: "Install the staged vphoned update and restart the agent.", result: [.required("restarting", .boolean)])
+        case .methodsList: MethodSpec(summary: "List every method with its description, params, result shape, and force requirement.", result: [.required("methods", .array)])
         }
-    }
-
-    var code: String {
-        if case let .alreadyDone(code, _) = self {
-            return code
-        }
-        if case .locationServicesOff = self {
-            return "location_services_off"
-        }
-        return "invalid_operation"
     }
 }
 
@@ -89,13 +439,14 @@ enum GuestAPI {
             "name": "vphoned",
             "api_version": 1,
             "status": "ok",
+            "os": GuestRuntimePlatform.isVisionOS ? "visionOS" : GuestRuntimePlatform.productName,
             "binary_hash": binaryHash,
             "instance": instance,
             "ios": "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)",
             "ip": ip ?? "",
-            "setup_pending": setupAssistantPending(),
+            "setup_pending": GuestRuntimePlatform.isVisionOS ? false : setupAssistantPending(),
             "mobilegestalt_restart_pending": GuestMobileGestaltCache.restartPending(),
-            "capabilities": [
+            "capabilities": GuestRuntimePlatform.isVisionOS ? (GuestRuntimePlatform.visionOSCapabilities + scriptCapabilities() + visionOSImmersionCapabilities) : [
                 "touch",
                 "touch2",
                 "touch_edge",
@@ -117,6 +468,8 @@ enum GuestAPI {
                 "screenshot",
                 "device_info",
                 "display",
+                "display_layout",
+                "display_capture_active",
                 "display_orientation",
                 "display_auto_lock",
                 "device_pose",
@@ -153,6 +506,7 @@ enum GuestAPI {
                 "motion_gyroscope",
                 "motion_gyroscope_toggle",
                 "motion_attitude",
+                "methods",
             ] + pointerCapabilities() + scriptCapabilities() + GuestHomePodDisplay.capabilities
                 + GuestHomePodDebug.capabilities + GuestHomeViewDistance.capabilities,
         ]
@@ -173,16 +527,51 @@ enum GuestAPI {
     }
 
     static func execute(method: String, params: [String: Any]) throws -> [String: Any] {
-        switch method {
-        case "device.snapshot":
+        try GuestMethodArea.dispatch(areas, method: method, params: params)
+    }
+
+    /// `screen.screenshot`. Without options the capture is base64-encoded as it
+    /// is; otherwise the daemon crops, scales and encodes it, so only the final
+    /// image crosses vsock.
+    private static func sizedScreenshot(_ options: GuestScreenshotSizing.Options) throws -> [String: Any] {
+        let screen = screenInfo()
+        guard let pointWidth = (screen["width"] as? NSNumber)?.doubleValue,
+              let pointHeight = (screen["height"] as? NSNumber)?.doubleValue,
+              pointWidth > 0, pointHeight > 0
+        else {
+            throw GuestAPIError.operationFailed("screenshot failed: the screen size is unknown")
+        }
+        var capture: [String: Any]
+        do { capture = try takeScreenshot(base64: options.isEmpty, nativeResolution: true) } catch {
+            throw GuestAPIError.operationFailed("screenshot capture failed: \(error)")
+        }
+        if !options.isEmpty {
+            guard let path = capture["path"] as? String else {
+                throw GuestAPIError.operationFailed("screenshot capture failed: no scratch file")
+            }
+            defer { try? FileManager.default.removeItem(atPath: path) }
+            do { capture["jpeg"] = try Data(contentsOf: URL(fileURLWithPath: path)) } catch {
+                throw GuestAPIError.operationFailed("screenshot read failed: \(error.localizedDescription)")
+            }
+        }
+        return try GuestScreenshotSizing.reply(
+            capture: capture,
+            options: options,
+            pointSize: (Double(pointWidth), Double(pointHeight)),
+        )
+    }
+
+    static func executeCore(_ m: CoreMethod, _ params: [String: Any]) throws -> [String: Any] {
+        switch m {
+        case .deviceSnapshot:
             var snapshot = try collectDeviceSnapshot()
             snapshot["jailbreak"] = jailbreakInfo()
             return snapshot
-        case "device.screen":
+        case .deviceScreen:
             return screenInfo()
-        case "screen.screenshot":
-            return try takeScreenshot(base64: true, nativeResolution: true)
-        case "apps.list":
+        case .screenScreenshot:
+            return try sizedScreenshot(try GuestScreenshotSizing.parse(params))
+        case .appsList:
             let filter = params["filter"] as? String ?? "all"
             let apps = try listedApps()
             let running = try runningApps()["apps"] as? [[String: Any]] ?? []
@@ -222,11 +611,11 @@ enum GuestAPI {
                     return info
                 },
             ]
-        case "apps.search":
+        case .appsSearch:
             return try searchApps(string(params, "query"))
-        case "apps.refresh":
+        case .appsRefresh:
             return try refreshAppRegistrations(directory: params["directory"] as? String)
-        case "apps.launch":
+        case .appsLaunch:
             let id = try string(params, "bundle_id")
             if let url = params["url"] as? String {
                 _ = try openAppURL(url, bundleID: id)
@@ -261,13 +650,12 @@ enum GuestAPI {
                     && front["verified"] as? Bool == true
                     && front["bundle_id"] as? String == id,
             ]
-        case "apps.terminate":
+        case .appsTerminate:
             return try killApp(string(params, "bundle_id"), force: true)
-        case "apps.uninstall":
+        case .appsUninstall:
             let id = try string(params, "bundle_id")
-            try requireForce(params, "uninstall \(id)")
             return try uninstallApp(id, force: true)
-        case "apps.foreground":
+        case .appsForeground:
             let front = frontmostApp()
             let id = front["bundle_id"] as? String ?? ""
             let apps = try searchApps(id)["apps"] as? [[String: Any]] ?? []
@@ -283,9 +671,9 @@ enum GuestAPI {
                 "verified": front["verified"] ?? false,
                 "source": front["source"] ?? "",
             ]
-        case "apps.open_url":
+        case .appsOpenUrl:
             return try openAppURL(string(params, "url"), bundleID: params["bundle_id"] as? String)
-        case "apps.install":
+        case .appsInstall:
             let path = try string(params, "path")
             let certificate = params["cert_path"] as? String ?? ""
             let registration: AppRegistrationType = params["registration"] as? String == "System" ? .system : .user
@@ -301,29 +689,31 @@ enum GuestAPI {
             let id = result["bundle_id"] as? String ?? "app"
             result["msg"] = "Installed \(id) as a \(registration.rawValue) app."
             return result
-        case "bootstrap.install":
+        case .bootstrapInstall:
             let layout = try string(params, "layout")
+            if GuestRuntimePlatform.isVisionOS, layout != "rootless" {
+                throw GuestAPIError.invalidRequest("visionOS currently supports the rootless Irisin layout only")
+            }
             return try GuestIrisinInstaller.install(
                 jailbreak: jailbreakInfo(),
                 layout: layout,
                 packagePath: params["package_path"] as? String,
             )
-        case "bootstrap.packages":
+        case .bootstrapPackages:
             return try GuestIrisinInstaller.installPackages(GuestIrisinInstaller.initialPackages)
-        case "bootstrap.status":
+        case .bootstrapStatus:
             return GuestIrisinInstaller.status()
-        case "bootstrap.inspect":
+        case .bootstrapInspect:
             return try GuestIrisinInstaller.installedBootstrap()
-        case "bootstrap.uninstall":
-            try requireForce(params, "uninstall the bootstrap")
+        case .bootstrapUninstall:
             let roots = try (params["roots"] as? [String]) ?? [string(params, "jbroot")]
             return try GuestIrisinInstaller.uninstall(
                 expectedRoots: roots,
                 reboot: params["reboot"] as? Bool ?? true,
             )
-        case "bootstrap.firmware":
+        case .bootstrapFirmware:
             return try GuestIrisinInstaller.repairFirmwareRecord()
-        case "input.touch":
+        case .inputTouch:
             guard let phase = (params["phase"] as? String).flatMap(TouchPhase.init(rawValue:)) else {
                 throw GuestAPIError.invalidRequest("phase must be down, move or up")
             }
@@ -340,7 +730,7 @@ enum GuestAPI {
                 phase, x: number(params, "x"), y: number(params, "y"),
                 normalized: params["normalized"] as? Bool ?? true,
             )
-        case "input.touch2":
+        case .inputTouch2:
             // Two fingers in one hand event. icli's `input.touch` carries a
             // single digitizer point, so a pinch has to go through vphoned's own
             // injection path (`vp_hid_touch2`) instead.
@@ -359,7 +749,7 @@ enum GuestAPI {
                 number(params, "x2"), number(params, "y2"),
             )
             return ["phase": phase.rawValue, "fingers": 2]
-        case "input.pointer":
+        case .inputPointer:
             let point: GuestPointerScroll.Point
             let sequence: UInt64
             let buttons: Int32
@@ -372,7 +762,7 @@ enum GuestAPI {
             }
             try movePointer(point, sequence: sequence, buttons: buttons)
             return ["x": point.x, "y": point.y, "buttons": Int(buttons)]
-        case "input.scroll":
+        case .inputScroll:
             let scroll: GuestPointerScroll.Scroll
             do {
                 scroll = try GuestPointerScroll.scroll(params)
@@ -381,7 +771,7 @@ enum GuestAPI {
             }
             try scrollPointer(scroll)
             return ["phase": scroll.phase.rawValue]
-        case "input.hid":
+        case .inputHid:
             let page = try integer(params, "page")
             let usage = try integer(params, "usage")
             if let value = params["long_press"] {
@@ -402,7 +792,7 @@ enum GuestAPI {
                 return try hidEvent(page: page, usage: usage, down: down)
             }
             return try hidPress(page: page, usage: usage)
-        case "location.set":
+        case .locationSet:
             guard CLLocationManager.locationServicesEnabled() else { throw GuestAPIError.locationServicesOff }
             return try simulateLocation(
                 latitude: number(params, "latitude"),
@@ -413,25 +803,30 @@ enum GuestAPI {
                 speed: (params["speed"] as? NSNumber)?.doubleValue,
                 course: (params["course"] as? NSNumber)?.doubleValue,
             )
-        case "location.clear":
+        case .locationClear:
             return try clearSimulatedLocation()
-        case "location.current":
+        case .locationCurrent:
             guard CLLocationManager.locationServicesEnabled() else { throw GuestAPIError.locationServicesOff }
             return try currentLocation(timeout: number(params, "timeout", default: 10))
-        case "developer_mode.status":
+        case .developerModeStatus:
             return try developerModeStatus()
-        case "developer_mode.enable":
+        case .developerModeEnable:
             return try enableDeveloperMode()
-        case "power.low_power_mode":
+        case .powerLowPowerMode:
             if let enabled = params["enabled"] as? Bool {
                 return try setLowPowerMode(enabled)
             }
             return try lowPowerMode()
-        case "clipboard.get":
+        case .locationServices:
+            if let enabled = params["enabled"] as? Bool {
+                return try setLocationServices(enabled)
+            }
+            return locationServices()
+        case .clipboardGet:
             return try clipboardInfo()
-        case "clipboard.set":
+        case .clipboardSet:
             return try setClipboard(string(params, "text"))
-        case "clipboard.clear":
+        case .clipboardClear:
             #if os(tvOS)
             throw GuestAPIError.operationFailed("tvOS has no system clipboard")
             #else
@@ -441,56 +836,47 @@ enum GuestAPI {
             pasteboard.items = []
             return try clipboardInfo()
             #endif
-        case "files.list":
+        case .filesList:
             return try fileList(string(params, "path"))
-        case "files.mkdir":
+        case .filesMkdir:
             return try makeDirectory(string(params, "path"), mode: nil)
-        case "files.remove":
+        case .filesRemove:
             return try removePath(
                 string(params, "path"), recursive: params["recursive"] as? Bool ?? false,
                 force: true,
             )
-        case "files.rename":
+        case .filesRename:
             return try movePath(string(params, "from"), to: string(params, "to"))
-        case "settings.get":
+        case .settingsGet:
             return try readPreference(domain: string(params, "domain"), key: params["key"] as? String)
-        case "settings.set":
-            let rawValue = params["value"] ?? NSNull()
-            let type =
-                params["type"] as? String
-                    ?? (rawValue is Bool
-                        ? "bool"
-                        : rawValue is NSNumber
-                        ? "float"
-                        : rawValue is String ? "string" : "json")
-            let text: String =
-                if type == "json" {
-                    try String(data: JSONSerialization.data(withJSONObject: rawValue), encoding: .utf8) ?? ""
-                } else {
-                    String(describing: rawValue)
-                }
+        case .settingsSet:
+            let domain = try string(params, "domain")
+            let key = try string(params, "key")
+            guard let value = GuestSettingsValue.typedText(params["value"], type: params["type"] as? String) else {
+                throw GuestAPIError.invalidRequest("value is required, and type json takes an array or object")
+            }
             return try writePreference(
-                domain: string(params, "domain"),
-                key: string(params, "key"),
-                value: PreferenceValue(text: text, type: type),
+                domain: domain,
+                key: key,
+                value: PreferenceValue(text: value.text, type: value.type),
             )
-        case "settings.delete":
+        case .settingsDelete:
             return try deletePreference(domain: string(params, "domain"), key: string(params, "key"))
-        case "keychain.list":
+        case .keychainList:
             return try GuestKeychain.list(className: params["class"] as? String)
-        case "keychain.add":
+        case .keychainAdd:
             return try GuestKeychain.add(
                 account: string(params, "account"),
                 service: string(params, "service"),
                 password: string(params, "password"),
             )
-        case "keychain.get":
+        case .keychainGet:
             return try GuestKeychain.get(GuestKeychain.Identity(params))
-        case "keychain.update":
+        case .keychainUpdate:
             return try GuestKeychain.update(GuestKeychain.Identity(params), value: string(params, "value"))
-        case "keychain.delete":
+        case .keychainDelete:
             return try GuestKeychain.delete(GuestKeychain.Identity(params))
-        case "agent.apply_update":
+        case .agentApplyUpdate:
             let expected = try string(params, "sha256")
             let cache = "/var/root/Library/Caches/vphoned"
             let next = cache + ".next"
@@ -507,11 +893,8 @@ enum GuestAPI {
             )
             DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) { exit(0) }
             return ["restarting": true]
-        default:
-            if let result = try executeExtended(method: method, params: params) {
-                return result
-            }
-            throw GuestAPIError.unsupportedMethod(method)
+        case .methodsList:
+            return GuestMethodArea.catalog(areas)
         }
     }
 
@@ -642,21 +1025,13 @@ enum GuestAPI {
     }
 
     static func bool(_ params: [String: Any], _ key: String, default fallback: Bool = false) -> Bool {
-        (params[key] as? NSNumber)?.boolValue ?? fallback
+        GuestMethodArea.flag(params, key, default: fallback)
     }
 
     static func requiredNumber(_ params: [String: Any], _ key: String) throws -> Double {
         let value = number(params, key)
         guard value.isFinite else { throw GuestAPIError.invalidRequest("\(key) must be a number") }
         return value
-    }
-
-    /// Operations that end a process, stop a service, remove an app or restart
-    /// the guest run only when the caller says so, so a stray request cannot.
-    static func requireForce(_ params: [String: Any], _ action: String) throws {
-        guard bool(params, "force") else {
-            throw GuestAPIError.invalidRequest("Pass force: true to \(action)")
-        }
     }
 
     /// Digitizer phase codes for vphoned's own multi-finger injection path.
